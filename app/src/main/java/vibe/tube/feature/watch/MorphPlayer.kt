@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,7 +48,6 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -58,11 +59,13 @@ import vibe.tube.player.PlayerController
 import vibe.tube.player.PlayerUiState
 import vibe.tube.ui.VIcon
 import vibe.tube.ui.components.TooltipIconButton
-import vibe.tube.ui.theme.Sizing
 import vibe.tube.ui.theme.Spacing
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.max
 import kotlin.math.roundToInt
+
+/** Share of the screen width the minimized player takes (keep in sync with the list padding in AppRoot). */
+internal const val MINI_WIDTH_FRACTION = 0.84f
 
 /** Critically damped: glides to the end without overshooting or bouncing. */
 private val MORPH_SPEC = spring<Float>(dampingRatio = 1f, stiffness = 380f)
@@ -162,18 +165,16 @@ internal fun MorphPlayer(
         val bottomInsetPx = max(navInsetPx, if (contentBottomPx > 0) hPx - contentBottomPx else 0f)
 
         val sidePx = with(density) { 8.dp.toPx() }
-        val miniHPx = with(density) { Sizing.miniPlayerHeight.toPx() }
-        val gapPx = with(density) { 6.dp.toPx() }
-        val miniTop = hPx - bottomInsetPx - miniHPx - gapPx
-        // The video box follows the real aspect ratio of the video (clamped), and so does the minimized thumbnail:
-        // it fits a 104x58.5dp slot, so a 4:3 clip gets a narrower thumbnail instead of letterboxing.
+        val gapPx = with(density) { 8.dp.toPx() }
+        // Minimized, the player is just the video (like YouTube's): a floating card on the right, 84% of the width at
+        // 16:9, narrower for taller videos, with play/pause and close drawn on its two edges.
         val aspect = videoAspect
-        val slotW = with(density) { 104.dp.toPx() }
-        val slotH = slotW * 9f / 16f
-        val thumbW = minOf(slotW, slotH * aspect)
+        val maxMiniW = wPx * MINI_WIDTH_FRACTION
+        val thumbW = minOf(maxMiniW, maxMiniW * 9f / 16f * aspect)
         val thumbH = thumbW / aspect
-        val thumbX = sidePx * 2f + (slotW - thumbW) / 2f
-        val thumbY = miniTop + (miniHPx - thumbH) / 2f
+        val miniTop = hPx - bottomInsetPx - thumbH - gapPx
+        val thumbX = wPx - sidePx * 1.5f - thumbW
+        val thumbY = miniTop
         val videoH = wPx / aspect
         val dragRange = max(miniTop, 1f)
         val fadeRange = with(density) { 140.dp.toPx() }
@@ -253,10 +254,7 @@ internal fun MorphPlayer(
 
         if (!visible) return@BoxWithConstraints
 
-        val cardColor = MaterialTheme.colorScheme.surfaceContainerHigh
         val pageColor = MaterialTheme.colorScheme.surface
-        val cardRadius = with(density) { 16.dp.toPx() }
-        val infoX = sidePx * 2f + slotW + with(density) { 12.dp.toPx() }
 
         Box(
             Modifier
@@ -301,18 +299,7 @@ internal fun MorphPlayer(
                 }
             }
 
-            // 2. Mini card background: fixed rectangle at the bottom, fades in as the page leaves.
-            Box(
-                Modifier
-                    .placedRect({ sidePx }, { miniTop }, { wPx - 2f * sidePx }, { miniHPx })
-                    .graphicsLayer {
-                        alpha = (1f - p() / 0.45f).coerceIn(0f, 1f)
-                        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
-                    }
-                    .drawBehind { drawRoundRect(cardColor, cornerRadius = androidx.compose.ui.geometry.CornerRadius(cardRadius)) },
-            )
-
-            // 3. The video is always laid out at its full size and only scaled/moved by the graphics layer, so the
+            // 2. The video is always laid out at its full size and only scaled/moved by the graphics layer, so the
             //    TextureView never re-lays out or resizes while the card morphs.
             Box(
                 Modifier
@@ -327,7 +314,7 @@ internal fun MorphPlayer(
                         scaleY = sc
                         translationX = lerpF(thumbX, 0f, p())
                         translationY = lerpF(thumbY, topInsetPx, p()) + fsOffset.value
-                        shape = RoundedCornerShape(CornerSize(lerpF(8.dp.toPx(), 0f, t()) / sc))
+                        shape = RoundedCornerShape(CornerSize(lerpF(14.dp.toPx(), 0f, t()) / sc))
                         clip = true
                         alpha = (1f + fsOffset.value / fsRange).coerceIn(0f, 1f)
                     },
@@ -387,42 +374,37 @@ internal fun MorphPlayer(
                 }
             }
 
-            // 4. Minimized card: tap to expand, drag up to expand, drag down to dismiss.
+            // 3. Minimized: tap the video to expand, drag up to expand, drag down to dismiss; play/pause and close sit
+            //    on the left and right edges of the video (half of each circle is clipped by the card).
             if (miniish || dragging) {
+                val miniRect = Modifier.placedRect({ thumbX }, { thumbY }, { thumbW }, { thumbH })
                 Box(
-                    Modifier
-                        .placedRect({ sidePx }, { miniTop }, { wPx - 2f * sidePx }, { miniHPx })
+                    miniRect
                         .then(dragModifier)
                         .clickable(role = Role.Button, onClickLabel = stringResource(R.string.action_expand_player)) { controller.expand() },
                 )
-                val video = current
-                Row(
-                    Modifier
-                        .placedRect(
-                            x = { infoX },
-                            y = { miniTop },
-                            w = { wPx - sidePx - infoX },
-                            h = { miniHPx },
-                        )
+                Box(
+                    miniRect
                         .graphicsLayer {
                             alpha = ((0.3f - t()) / 0.3f).coerceIn(0f, 1f)
                             compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
-                        },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(video?.title.orEmpty(), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        video?.channelName?.let {
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                    }
-                    TooltipIconButton(
-                        if (isPlaying) VIcon.Pause else VIcon.PlayArrowFilled,
-                        stringResource(if (isPlaying) R.string.action_pause else R.string.action_play),
-                        controller::togglePlay,
-                        animateIcon = true,
+                        .clip(RoundedCornerShape(14.dp)),
+                ) {
+                    MiniEdgeButton(
+                        Modifier.align(Alignment.CenterStart).offset(x = (-28).dp),
+                        iconOffset = 14.dp,
+                        icon = if (isPlaying) VIcon.Pause else VIcon.PlayArrowFilled,
+                        label = stringResource(if (isPlaying) R.string.action_pause else R.string.action_play),
+                        onClick = controller::togglePlay,
                     )
-                    TooltipIconButton(VIcon.Close, stringResource(R.string.action_close_player), { scope.launch { fadeOutAndDismiss() } })
+                    MiniEdgeButton(
+                        Modifier.align(Alignment.CenterEnd).offset(x = 28.dp),
+                        iconOffset = (-14).dp,
+                        icon = VIcon.Close,
+                        label = stringResource(R.string.action_close_player),
+                        onClick = { scope.launch { fadeOutAndDismiss() } },
+                    )
                 }
             }
         }
@@ -443,4 +425,30 @@ private fun ChaptersHost(state: androidx.compose.runtime.State<PlayerUiState>, c
     // The position is read once, when the sheet opens, to scroll to the current chapter.
     val position = remember { state.value.positionMs }
     ChaptersSheet(chapters, position, onSeek, onDismiss)
+}
+
+/** Translucent round button that straddles an edge of the minimized video. */
+@Composable
+private fun MiniEdgeButton(
+    modifier: Modifier,
+    iconOffset: androidx.compose.ui.unit.Dp,
+    icon: Int,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier
+            .size(56.dp)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f))
+            .clickable(role = Role.Button, onClickLabel = label, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        vibe.tube.ui.components.SwappingIcon(
+            icon,
+            label,
+            Modifier.offset(x = iconOffset).size(28.dp),
+            tint = androidx.compose.ui.graphics.Color.White,
+        )
+    }
 }

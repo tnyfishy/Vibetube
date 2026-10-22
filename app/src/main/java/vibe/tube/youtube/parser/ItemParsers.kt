@@ -11,6 +11,12 @@ import vibe.tube.youtube.model.VideoAvailability
 import vibe.tube.youtube.model.VideoItem
 
 object ItemParsers {
+    /** Channel handles arrive percent-encoded in URLs (`@L%C3%AA...`); show the real characters. */
+    fun decodeHandle(raw: String?): String? {
+        if (raw == null || '%' !in raw) return raw
+        return runCatching { java.net.URLDecoder.decode(raw.replace("+", "%2B"), "UTF-8") }.getOrDefault(raw)
+    }
+
     /** Reads the verified / official-artist marker out of the badge-carrying part of a renderer. */
     fun badgeOf(node: JsonElement?): ChannelBadge {
         val s = node?.toString() ?: return ChannelBadge.None
@@ -264,8 +270,10 @@ object ItemParsers {
         return ChannelItem(
             id = id,
             name = node.at("title").textOf().orEmpty(),
-            handle = handleFromSubs ?: node.at("navigationEndpoint").at("browseEndpoint").at("canonicalBaseUrl").str
-                ?.takeIf { it.startsWith("/@") }?.removePrefix("/"),
+            handle = handleFromSubs ?: decodeHandle(
+                node.at("navigationEndpoint").at("browseEndpoint").at("canonicalBaseUrl").str
+                    ?.takeIf { it.startsWith("/@") }?.removePrefix("/"),
+            ),
             avatars = thumbs(node.at("thumbnail")),
             subscriberText = subscribers,
             description = node.at("descriptionSnippet").textOf(),

@@ -70,7 +70,7 @@ fun ChannelScreen(
                         Avatar(d?.avatar, Sizing.avatarHero)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                             Text(d?.name.orEmpty(), style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            val meta = listOfNotNull(d?.handle, d?.subscriberText).joinToString(" · ")
+                            val meta = listOfNotNull(vibe.tube.youtube.parser.ItemParsers.decodeHandle(d?.handle), d?.subscriberText).joinToString(" · ")
                             if (meta.isNotBlank()) {
                                 Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }

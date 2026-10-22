@@ -241,7 +241,8 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     // Reserved for as long as the player exists (expanded or not), so expanding/collapsing never changes the padding of
     // every list underneath in the middle of the morph animation.
     val miniVisible = playerState.visible && !playerState.inPip
-    val miniPadding = if (miniVisible) Sizing.miniPlayerHeight + 16.dp else 0.dp
+    // The minimized player is a 16:9 card 84% of the width wide (see MorphPlayer); lists keep that much room below.
+    val miniPadding = if (miniVisible) (windowConfig.screenWidthDp * vibe.tube.feature.watch.MINI_WIDTH_FRACTION * 9f / 16f).dp + 20.dp else 0.dp
 
     val hiddenIds = remember(settings.hiddenChannels)  { settings.hiddenChannelIds }
     val density = androidx.compose.ui.platform.LocalDensity.current

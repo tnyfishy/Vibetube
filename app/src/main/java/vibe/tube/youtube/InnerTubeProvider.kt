@@ -221,7 +221,7 @@ class InnerTubeProvider(
         return ChannelDetail(
             id = channelId,
             name = metadata.at("title").str ?: header.firstString("pageTitle").orEmpty(),
-            handle = metadata.at("vanityChannelUrl").str?.substringAfterLast('/')?.takeIf { it.startsWith("@") },
+            handle = ItemParsers.decodeHandle(metadata.at("vanityChannelUrl").str?.substringAfterLast('/')?.takeIf { it.startsWith("@") }),
             avatar = ItemParsers.thumbs(metadata.at("avatar")).lastOrNull()?.url
                 ?: ItemParsers.sources(header.firstObject("avatarViewModel").at("image")).lastOrNull()?.url,
             subscriberText = header.firstObject("contentMetadataViewModel")?.let { m ->

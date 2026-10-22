@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Play triangle with softly rounded corners (fill + round-joined stroke). -->
+    <path
+        android:fillColor="#FFD7F5E6"
+        android:pathData="M43,35L43,73L77,54Z"
+        android:strokeColor="#FFD7F5E6"
+        android:strokeLineJoin="round"
+        android:strokeWidth="11" />
+    <!-- Little "vibe" wave riding through the triangle. -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M43,54C47,46 52,46 56,54C60,62 65,62 69,54"
+        android:strokeColor="#FF0E4A38"
+        android:strokeLineCap="round"
+        android:strokeWidth="3.4" />
+</vector>
