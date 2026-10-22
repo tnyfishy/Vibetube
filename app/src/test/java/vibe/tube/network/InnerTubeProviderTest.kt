@@ -207,16 +207,23 @@ class InnerTubeProviderTest {
 
     @Test
     fun verifyAcceptsOnlyWhenYouTubeReturnsActiveAccountHeader() = runBlocking {
-        enqueueJson(Fixtures.text("account_menu_logged_in_structure.json"))
-        enqueueJson(Fixtures.text("accounts_list_structure.json"))
+        // account_menu and accounts_list are fetched in parallel, so answer by path instead of by order.
+        val menuJson = Fixtures.text("account_menu_logged_in_structure.json")
+        val listJson = Fixtures.text("accounts_list_structure.json")
+        server.dispatcher = object : mockwebserver3.Dispatcher() {
+            override fun dispatch(request: mockwebserver3.RecordedRequest): MockResponse {
+                val body = if (request.url.encodedPath.endsWith("account_menu")) menuJson else listJson
+                return MockResponse.Builder().code(200).addHeader("Content-Type", "application/json").body(body).build()
+            }
+        }
         val session = AccountSession("s1", "", null, null, cookies = jar().snapshot(), createdAt = 0)
         val result = provider.verify(session, locale)
         assertTrue(result is VerifyResult.Verified)
         result as VerifyResult.Verified
         assertEquals("Test User", result.profile.name)
         assertEquals(2, result.identities.size)
-        assertEquals("/youtubei/v1/account/account_menu", server.takeRequest().url.encodedPath)
-        assertEquals("/youtubei/v1/account/accounts_list", server.takeRequest().url.encodedPath)
+        val paths = setOf(server.takeRequest().url.encodedPath, server.takeRequest().url.encodedPath)
+        assertEquals(setOf("/youtubei/v1/account/account_menu", "/youtubei/v1/account/accounts_list"), paths)
     }
 
     @Test
