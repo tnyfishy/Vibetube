@@ -87,7 +87,7 @@ jobs:
         run: |
           log="$RUNNER_TEMP/unit-tests.log"
           [ -f "$log" ] || exit 0
-          grep -E "^e: |FAILED|AssertionError|What went wrong|Compilation error|error:" -A2 "$log" | head -40 | while IFS= read -r line; do
+          { grep -E "^e: |FAILED|AssertionError|What went wrong|Compilation error|error:" -A2 "$log" || true; } | head -40 | while IFS= read -r line; do
             echo "::error title=unit tests::${line:0:500}"
           done
           exit 0
