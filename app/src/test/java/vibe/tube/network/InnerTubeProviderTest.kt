@@ -127,7 +127,7 @@ class InnerTubeProviderTest {
         enqueueJson(Fixtures.text("search_videos.json"))
         val page = provider.trending(ProviderCall(locale, null), null)
         val request = server.takeRequest()
-        assertTrue(request.path!!.contains("/search"))
+        assertTrue(request.url.encodedPath.contains("/search"))
         val body = Fixtures.json.parseToJsonElement(request.body!!.utf8()).jsonObject
         assertEquals(InnerTubeProvider.TRENDING_SEARCH_PARAMS, body["params"]!!.jsonPrimitive.content)
         assertTrue(body["query"]!!.jsonPrimitive.content.isNotBlank())
