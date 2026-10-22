@@ -1,5 +1,8 @@
 package vibe.tube.youtube.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class Thumb(val url: String, val width: Int, val height: Int)
 
 fun List<Thumb>.bestFor(minWidth: Int): String? {
@@ -8,12 +11,15 @@ fun List<Thumb>.bestFor(minWidth: Int): String? {
     return (sorted.firstOrNull { it.width >= minWidth } ?: sorted.last()).url
 }
 
+@Serializable
 enum class VideoAvailability { Available, Private, Deleted, Unplayable }
 
+@Serializable
 sealed interface FeedItem {
     val id: String
 }
 
+@Serializable
 data class VideoItem(
     override val id: String,
     val title: String,
@@ -33,6 +39,7 @@ data class VideoItem(
     val playlistIndex: Int? = null,
 ) : FeedItem
 
+@Serializable
 data class PlaylistItem(
     override val id: String,
     val title: String,
@@ -44,6 +51,7 @@ data class PlaylistItem(
     val updatedText: String? = null,
 ) : FeedItem
 
+@Serializable
 data class ChannelItem(
     override val id: String,
     val name: String,
