@@ -217,12 +217,21 @@ fun SearchPill(
  * Header row of a top-level screen: heading, the search pill, then [trailing] (e.g. the account avatar).
  * The pill pushes across the heading when tapped and the heading fades out right at the pill's leading edge.
  */
+/** Hands the "heading rams the search pill" intro from the welcome screen to the home header. */
+object HomeIntro {
+    const val NONE = 0
+    const val HOLD = 1
+    const val RUN = 2
+    var phase by androidx.compose.runtime.mutableIntStateOf(NONE)
+}
+
 @Composable
 fun SearchHeaderRow(
     title: String,
     onSearch: () -> Unit,
     modifier: Modifier = Modifier,
     visibilityScope: AnimatedVisibilityScope? = null,
+    intro: Boolean = false,
     trailing: @Composable () -> Unit = {},
 ) {
     // True while the search screen is open above this page; on the way back the pill collapses and the heading fades in.
@@ -241,6 +250,29 @@ fun SearchHeaderRow(
     val fade = with(density) { 36.dp.toPx() }
     // The search screen's back button occupies the first 52dp of its header, so the pill stops there.
     val searchFieldStart = with(density) { (Spacing.xs + 48.dp - Spacing.lg).toPx() }
+    // Intro: coming from the welcome screen the heading charges in from the left edge, rams the search pill, both
+    // bounce off each other on springs and settle back where they belong.
+    val titleShift = remember { Animatable(0f) }
+    val pillShift = remember { Animatable(0f) }
+    val introPhase = if (intro) HomeIntro.phase else HomeIntro.NONE
+    var introStarted by remember { mutableStateOf(false) }
+    val offscreen = titleWidth + with(density) { 80.dp.toPx() }
+    LaunchedEffect(introPhase) {
+        if (introPhase == HomeIntro.RUN) {
+            val impact = gap
+            titleShift.snapTo(-offscreen)
+            introStarted = true
+            kotlinx.coroutines.delay(140)
+            titleShift.animateTo(impact, tween(380, easing = androidx.compose.animation.core.CubicBezierEasing(0.55f, 0f, 0.95f, 0.55f)))
+            val bump = with(density) { 560.dp.toPx() }
+            kotlinx.coroutines.coroutineScope {
+                launch { pillShift.animateTo(0f, spring(dampingRatio = 0.34f, stiffness = 240f), initialVelocity = bump) }
+                launch { titleShift.animateTo(0f, spring(dampingRatio = 0.42f, stiffness = 300f), initialVelocity = -bump * 0.9f) }
+            }
+            HomeIntro.phase = HomeIntro.NONE
+        }
+    }
+    val squish = with(density) { 28.dp.toPx() }
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
         Text(
             title,
@@ -251,6 +283,7 @@ fun SearchHeaderRow(
                 .graphicsLayer {
                     compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                     alpha = 1f - expansion.value
+                    translationX = if (introPhase == HomeIntro.HOLD || (introPhase == HomeIntro.RUN && !introStarted)) -offscreen else titleShift.value
                 }
                 .drawWithContent {
                     drawContent()
@@ -269,7 +302,14 @@ fun SearchHeaderRow(
         )
         SearchPill(
             onClick = { returning = true; onSearch() },
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .graphicsLayer {
+                    translationX = pillShift.value
+                    // The leading edge dents on impact: squeeze towards the far (right) edge.
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
+                    scaleX = 1f - 0.05f * (kotlin.math.abs(pillShift.value) / squish).coerceAtMost(1f)
+                },
             visibilityScope = visibilityScope,
             expansion = expansion,
             expandDistance = { titleWidth + gap - searchFieldStart },

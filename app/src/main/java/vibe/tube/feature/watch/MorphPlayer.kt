@@ -7,6 +7,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
@@ -48,6 +50,10 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -65,7 +71,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /** Share of the screen width the minimized player takes (keep in sync with the list padding in AppRoot). */
-internal const val MINI_WIDTH_FRACTION = 0.84f
+internal const val MINI_WIDTH_FRACTION = 0.42f
 
 /** Critically damped: glides to the end without overshooting or bouncing. */
 private val MORPH_SPEC = spring<Float>(dampingRatio = 1f, stiffness = 380f)
@@ -133,6 +139,11 @@ internal fun MorphPlayer(
     var pendingVelocity by remember { mutableFloatStateOf(0f) }
     // True while a finger is dragging the card: the node that owns the gesture must stay composed until it ends.
     var dragging by remember { mutableStateOf(false) }
+    // Where the minimized player is docked, as 0..1 along the free range of each axis (0 = left/top edge, 1 = right/bottom
+    // edge). Fractions, not pixels, so it stays glued to its edge when the video's size or the screen changes.
+    val anchorX = remember { Animatable(1f) }
+    val anchorY = remember { Animatable(1f) }
+    var miniDragging by remember { mutableStateOf(false) }
 
     val target = if (visible && expanded) 1f else 0f
     LaunchedEffect(target) {
@@ -166,17 +177,20 @@ internal fun MorphPlayer(
 
         val sidePx = with(density) { 8.dp.toPx() }
         val gapPx = with(density) { 8.dp.toPx() }
-        // Minimized, the player is just the video (like YouTube's): a floating card on the right, 84% of the width at
-        // 16:9, narrower for taller videos, with play/pause and close drawn on its two edges.
+        // Minimized, the player is just the video: a small floating card (42% of the width at 16:9, narrower for
+        // taller videos) that can be dragged around and always rests against an edge of the screen.
         val aspect = videoAspect
         val maxMiniW = wPx * MINI_WIDTH_FRACTION
         val thumbW = minOf(maxMiniW, maxMiniW * 9f / 16f * aspect)
         val thumbH = thumbW / aspect
-        val miniTop = hPx - bottomInsetPx - thumbH - gapPx
-        val thumbX = wPx - sidePx * 1.5f - thumbW
-        val thumbY = miniTop
+        val minX = sidePx
+        val maxX = max(wPx - sidePx - thumbW, minX)
+        val minY = topInsetPx + sidePx
+        val maxY = max(hPx - bottomInsetPx - thumbH - gapPx, minY)
+        val thumbX: () -> Float = { minX + anchorX.value.coerceIn(0f, 1f) * (maxX - minX) }
+        val thumbY: () -> Float = { minY + anchorY.value.coerceIn(0f, 1f) * (maxY - minY) }
         val videoH = wPx / aspect
-        val dragRange = max(miniTop, 1f)
+        val dragRange = max(maxY, 1f)
         val fadeRange = with(density) { 140.dp.toPx() }
 
         val p: () -> Float = { progress.value.coerceIn(0f, 1f) }
@@ -312,9 +326,9 @@ internal fun MorphPlayer(
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                         scaleX = sc
                         scaleY = sc
-                        translationX = lerpF(thumbX, 0f, p())
-                        translationY = lerpF(thumbY, topInsetPx, p()) + fsOffset.value
-                        shape = RoundedCornerShape(CornerSize(lerpF(14.dp.toPx(), 0f, t()) / sc))
+                        translationX = lerpF(thumbX(), 0f, p())
+                        translationY = lerpF(thumbY(), topInsetPx, p()) + fsOffset.value
+                        shape = RoundedCornerShape(CornerSize(lerpF(12.dp.toPx(), 0f, t()) / sc))
                         clip = true
                         alpha = (1f + fsOffset.value / fsRange).coerceIn(0f, 1f)
                     },
@@ -342,65 +356,121 @@ internal fun MorphPlayer(
                     onChapters = { chaptersOpen = true },
                 )
             }
-            // Playback progress rides along the bottom of the thumbnail while minimized.
+            // Playback progress: a straight line flush with the bottom edge of the minimized video.
             if (miniish) {
-                val miniAmpAnim = remember { Animatable(0f) }
-                val miniFlat by remember { derivedStateOf { !stateHolder.value.isPlaying || stateHolder.value.phase != vibe.tube.player.PlayerPhase.Ready } }
-                LaunchedEffect(miniFlat) { if (miniFlat) miniAmpAnim.snapTo(0f) else miniAmpAnim.animateTo(1f, tween(900)) }
+                val track = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.35f)
+                val fill = MaterialTheme.colorScheme.primary
                 Box(
                     Modifier
                         .placedRect(
-                            x = { lerpF(thumbX, 0f, p()) },
-                            y = { lerpF(thumbY, topInsetPx, p()) },
+                            x = { lerpF(thumbX(), 0f, p()) },
+                            y = { lerpF(thumbY(), topInsetPx, p()) },
                             w = { lerpF(thumbW, wPx, p()) },
                             h = { lerpF(thumbH, videoH, p()) },
                         )
                         .graphicsLayer {
                             alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f)
                             compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                            shape = RoundedCornerShape(lerpF(12.dp.toPx(), 0f, t()))
+                            clip = true
                         },
                 ) {
-                    vibe.tube.ui.components.WavyProgress(
-                        progress = { stateHolder.value.let { if (it.durationMs > 0) (it.positionMs.toFloat() / it.durationMs).coerceIn(0f, 1f) else 0f } },
-                        amplitude = { miniAmpAnim.value },
-                        animate = isPlaying,
-                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(10.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.35f),
-                        strokeWidth = 2.dp,
-                        wavelength = 9.dp,
-                        maxAmplitude = 1.dp,
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .drawBehind {
+                                val s0 = stateHolder.value
+                                val frac = if (s0.durationMs > 0) (s0.positionMs.toFloat() / s0.durationMs).coerceIn(0f, 1f) else 0f
+                                drawRect(track)
+                                drawRect(fill, size = androidx.compose.ui.geometry.Size(size.width * frac, size.height))
+                            },
                     )
                 }
             }
 
-            // 3. Minimized: tap the video to expand, drag up to expand, drag down to dismiss; play/pause and close sit
-            //    on the left and right edges of the video (half of each circle is clipped by the card).
+            // 3. Minimized: drag to move (it settles against the nearest screen edge on release), tap to expand.
+            //    Play/pause and close are small icon buttons in the top corners.
             if (miniish || dragging) {
-                val miniRect = Modifier.placedRect({ thumbX }, { thumbY }, { thumbW }, { thumbH })
+                val miniRect = Modifier.placedRect(thumbX, thumbY, { thumbW }, { thumbH })
+                val geo = remember { MiniGeo() }
+                val expandLabel = stringResource(R.string.action_expand_player)
+                geo.minX = minX; geo.maxX = maxX; geo.minY = minY; geo.maxY = maxY
                 Box(
                     miniRect
-                        .then(dragModifier)
-                        .clickable(role = Role.Button, onClickLabel = stringResource(R.string.action_expand_player)) { controller.expand() },
+                        .pointerInput(Unit) {
+                            var total = androidx.compose.ui.geometry.Offset.Zero
+                            val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
+                            fun settle(velocity: androidx.compose.ui.unit.Velocity) {
+                                val rx = (geo.maxX - geo.minX).coerceAtLeast(1f)
+                                val ry = (geo.maxY - geo.minY).coerceAtLeast(1f)
+                                // Where it would coast to; the edge nearest to that point wins.
+                                val fx = (anchorX.value + velocity.x * 0.12f / rx).coerceIn(0f, 1f)
+                                val fy = (anchorY.value + velocity.y * 0.12f / ry).coerceIn(0f, 1f)
+                                val dl = fx * rx
+                                val dr = (1f - fx) * rx
+                                val dt = fy * ry
+                                val db = (1f - fy) * ry
+                                var tx = fx
+                                var ty = fy
+                                when (minOf(minOf(dl, dr), minOf(dt, db))) {
+                                    dl -> tx = 0f
+                                    dr -> tx = 1f
+                                    dt -> ty = 0f
+                                    else -> ty = 1f
+                                }
+                                val spec = spring<Float>(dampingRatio = 0.72f, stiffness = 380f)
+                                scope.launch { anchorX.animateTo(tx, spec) }
+                                scope.launch { anchorY.animateTo(ty, spec) }
+                            }
+                            detectDragGestures(
+                                onDragStart = {
+                                    total = androidx.compose.ui.geometry.Offset.Zero
+                                    tracker.resetTracking()
+                                    miniDragging = true
+                                    scope.launch { anchorX.stop(); anchorY.stop() }
+                                },
+                                onDragEnd = {
+                                    miniDragging = false
+                                    settle(tracker.calculateVelocity())
+                                },
+                                onDragCancel = {
+                                    miniDragging = false
+                                    settle(androidx.compose.ui.unit.Velocity.Zero)
+                                },
+                            ) { change, drag ->
+                                change.consume()
+                                total += drag
+                                tracker.addPosition(change.uptimeMillis, total)
+                                val rx = (geo.maxX - geo.minX).coerceAtLeast(1f)
+                                val ry = (geo.maxY - geo.minY).coerceAtLeast(1f)
+                                scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                                    anchorX.snapTo((anchorX.value + drag.x / rx).coerceIn(0f, 1f))
+                                    anchorY.snapTo((anchorY.value + drag.y / ry).coerceIn(0f, 1f))
+                                }
+                            }
+                        }
+                        .pointerInput(Unit) { detectTapGestures { controller.expand() } }
+                        .semantics {
+                            role = Role.Button
+                            onClick(label = expandLabel) { controller.expand(); true }
+                        },
                 )
                 Box(
-                    miniRect
-                        .graphicsLayer {
-                            alpha = ((0.3f - t()) / 0.3f).coerceIn(0f, 1f)
-                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
-                        }
-                        .clip(RoundedCornerShape(14.dp)),
+                    miniRect.graphicsLayer {
+                        alpha = ((0.3f - t()) / 0.3f).coerceIn(0f, 1f)
+                        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                    },
                 ) {
-                    MiniEdgeButton(
-                        Modifier.align(Alignment.CenterStart).offset(x = (-28).dp),
-                        iconOffset = 14.dp,
+                    MiniIconButton(
+                        Modifier.align(Alignment.TopStart).padding(4.dp),
                         icon = if (isPlaying) VIcon.Pause else VIcon.PlayArrowFilled,
                         label = stringResource(if (isPlaying) R.string.action_pause else R.string.action_play),
                         onClick = controller::togglePlay,
                     )
-                    MiniEdgeButton(
-                        Modifier.align(Alignment.CenterEnd).offset(x = 28.dp),
-                        iconOffset = (-14).dp,
+                    MiniIconButton(
+                        Modifier.align(Alignment.TopEnd).padding(4.dp),
                         icon = VIcon.Close,
                         label = stringResource(R.string.action_close_player),
                         onClick = { scope.launch { fadeOutAndDismiss() } },
@@ -427,28 +497,39 @@ private fun ChaptersHost(state: androidx.compose.runtime.State<PlayerUiState>, c
     ChaptersSheet(chapters, position, onSeek, onDismiss)
 }
 
-/** Translucent round button that straddles an edge of the minimized video. */
+private class MiniGeo {
+    var minX = 0f
+    var maxX = 0f
+    var minY = 0f
+    var maxY = 0f
+}
+
+/** Small M3 filled-tonal icon button (32dp container) for the corners of the minimized video. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MiniEdgeButton(
+private fun MiniIconButton(
     modifier: Modifier,
-    iconOffset: androidx.compose.ui.unit.Dp,
     icon: Int,
     label: String,
     onClick: () -> Unit,
 ) {
-    Box(
-        modifier
-            .size(56.dp)
-            .clip(androidx.compose.foundation.shape.CircleShape)
-            .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.45f))
-            .clickable(role = Role.Button, onClickLabel = label, onClick = onClick),
-        contentAlignment = Alignment.Center,
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.material3.LocalMinimumInteractiveComponentSize provides androidx.compose.ui.unit.Dp.Unspecified,
     ) {
-        vibe.tube.ui.components.SwappingIcon(
-            icon,
-            label,
-            Modifier.offset(x = iconOffset).size(28.dp),
-            tint = androidx.compose.ui.graphics.Color.White,
-        )
+        androidx.compose.material3.FilledTonalIconButton(
+            onClick = onClick,
+            modifier = modifier.size(32.dp),
+            colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.92f),
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            ),
+        ) {
+            vibe.tube.ui.components.SwappingIcon(
+                icon,
+                label,
+                Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
     }
 }

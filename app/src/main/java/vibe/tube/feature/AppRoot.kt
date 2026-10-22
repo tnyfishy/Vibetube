@@ -374,13 +374,22 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                 },
             )
             val welcomePrefs = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("app_state", android.content.Context.MODE_PRIVATE)
-            var welcomeSeen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(welcomePrefs.getBoolean("welcome_seen", false)) }
+            var welcomeSeen by androidx.compose.runtime.remember {
+                val seen = welcomePrefs.getBoolean("welcome_seen", false)
+                // First launch: keep the home heading off screen under the welcome page until it is time to charge in.
+                if (!seen) vibe.tube.ui.components.HomeIntro.phase = vibe.tube.ui.components.HomeIntro.HOLD
+                androidx.compose.runtime.mutableStateOf(seen)
+            }
             androidx.compose.animation.AnimatedVisibility(
                 visible = !welcomeSeen,
                 enter = androidx.compose.animation.EnterTransition.None,
                 exit = androidx.compose.animation.fadeOut(tween(260)),
             ) {
-                vibe.tube.feature.welcome.WelcomeScreen(onDone = { welcomePrefs.edit().putBoolean("welcome_seen", true).apply(); welcomeSeen = true })
+                vibe.tube.feature.welcome.WelcomeScreen(onDone = {
+                    welcomePrefs.edit().putBoolean("welcome_seen", true).apply()
+                    welcomeSeen = true
+                    vibe.tube.ui.components.HomeIntro.phase = vibe.tube.ui.components.HomeIntro.RUN
+                })
             }
             if (playerState.expanded && playerState.visible) {
                 Box(Modifier.align(Alignment.BottomCenter)) {

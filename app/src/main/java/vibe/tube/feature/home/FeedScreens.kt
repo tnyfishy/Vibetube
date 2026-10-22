@@ -74,6 +74,7 @@ fun HomeScreen(
                     onSearch = onSearch,
                     modifier = Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.xs, bottom = Spacing.sm),
                     visibilityScope = visibilityScope,
+                    intro = true,
                 ) {
                     if (auth is AuthState.Guest) {
                         TooltipIconButton(VIcon.Person, stringResource(R.string.action_sign_in), onLogin)
