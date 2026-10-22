@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -276,14 +277,14 @@ private fun Controls(
                         dragging = false
                     },
                     modifier = Modifier.fillMaxWidth().height(28.dp).semantics { contentDescription = label },
-                    thumb = {
+                    thumb = { _ ->
                         SliderDefaults.Thumb(
                             interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                             thumbSize = androidx.compose.ui.unit.DpSize(4.dp, 20.dp),
                             colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary),
                         )
                     },
-                    track = {
+                    track = { _ ->
                         androidx.compose.material3.LinearWavyProgressIndicator(
                             progress = { fraction },
                             modifier = Modifier.fillMaxWidth(),
@@ -291,7 +292,7 @@ private fun Controls(
                             trackColor = MediaOverlayColors.onScrim.copy(alpha = 0.3f),
                             stroke = stroke,
                             trackStroke = stroke,
-                            amplitude = { amplitude },
+                            amplitude = { _ -> amplitude },
                             wavelength = 20.dp,
                         )
                     },

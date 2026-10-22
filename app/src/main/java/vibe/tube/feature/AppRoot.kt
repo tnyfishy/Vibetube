@@ -43,6 +43,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -299,7 +301,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                     ) {
                         tabs.forEach { tab ->
                             val selected = destination?.hasRoute(tab.route::class) == true
-                            androidx.compose.material3.NavigationBarItem(
+                            NavigationBarItem(
                                 selected = selected,
                                 onClick = { goToTab(tab) },
                                 icon = { VIconImage(if (selected) tab.iconSelected else tab.icon, null) },
