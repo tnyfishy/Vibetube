@@ -3,6 +3,7 @@ package vibe.tube.ui.components
 import androidx.annotation.DrawableRes
 import vibe.tube.R
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
