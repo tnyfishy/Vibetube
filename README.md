@@ -45,7 +45,7 @@ cp keystore.properties.sample keystore.properties
 
 ## Sử dụng
 
-1. Mở ứng dụng. Chưa đăng nhập, Trang chủ hiển thị rõ chế độ khách; ứng dụng không thay bằng feed thịnh hành hay dữ liệu mẫu.
+1. Mở ứng dụng. Chưa đăng nhập, Trang chủ hiển thị rõ chế độ khách và danh sách video thịnh hành trong tuần (từ tìm kiếm công khai, không phải đề xuất cá nhân).
 2. Tab Tài khoản (hoặc nút Đăng nhập) mở trang đăng nhập Google chính thức trong WebView. Bạn tự nhập thông tin và xác minh. Vibetube chỉ giữ phiên YouTube sau khi YouTube xác nhận bằng một yêu cầu `account_menu`.
 3. Nếu Google chặn đăng nhập trong WebView, ứng dụng hiển thị lỗi thật và không giả lập thành công. Xem [docs/SESSION.md](docs/SESSION.md).
 4. Tìm kiếm ở thanh ứng dụng; chạm video để phát; thu nhỏ thành mini-player; Hình trong hình khi rời ứng dụng.
