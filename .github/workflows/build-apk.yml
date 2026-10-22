@@ -76,3 +76,15 @@ jobs:
       - name: Unit tests
         continue-on-error: true
         run: ./gradlew :app:testDebugUnitTest --stacktrace
+
+      # Surface unit-test failures as annotations (the step above is allowed to fail without blocking the APK).
+      - name: Report test failures
+        if: always()
+        run: |
+          for f in app/build/test-results/testDebugUnitTest/*.xml; do
+            [ -f "$f" ] || continue
+            grep -A3 "<testcase" "$f" | grep -B1 -A2 "<failure" | tr '\n' ' ' | sed 's/<testcase/\n<testcase/g' | grep "<failure" | while IFS= read -r line; do
+              echo "::error title=unit test failed::${line:0:600}"
+            done
+          done
+          exit 0
