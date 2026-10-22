@@ -194,6 +194,11 @@ internal fun MorphPlayer(
                             dismiss.animateTo(0f, tween(220, easing = vibe.tube.ui.components.EmphasizedDecelerate))
                         }
                     } else {
+                        if (state.expanded && progress.value > 0.9f && velocity < -900f && !state.fullscreen) {
+                            progress.animateTo(1f, MORPH_SPEC)
+                            controller.setFullscreen(true)
+                            return@launch
+                        }
                         val goExpanded = when {
                             velocity > 900f -> false
                             velocity < -900f -> true
@@ -298,12 +303,13 @@ internal fun MorphPlayer(
                         .graphicsLayer { alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f) },
                 ) {
                     val miniStroke = androidx.compose.ui.graphics.drawscope.Stroke(width = with(density) { 2.dp.toPx() }, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    val miniAmp by androidx.compose.animation.core.animateFloatAsState(if (state.isPlaying) 0.6f else 0f, tween(260), label = "miniAmp")
                     LinearWavyProgressIndicator(
                         progress = { fraction },
                         wavelength = 9.dp,
                         stroke = miniStroke,
                         trackStroke = miniStroke,
-                        amplitude = { 0.6f },
+                        amplitude = { miniAmp },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

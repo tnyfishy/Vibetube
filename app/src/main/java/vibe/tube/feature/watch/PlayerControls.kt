@@ -38,6 +38,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlin.math.roundToInt
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -267,13 +272,44 @@ private fun Controls(
             if (!state.isLive) {
                 val label = stringResource(R.string.player_seek_bar)
                 // Wavy (M3 Expressive) while playing, flattening to a straight line while the thumb is held.
-                val amplitude by androidx.compose.animation.core.animateFloatAsState(if (dragging) 0f else 1f, androidx.compose.animation.core.tween(220), label = "seekAmplitude")
+                val amplitude by androidx.compose.animation.core.animateFloatAsState(if (dragging || !state.isPlaying) 0f else 1f, androidx.compose.animation.core.tween(260, easing = vibe.tube.ui.components.EmphasizedDecelerate), label = "seekAmplitude")
                 val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { 3.dp.toPx() }
                 val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = strokePx, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
+                var barWidth by remember { mutableFloatStateOf(1f) }
+                val thumbPx = with(androidx.compose.ui.platform.LocalDensity.current) { 4.dp.toPx() }
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.lg, vertical = 0.dp)
+                        .padding(bottom = Spacing.md)
+                        .height(28.dp)
+                        .onSizeChanged { barWidth = it.width.toFloat().coerceAtLeast(1f) }
+                        .semantics { contentDescription = label }
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                val down = awaitFirstDown()
+                                dragging = true
+                                dragValue = (down.position.x / size.width).coerceIn(0f, 1f)
+                                onInteract()
+                                var moved = false
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                                    if (!change.pressed) { change.consume(); break }
+                                    dragValue = (change.position.x / size.width).coerceIn(0f, 1f)
+                                    moved = true
+                                    change.consume()
+                                    onInteract()
+                                }
+                                onSeek((dragValue * duration).toLong())
+                                dragging = false
+                            }
+                        },
+                    contentAlignment = Alignment.CenterStart,
+                ) {
                     androidx.compose.material3.LinearWavyProgressIndicator(
                         progress = { fraction },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MediaOverlayColors.onScrim.copy(alpha = 0.3f),
                         stroke = stroke,
@@ -281,21 +317,11 @@ private fun Controls(
                         amplitude = { _ -> amplitude },
                         wavelength = 20.dp,
                     )
-                    Slider(
-                        value = fraction,
-                        onValueChange = { dragging = true; dragValue = it; onInteract() },
-                        onValueChangeFinished = {
-                            onSeek((dragValue * duration).toLong())
-                            dragging = false
-                        },
-                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = androidx.compose.ui.graphics.Color.Transparent,
-                            inactiveTrackColor = androidx.compose.ui.graphics.Color.Transparent,
-                            activeTickColor = androidx.compose.ui.graphics.Color.Transparent,
-                            inactiveTickColor = androidx.compose.ui.graphics.Color.Transparent,
-                        ),
+                    Box(
+                        Modifier
+                            .offset { androidx.compose.ui.unit.IntOffset((fraction * barWidth - thumbPx / 2f).roundToInt(), 0) }
+                            .size(4.dp, 20.dp)
+                            .background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(2.dp)),
                     )
                 }
             }

@@ -106,12 +106,16 @@ fun VideoThumbnail(video: VideoItem, modifier: Modifier = Modifier) {
         }
         val watched = video.watchedPercent
         if (watched != null && watched > 0) {
-            LinearProgressIndicator(
+            androidx.compose.material3.LinearWavyProgressIndicator(
                 progress = { watched / 100f },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp, vertical = 3.dp),
                 trackColor = MediaOverlayColors.scrim,
+                stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                trackStroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+                wavelength = 12.dp,
             )
         }
     }
@@ -129,7 +133,7 @@ fun VideoMenu(
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
         TooltipIconButton(VIcon.MoreVert, stringResource(R.string.action_more), { open = true })
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.action_save_to_playlist)) },
                 leadingIcon = { VIconImage(VIcon.PlaylistAdd, null) },
@@ -246,7 +250,7 @@ fun VideoRow(
             Text(
                 video.title,
                 style = MaterialTheme.typography.titleSmall,
-                maxLines = 2,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
                 color = if (unavailable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             )

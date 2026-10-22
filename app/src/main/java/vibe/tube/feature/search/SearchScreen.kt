@@ -179,7 +179,7 @@ fun SearchScreen(
                                         label = { Text(stringResource(sortLabel(ui.sort))) },
                                         trailingIcon = { VIconImage(VIcon.ExpandMore, null) },
                                     )
-                                    DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                                    DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }, shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
                                         SearchSort.entries.forEach { sort ->
                                             DropdownMenuItem(
                                                 text = { Text(stringResource(sortLabel(sort))) },

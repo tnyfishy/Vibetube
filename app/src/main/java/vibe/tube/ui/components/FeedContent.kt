@@ -123,10 +123,19 @@ fun FeedContent(
     val refreshing = state.phase == FeedPhase.Refreshing
     val blockingFailure = state.failure.takeIf { state.items.isEmpty() }
 
+    val ptrState = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
     PullToRefreshBox(
         isRefreshing = refreshing,
         onRefresh = onRefresh,
+        state = ptrState,
         modifier = modifier.fillMaxSize(),
+        indicator = {
+            androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.LoadingIndicator(
+                state = ptrState,
+                isRefreshing = refreshing,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = contentPadding.calculateTopPadding()),
+            )
+        },
     ) {
         val columns = if (singleColumn) GridCells.Fixed(1) else GridCells.Adaptive(Sizing.gridMinCardWidth)
         LazyVerticalGrid(

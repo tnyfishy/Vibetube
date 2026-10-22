@@ -146,6 +146,12 @@ private fun PlayerPage(
         },
     )
 
+    val exitFullscreenDrag = Modifier.draggable(
+        orientation = Orientation.Vertical,
+        state = rememberDraggableState { },
+        onDragStopped = { velocity -> if (velocity > 900f) controller.setFullscreen(false) },
+    )
+
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -175,7 +181,7 @@ private fun PlayerPage(
                     onRetry = controller::retry,
                     onLogin = onLogin,
                     modifier = m,
-                    dragModifier = if (fullscreen) Modifier else dragModifier,
+                    dragModifier = if (state.fullscreen) exitFullscreenDrag else if (fullscreen) Modifier else dragModifier,
                 )
             }
 

@@ -128,8 +128,9 @@ private const val SEARCH_BOUNDS_KEY = "vibetube-search-bounds"
  */
 @Composable
 fun Modifier.searchBounds(visibilityScope: AnimatedVisibilityScope?, cornerRadius: Int = 28): Modifier {
-    val transition = LocalSharedTransitionScope.current
-    if (transition == null || visibilityScope == null) return this
+    if (true) return this
+    val transition = LocalSharedTransitionScope.current ?: return this
+    if (visibilityScope == null) return this
     val reduced = LocalReducedMotion.current
     return with(transition) {
         this@searchBounds.sharedBounds(
@@ -162,13 +163,6 @@ fun SearchPill(
     val reduced = LocalReducedMotion.current
     val scope = rememberCoroutineScope()
     Surface(
-        onClick = {
-            scope.launch {
-                if (expansion != null && !reduced) expansion.animateTo(1f, tween(260, easing = EmphasizedDecelerate))
-                onClick()
-            }
-        },
-        interactionSource = source,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = modifier
@@ -179,7 +173,13 @@ fun SearchPill(
                 layout(constraints.maxWidth, placeable.height) { placeable.place(-extra, 0) }
             }
             .height(48.dp)
-            .searchBounds(visibilityScope),
+            .clip(CircleShape)
+            .clickable(interactionSource = source, indication = null) {
+                scope.launch {
+                    if (expansion != null && !reduced) expansion.animateTo(1f, tween(260, easing = EmphasizedDecelerate))
+                    onClick()
+                }
+            },
     ) {
         Row(
             Modifier.padding(horizontal = Spacing.lg),

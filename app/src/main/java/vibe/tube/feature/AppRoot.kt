@@ -37,6 +37,14 @@ import vibe.tube.ui.components.LocalSharedTransitionScope
 import vibe.tube.ui.theme.LocalReducedMotion
 import kotlin.math.abs
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -267,7 +275,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                         .weight(1f)
                         .fillMaxWidth()
                         .onGloballyPositioned { contentBottomPx = (it.positionInRoot().y + it.size.height).roundToInt() }
-                        .then(if (isBar) Modifier.nestedScroll(barScroll) else Modifier)
+                        .then(if (isBar && currentTab == 0) Modifier.nestedScroll(barScroll) else Modifier)
                         .tabSwipe(enabled = currentTab >= 0 && !(playerState.visible && playerState.expanded)) { direction ->
                             tabs.getOrNull(currentTab + direction)?.let(goToTab)
                         },
@@ -289,7 +297,8 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                     )
                 }
                 if (isBar) {
-                    androidx.compose.material3.NavigationBar(
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainer,
                         modifier = Modifier
                             .layout { measurable, constraints ->
                                 val full = barFullPx
@@ -299,14 +308,35 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                             }
                             .clipToBounds(),
                     ) {
-                        tabs.forEach { tab ->
-                            val selected = destination?.hasRoute(tab.route::class) == true
-                            NavigationBarItem(
-                                selected = selected,
-                                onClick = { goToTab(tab) },
-                                icon = { VIconImage(if (selected) tab.iconSelected else tab.icon, null) },
-                                label = { Text(stringResource(tab.label), maxLines = 1) },
-                            )
+                        Row(Modifier.fillMaxWidth().height(barBody)) {
+                            tabs.forEach { tab ->
+                                val selected = destination?.hasRoute(tab.route::class) == true
+                                Column(
+                                    Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = androidx.compose.ui.semantics.Role.Tab) { goToTab(tab) },
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center,
+                                ) {
+                                    val pill by androidx.compose.animation.animateColorAsState(
+                                        if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+                                        androidx.compose.animation.core.tween(200),
+                                        label = "navPill",
+                                    )
+                                    Box(
+                                        Modifier.size(width = 56.dp, height = 30.dp).background(pill, androidx.compose.foundation.shape.CircleShape),
+                                        contentAlignment = Alignment.Center,
+                                    ) { VIconImage(if (selected) tab.iconSelected else tab.icon, null, Modifier.size(22.dp)) }
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        stringResource(tab.label),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -458,7 +488,7 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
                     SettingsScreen(
                         onBack = { nav.popBackStack() },
                         onLicenses = { nav.navigate(LicensesRoute) },
-                        onDebug = if (BuildConfig.DEBUG) ({ nav.navigate(GalleryRoute) }) else null,
+                        onDebug = null,
                     )
                 }
                 page<LicensesRoute> { LicensesScreen(onBack = { nav.popBackStack() }) }

@@ -22,7 +22,7 @@ object Sizing {
     val avatarHero: Dp = 96.dp
     val miniPlayerHeight: Dp = 72.dp
     val miniPlayerThumbnailWidth: Dp = 96.dp
-    val listThumbnailWidth: Dp = 168.dp
+    val listThumbnailWidth: Dp = 140.dp
     val gridMinCardWidth: Dp = 280.dp
     val iconSmall: Dp = 18.dp
     val iconMedium: Dp = 24.dp

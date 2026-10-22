@@ -229,11 +229,6 @@ fun YoutubeHistoryScreen(onBack: () -> Unit, onLogin: () -> Unit, viewModel: Acc
             onLogin = onLogin,
             contentPadding = inner,
             singleColumn = true,
-            header = {
-                item(key = "history-note", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                    Banner(stringResource(R.string.youtube_history_note), VIcon.Info)
-                }
-            },
             emptyTitle = stringResource(R.string.youtube_history_empty_title),
             emptyBody = stringResource(R.string.youtube_history_empty_body),
         ) { item, queue ->

@@ -25,6 +25,8 @@ data class PlayerUiState(
     val durationMs: Long = 0,
     val bufferedMs: Long = 0,
     val speed: Float = 1f,
+    val pitch: Float = 1f,
+    val tuningRemembered: Boolean = false,
     val isLive: Boolean = false,
     val qualities: List<Int> = emptyList(),
     val selectedHeight: Int? = null,

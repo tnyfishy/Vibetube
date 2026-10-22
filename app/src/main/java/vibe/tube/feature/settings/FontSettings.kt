@@ -54,11 +54,16 @@ fun FontSheet(settings: AppSettings, onChange: (AppSettings.() -> AppSettings) -
     var weight by remember { mutableFloatStateOf(settings.fontWeightOffset.toFloat()) }
     var width by remember { mutableFloatStateOf(settings.fontWidth.toFloat()) }
     var roundness by remember { mutableFloatStateOf(settings.fontRoundness.toFloat()) }
-    val candidate = FontStyleSettings(font, weight.roundToInt(), width.roundToInt(), roundness.roundToInt())
-    val preview = remember(candidate) { buildTypography(candidate) }
+    // The preview follows committed values only (on release), so dragging a slider never rebuilds typography per frame.
+    var applied by remember { mutableStateOf(FontStyleSettings(settings.font, settings.fontWeightOffset, settings.fontWidth, settings.fontRoundness)) }
+    val preview = remember(applied) { buildTypography(applied) }
 
-    fun commit() = onChange {
+    fun commitSettings() = onChange {
         copy(font = font, fontWeightOffset = weight.roundToInt(), fontWidth = width.roundToInt(), fontRoundness = roundness.roundToInt())
+    }
+    fun commit() {
+        applied = FontStyleSettings(font, weight.roundToInt(), width.roundToInt(), roundness.roundToInt())
+        commitSettings()
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -71,14 +76,13 @@ fun FontSheet(settings: AppSettings, onChange: (AppSettings.() -> AppSettings) -
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
                 Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                     Text(stringResource(R.string.settings_font_preview_title), style = preview.headlineSmall)
-                    Text(stringResource(R.string.settings_font_preview_body), style = preview.bodyLarge)
                     Text(stringResource(R.string.settings_font_preview_label), style = preview.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
             Column(Modifier.selectableGroup()) {
                 AppFont.entries.forEach { option ->
-                    val style = remember(option, weight.roundToInt()) { buildTypography(FontStyleSettings(option, weight.roundToInt(), width.roundToInt(), roundness.roundToInt())).titleMedium }
+                    val style = remember(option, applied.weightOffset) { buildTypography(FontStyleSettings(option, applied.weightOffset, applied.width, applied.roundness)).titleMedium }
                     Row(
                         Modifier
                             .fillMaxWidth()

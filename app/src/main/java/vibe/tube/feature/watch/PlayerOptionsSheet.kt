@@ -2,6 +2,8 @@ package vibe.tube.feature.watch
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -12,6 +14,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.Slider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import vibe.tube.R
@@ -38,6 +43,18 @@ fun PlayerOptionsSheet(state: PlayerUiState, controller: PlayerController, onDis
                         onClick = { controller.setSpeed(value) },
                         label = { Text(if (value == 1f) stringResource(R.string.player_speed_normal) else "${value}x") },
                     )
+                }
+            }
+            TuningSlider(stringResource(R.string.player_speed), state.speed, 0.25f..3f, controller::setSpeed)
+            TuningSlider(stringResource(R.string.player_pitch), state.pitch, 0.5f..2f, controller::setPitch)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                FilterChip(
+                    selected = state.tuningRemembered,
+                    onClick = { controller.setRememberTuning(!state.tuningRemembered) },
+                    label = { Text(stringResource(R.string.player_tuning_remember)) },
+                )
+                androidx.compose.material3.OutlinedButton(onClick = { controller.setSpeed(1f); controller.setPitch(1f) }) {
+                    Text(stringResource(R.string.player_tuning_reset))
                 }
             }
             if (state.qualities.isNotEmpty()) {
@@ -109,6 +126,21 @@ private fun Section(title: Int, content: @Composable androidx.compose.foundation
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             content = content,
+        )
+    }
+}
+
+@Composable
+private fun TuningSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
+    Column {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.titleSmall)
+            Text(String.format(java.util.Locale.US, "%.2fx", value), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
+        Slider(
+            value = value,
+            onValueChange = { onChange((it * 20f).roundToInt() / 20f) },
+            valueRange = range,
         )
     }
 }

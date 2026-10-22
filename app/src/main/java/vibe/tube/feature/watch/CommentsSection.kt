@@ -137,7 +137,7 @@ fun CommentsHeader(
                         VIconImage(VIcon.Sort, null)
                         Text(state.sorts.firstOrNull { it.selected }?.title ?: stringResource(R.string.comments_sort), Modifier.padding(start = Spacing.sm))
                     }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
                         state.sorts.forEach { sort ->
                             DropdownMenuItem(text = { Text(sort.title) }, onClick = { menu = false; onSort(sort) })
                         }

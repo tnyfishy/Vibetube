@@ -129,7 +129,7 @@ fun PlaylistScreen(
                     if (canEditMeta) {
                         androidx.compose.foundation.layout.Box {
                             TooltipIconButton(VIcon.MoreVert, stringResource(R.string.action_more), { menuOpen = true })
-                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.action_rename)) },
                                     leadingIcon = { VIconImage(VIcon.Edit, null) },

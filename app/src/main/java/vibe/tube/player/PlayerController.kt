@@ -70,6 +70,7 @@ class PlayerController @Inject constructor(
     private val mutable = MutableStateFlow(PlayerUiState())
     val state: StateFlow<PlayerUiState> = mutable.asStateFlow()
 
+    private val tuningPrefs = context.getSharedPreferences("player_tuning", Context.MODE_PRIVATE)
     private var loadJob: Job? = null
     private var tickerJob: Job? = null
     private var queueJob: Job? = null
@@ -97,7 +98,8 @@ class PlayerController @Inject constructor(
         }
 
         override fun onPlaybackParametersChanged(parameters: PlaybackParameters) {
-            mutable.update { it.copy(speed = parameters.speed) }
+            mutable.update { it.copy(speed = parameters.speed, pitch = parameters.pitch) }
+            if (mutable.value.tuningRemembered) saveTuning()
         }
 
         override fun onVideoSizeChanged(videoSize: VideoSize) {
@@ -117,6 +119,10 @@ class PlayerController @Inject constructor(
         wired = true
         engine.queueHandler = this
         engine.player.addListener(listener)
+        if (tuningPrefs.getBoolean("remember", false)) {
+            engine.player.playbackParameters = PlaybackParameters(tuningPrefs.getFloat("speed", 1f), tuningPrefs.getFloat("pitch", 1f))
+            mutable.update { it.copy(tuningRemembered = true) }
+        }
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
                 val s = mutable.value
@@ -366,7 +372,23 @@ class PlayerController @Inject constructor(
     }
 
     fun setSpeed(speed: Float) {
-        engine.player.setPlaybackSpeed(speed)
+        val p = engine.player
+        p.playbackParameters = PlaybackParameters(speed.coerceIn(0.25f, 3f), p.playbackParameters.pitch)
+    }
+
+    fun setPitch(pitch: Float) {
+        val p = engine.player
+        p.playbackParameters = PlaybackParameters(p.playbackParameters.speed, pitch.coerceIn(0.5f, 2f))
+    }
+
+    fun setRememberTuning(on: Boolean) {
+        mutable.update { it.copy(tuningRemembered = on) }
+        if (on) saveTuning() else tuningPrefs.edit().putBoolean("remember", false).apply()
+    }
+
+    private fun saveTuning() {
+        val params = engine.player.playbackParameters
+        tuningPrefs.edit().putBoolean("remember", true).putFloat("speed", params.speed).putFloat("pitch", params.pitch).apply()
     }
 
     fun selectQuality(height: Int?) {
