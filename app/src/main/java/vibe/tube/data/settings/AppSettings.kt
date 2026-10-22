@@ -24,11 +24,6 @@ enum class AppFont(
     /** Static fonts only: (weight, resource) pairs. */
     val statics: List<Pair<Int, Int>> = emptyList(),
 ) {
-    val isSystem: Boolean get() = resId == null && statics.isEmpty()
-    val isStatic: Boolean get() = statics.isNotEmpty()
-    /** Anything but the system font can be previewed/loaded from bundled files. */
-    val isBundled: Boolean get() = !isSystem
-
     System(null, null),
     GoogleSansFlex(vibe.tube.R.font.google_sans_flex, "Google Sans Flex", 1, 1000, 25f, 151f, hasRoundness = true),
     TikTokSans(vibe.tube.R.font.tiktok_sans, "TikTok Sans", 300, 900, 75f, 150f),
@@ -47,6 +42,12 @@ enum class AppFont(
             900 to vibe.tube.R.font.be_vietnam_pro_black,
         ),
     ),
+    ;
+
+    val isSystem: Boolean get() = resId == null && statics.isEmpty()
+    val isStatic: Boolean get() = statics.isNotEmpty()
+    /** Anything but the system font can be previewed/loaded from bundled files. */
+    val isBundled: Boolean get() = !isSystem
 }
 
 /**
