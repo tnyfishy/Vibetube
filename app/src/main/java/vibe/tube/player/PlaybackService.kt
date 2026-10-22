@@ -31,6 +31,9 @@ class PlaybackService : MediaSessionService() {
         session = MediaSession.Builder(this, engine.sessionPlayer)
             .setSessionActivity(activityIntent)
             .build()
+        // Registering the session here is what makes the service post the media-control notification itself,
+        // without waiting for an external controller to bind.
+        session?.let(::addSession)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session

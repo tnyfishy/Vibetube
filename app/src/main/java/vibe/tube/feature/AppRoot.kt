@@ -288,7 +288,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                             .fillMaxSize()
                             .padding(bottom = reservedBottom)
                             .onGloballyPositioned { contentBottomPx = (it.positionInRoot().y + it.size.height).roundToInt() }
-                            .then(if (isBar && homeTab) Modifier.nestedScroll(barScroll) else Modifier)
+                            
                             .tabSwipe(enabled = currentTab >= 0 && !(playerState.visible && playerState.expanded)) { direction ->
                                 tabs.getOrNull(currentTab + direction)?.let(goToTab)
                             },

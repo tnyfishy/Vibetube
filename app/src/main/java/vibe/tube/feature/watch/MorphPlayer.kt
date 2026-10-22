@@ -166,7 +166,10 @@ internal fun MorphPlayer(
         val p: () -> Float = { progress.value.coerceIn(0f, 1f) }
         val t: () -> Float = { progress.value.coerceIn(0f, 1f) }
 
-        val showPage by remember { derivedStateOf { progress.value > 0.05f } }
+        var pageComposed by remember { mutableStateOf(false) }
+        val opened by remember { derivedStateOf { progress.value > 0.05f } }
+        LaunchedEffect(opened, state.visible) { pageComposed = opened || (pageComposed && state.visible) }
+        val showPage = pageComposed
         val miniish by remember { derivedStateOf { progress.value < 0.35f } }
         val controlsOn by remember { derivedStateOf { progress.value > 0.92f } }
 
@@ -257,7 +260,6 @@ internal fun MorphPlayer(
                         val tt = t()
                         shape = RoundedCornerShape(CornerSize(lerpF(16.dp.toPx(), deviceCorner, tt)))
                         clip = true
-                        shadowElevation = (1f - tt) * 6.dp.toPx()
                     }
                     .drawBehind { drawRect(lerp(cardColor, pageColor, t())) }
                     .pointerInput(Unit) {},
@@ -274,19 +276,23 @@ internal fun MorphPlayer(
                 }
             }
 
-            // 2. The video: full width at the top when expanded, the small thumbnail in the mini card.
+            // 2. The video is always laid out at its full size and only scaled/moved by the graphics layer, so the
+            //    TextureView never re-lays out or resizes while the card morphs (that is what made it stutter).
             Box(
                 Modifier
-                    .placedRect(
-                        x = { lerpF(thumbX, 0f, p()) },
-                        y = { lerpF(thumbY, topInsetPx, p()) },
-                        w = { lerpF(thumbW, wPx, p()) },
-                        h = { lerpF(thumbH, videoH, p()) },
-                    )
+                    .layout { measurable, _ ->
+                        val placeable = measurable.measure(Constraints.fixed(wPx.roundToInt(), videoH.roundToInt()))
+                        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                    }
                     .graphicsLayer {
-                        shape = RoundedCornerShape(CornerSize(lerpF(8.dp.toPx(), 0f, t())))
+                        val sc = lerpF(thumbW, wPx, p()) / wPx
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+                        scaleX = sc
+                        scaleY = sc
+                        translationX = lerpF(thumbX, 0f, p())
+                        translationY = lerpF(thumbY, topInsetPx, p()) + fsOffset.value
+                        shape = RoundedCornerShape(CornerSize(lerpF(8.dp.toPx(), 0f, t()) / sc))
                         clip = true
-                        translationY = fsOffset.value
                         alpha = (1f + fsOffset.value / fsRange).coerceIn(0f, 1f)
                     },
             ) {
@@ -308,26 +314,33 @@ internal fun MorphPlayer(
                     modifier = Modifier.fillMaxSize(),
                     dragModifier = if (controlsOn || !miniish || dragging) dragModifier else Modifier,
                 )
-                // Playback progress rides inside the thumbnail while minimized.
+            }
+            // Playback progress rides along the bottom of the thumbnail while minimized.
+            if (miniish) {
                 val fraction = if (state.durationMs > 0) (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f
+                val miniAmpAnim = remember { Animatable(0f) }
+                val miniFlat = !state.isPlaying || state.phase != vibe.tube.player.PlayerPhase.Ready
+                LaunchedEffect(miniFlat) { if (miniFlat) miniAmpAnim.snapTo(0f) else miniAmpAnim.animateTo(1f, tween(900)) }
                 Box(
                     Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(start = 6.dp, end = 6.dp, bottom = 3.dp)
+                        .placedRect(
+                            x = { lerpF(thumbX, 0f, p()) },
+                            y = { lerpF(thumbY, topInsetPx, p()) },
+                            w = { lerpF(thumbW, wPx, p()) },
+                            h = { lerpF(thumbH, videoH, p()) },
+                        )
                         .graphicsLayer { alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f) },
                 ) {
-                    val miniStroke = androidx.compose.ui.graphics.drawscope.Stroke(width = with(density) { 2.dp.toPx() }, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                    val miniAmpAnim = remember { Animatable(0f) }
-                    val miniFlat = !state.isPlaying || state.phase != vibe.tube.player.PlayerPhase.Ready
-                    LaunchedEffect(miniFlat) { miniAmpAnim.animateTo(if (miniFlat) 0f else 0.6f, if (miniFlat) tween(140) else tween(900)) }
-                    LinearWavyProgressIndicator(
+                    vibe.tube.ui.components.WavyProgress(
                         progress = { fraction },
+                        amplitude = { miniAmpAnim.value },
+                        animate = state.isPlaying,
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(10.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.35f),
+                        strokeWidth = 2.dp,
                         wavelength = 9.dp,
-                        stroke = miniStroke,
-                        trackStroke = miniStroke,
-                        amplitude = { _ -> miniAmpAnim.value },
-                        modifier = Modifier.fillMaxWidth(),
+                        maxAmplitude = 1.dp,
                     )
                 }
             }

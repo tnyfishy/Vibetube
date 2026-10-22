@@ -314,35 +314,30 @@ private fun Controls(
                 LaunchedEffect(flat, dragging) {
                     when {
                         dragging -> waveAmp.snapTo(0f)
-                        flat -> waveAmp.animateTo(0f, tween(140))
+                        flat -> waveAmp.animateTo(0f, tween(120))
                         else -> waveAmp.animateTo(1f, tween(900, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
                     }
                 }
-                val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { 3.dp.toPx() }
-                val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = strokePx, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                var barWidth by remember { mutableFloatStateOf(1f) }
-                val thumbPx = with(androidx.compose.ui.platform.LocalDensity.current) { 4.dp.toPx() }
+                val insetPx = with(androidx.compose.ui.platform.LocalDensity.current) { vibe.tube.ui.components.WavyInset.toPx() }
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = 0.dp)
+                        .padding(horizontal = Spacing.lg)
                         .padding(bottom = Spacing.md)
                         .height(28.dp)
-                        .onSizeChanged { barWidth = it.width.toFloat().coerceAtLeast(1f) }
                         .semantics { contentDescription = label }
                         .pointerInput(Unit) {
                             awaitEachGesture {
                                 val down = awaitFirstDown()
+                                fun at(x: Float) = ((x - insetPx) / (size.width - 2 * insetPx)).coerceIn(0f, 1f)
                                 dragging = true
-                                dragValue = (down.position.x / size.width).coerceIn(0f, 1f)
+                                dragValue = at(down.position.x)
                                 onInteract()
-                                var moved = false
                                 while (true) {
                                     val event = awaitPointerEvent()
                                     val change = event.changes.firstOrNull { it.id == down.id } ?: break
                                     if (!change.pressed) { change.consume(); break }
-                                    dragValue = (change.position.x / size.width).coerceIn(0f, 1f)
-                                    moved = true
+                                    dragValue = at(change.position.x)
                                     change.consume()
                                     onInteract()
                                 }
@@ -350,23 +345,15 @@ private fun Controls(
                                 dragging = false
                             }
                         },
-                    contentAlignment = Alignment.CenterStart,
                 ) {
-                    androidx.compose.material3.LinearWavyProgressIndicator(
+                    vibe.tube.ui.components.WavyProgress(
                         progress = { fraction },
-                        modifier = Modifier.fillMaxWidth(),
+                        amplitude = { waveAmp.value },
+                        animate = state.isPlaying && !dragging,
+                        modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MediaOverlayColors.onScrim.copy(alpha = 0.3f),
-                        stroke = stroke,
-                        trackStroke = stroke,
-                        amplitude = { _ -> waveAmp.value },
-                        wavelength = 20.dp,
-                    )
-                    Box(
-                        Modifier
-                            .offset { androidx.compose.ui.unit.IntOffset((fraction * barWidth - thumbPx / 2f).roundToInt(), 0) }
-                            .size(4.dp, 20.dp)
-                            .background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(2.dp)),
+                        thumb = androidx.compose.ui.unit.DpSize(4.dp, 20.dp),
                     )
                 }
             }
