@@ -127,6 +127,6 @@ class FeedUiTest {
     @Test
     fun offlineCacheBannerIsShownWithItems() {
         content(state({ it.copy(source = FeedSource.Cache, cacheFetchedAt = 1_700_000_000_000, failure = FeedFailure.Network(null)) }))
-        rule.onNodeWithText("Couldn't reach YouTube", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("Couldn't reach Vibetube", substring = true).assertIsDisplayed()
     }
 }

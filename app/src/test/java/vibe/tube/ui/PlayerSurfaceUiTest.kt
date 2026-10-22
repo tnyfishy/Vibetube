@@ -92,7 +92,7 @@ class PlayerSurfaceUiTest {
     fun errorOverlaysStateTheRealReasonAndOfferTheRightAction() {
         val events = mutableListOf<String>()
         show(base().copy(phase = PlayerPhase.Error, isPlaying = false, error = PlayerError(PlaybackFailure.BotCheck, null)), events)
-        rule.onNodeWithText("YouTube asked for verification").assertIsDisplayed()
+        rule.onNodeWithText("Vibetube asked for verification").assertIsDisplayed()
         rule.onNodeWithText("Retry").performClick()
         assertEquals(listOf("retry"), events)
     }
