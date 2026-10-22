@@ -47,6 +47,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -229,12 +230,26 @@ fun VideoSurface(
                 }
             }
         }
-        if (!state.inPip && showControls) {
-            AnimatedVisibility(
-                visible = controlsVisible && state.phase != PlayerPhase.Error,
-                enter = fadeIn(VibeMotion.fastEffects()),
-                exit = fadeOut(VibeMotion.fastEffects()),
-                modifier = Modifier.fillMaxSize(),
+        if (!state.inPip) {
+            // The controls stay composed (hidden) so that showing them is a fade, not the composition of a whole
+            // control overlay in the last frames of the expand animation.
+            val shown = showControls && controlsVisible && state.phase != PlayerPhase.Error
+            val controlsAlpha = androidx.compose.animation.core.animateFloatAsState(
+                targetValue = if (shown) 1f else 0f,
+                animationSpec = tween(if (shown) 150 else 200),
+                label = "controlsAlpha",
+            )
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        layout(placeable.width, placeable.height) { if (controlsAlpha.value > 0.001f) placeable.place(0, 0) }
+                    }
+                    .graphicsLayer {
+                        alpha = controlsAlpha.value
+                        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                    },
             ) {
                 Controls(
                     state, onCollapse, onToggleFullscreen, onOptions, onPip, onTogglePlay, onNext, onPrevious, onSeek,

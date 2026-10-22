@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,7 +72,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /** Share of the screen width the minimized player takes (keep in sync with the list padding in AppRoot). */
-internal const val MINI_WIDTH_FRACTION = 0.42f
+internal const val MINI_WIDTH_FRACTION = 0.46f
 
 /** Critically damped: glides to the end without overshooting or bouncing. */
 private val MORPH_SPEC = spring<Float>(dampingRatio = 1f, stiffness = 380f)
@@ -79,14 +80,14 @@ private val MORPH_SPEC = spring<Float>(dampingRatio = 1f, stiffness = 380f)
 private fun lerpF(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
 /** Positions and sizes a child in absolute pixels; every lambda is read in the layout phase (no recomposition per frame). */
-private fun Modifier.placedRect(x: () -> Float, y: () -> Float, w: () -> Float, h: () -> Float): Modifier =
+private fun Modifier.placedRect(x: () -> Float, y: () -> Float, w: () -> Float, h: () -> Float, show: () -> Boolean = { true }): Modifier =
     this
         .offset { IntOffset(x().roundToInt(), y().roundToInt()) }
         .layout { measurable, _ ->
             val width = w().roundToInt().coerceAtLeast(0)
             val height = h().roundToInt().coerceAtLeast(0)
             val placeable = measurable.measure(Constraints.fixed(width, height))
-            layout(width, height) { placeable.place(0, 0) }
+            layout(width, height) { if (show()) placeable.place(0, 0) }
         }
 
 /**
@@ -146,7 +147,21 @@ internal fun MorphPlayer(
     var miniDragging by remember { mutableStateOf(false) }
 
     val target = if (visible && expanded) 1f else 0f
+    // Whenever the player is minimized by swiping down (or any other way) it returns to the bottom-right corner. The
+    // anchors are reset while fully expanded, where the mini card has no visual weight, so nothing jumps.
+    LaunchedEffect(Unit) {
+        snapshotFlow { progress.value >= 0.999f }.collect { full ->
+            if (full) {
+                anchorX.snapTo(1f)
+                anchorY.snapTo(1f)
+            }
+        }
+    }
     LaunchedEffect(target) {
+        if (target == 0f && !miniDragging) {
+            launch { if (anchorX.value != 1f) anchorX.animateTo(1f, spring(dampingRatio = 1f, stiffness = 380f)) }
+            launch { if (anchorY.value != 1f) anchorY.animateTo(1f, spring(dampingRatio = 1f, stiffness = 380f)) }
+        }
         val velocity = pendingVelocity
         pendingVelocity = 0f
         progress.animateTo(target, MORPH_SPEC, initialVelocity = velocity)
@@ -177,7 +192,7 @@ internal fun MorphPlayer(
 
         val sidePx = with(density) { 8.dp.toPx() }
         val gapPx = with(density) { 8.dp.toPx() }
-        // Minimized, the player is just the video: a small floating card (42% of the width at 16:9, narrower for
+        // Minimized, the player is just the video: a small floating card (46% of the width at 16:9, narrower for
         // taller videos) that can be dragged around and always rests against an edge of the screen.
         val aspect = videoAspect
         val maxMiniW = wPx * MINI_WIDTH_FRACTION
@@ -357,7 +372,7 @@ internal fun MorphPlayer(
                 )
             }
             // Playback progress: a straight line flush with the bottom edge of the minimized video.
-            if (miniish) {
+            run {
                 val track = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.35f)
                 val fill = MaterialTheme.colorScheme.primary
                 Box(
@@ -367,6 +382,7 @@ internal fun MorphPlayer(
                             y = { lerpF(thumbY(), topInsetPx, p()) },
                             w = { lerpF(thumbW, wPx, p()) },
                             h = { lerpF(thumbH, videoH, p()) },
+                            show = { miniish },
                         )
                         .graphicsLayer {
                             alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f)
@@ -392,8 +408,8 @@ internal fun MorphPlayer(
 
             // 3. Minimized: drag to move (it settles against the nearest screen edge on release), tap to expand.
             //    Play/pause and close are small icon buttons in the top corners.
-            if (miniish || dragging) {
-                val miniRect = Modifier.placedRect(thumbX, thumbY, { thumbW }, { thumbH })
+            run {
+                val miniRect = Modifier.placedRect(thumbX, thumbY, { thumbW }, { thumbH }, show = { miniish || dragging })
                 val geo = remember { MiniGeo() }
                 val expandLabel = stringResource(R.string.action_expand_player)
                 geo.minX = minX; geo.maxX = maxX; geo.minY = minY; geo.maxY = maxY
