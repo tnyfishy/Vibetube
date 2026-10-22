@@ -269,34 +269,34 @@ private fun Controls(
                 val amplitude by androidx.compose.animation.core.animateFloatAsState(if (dragging) 0f else 1f, androidx.compose.animation.core.tween(220), label = "seekAmplitude")
                 val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { 3.dp.toPx() }
                 val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = strokePx, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                Slider(
-                    value = fraction,
-                    onValueChange = { dragging = true; dragValue = it; onInteract() },
-                    onValueChangeFinished = {
-                        onSeek((dragValue * duration).toLong())
-                        dragging = false
-                    },
-                    modifier = Modifier.fillMaxWidth().height(28.dp).semantics { contentDescription = label },
-                    thumb = { _ ->
-                        SliderDefaults.Thumb(
-                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                            thumbSize = androidx.compose.ui.unit.DpSize(4.dp, 20.dp),
-                            colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary),
-                        )
-                    },
-                    track = { _ ->
-                        androidx.compose.material3.LinearWavyProgressIndicator(
-                            progress = { fraction },
-                            modifier = Modifier.fillMaxWidth(),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MediaOverlayColors.onScrim.copy(alpha = 0.3f),
-                            stroke = stroke,
-                            trackStroke = stroke,
-                            amplitude = { _ -> amplitude },
-                            wavelength = 20.dp,
-                        )
-                    },
-                )
+                Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.LinearWavyProgressIndicator(
+                        progress = { fraction },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MediaOverlayColors.onScrim.copy(alpha = 0.3f),
+                        stroke = stroke,
+                        trackStroke = stroke,
+                        amplitude = { _ -> amplitude },
+                        wavelength = 20.dp,
+                    )
+                    Slider(
+                        value = fraction,
+                        onValueChange = { dragging = true; dragValue = it; onInteract() },
+                        onValueChangeFinished = {
+                            onSeek((dragValue * duration).toLong())
+                            dragging = false
+                        },
+                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = androidx.compose.ui.graphics.Color.Transparent,
+                            inactiveTrackColor = androidx.compose.ui.graphics.Color.Transparent,
+                            activeTickColor = androidx.compose.ui.graphics.Color.Transparent,
+                            inactiveTickColor = androidx.compose.ui.graphics.Color.Transparent,
+                        ),
+                    )
+                }
             }
         }
     }
