@@ -111,7 +111,7 @@ class FeedUiTest {
     fun guestStateShowsLoginPromptNotFallbackFeed() {
         var login = 0
         content(FeedState(phase = FeedPhase.Idle, failure = FeedFailure.LoginRequired, guest = true), onLogin = { login++ })
-        rule.onNodeWithText("Sign in to see your recommendations").assertIsDisplayed()
+        rule.onNodeWithText("Sign in to continue").assertIsDisplayed()
         rule.onAllNodes(hasText("Sign in")).onFirst().performClick()
         assertEquals(1, login)
         save("feed_guest")

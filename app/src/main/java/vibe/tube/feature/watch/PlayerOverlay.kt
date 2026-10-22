@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
@@ -335,9 +336,9 @@ private fun LazyListScope.detailsHeader(ui: WatchUiState, state: PlayerUiState, 
                     }
                 }
                 if (ui.subscribed == true) {
-                    FilledTonalButton(onClick = { watch.toggleSubscribe(onLogin) }, enabled = !ui.subscribeBusy) { Text(stringResource(R.string.action_subscribed)) }
+                    FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { watch.toggleSubscribe(onLogin) }, enabled = !ui.subscribeBusy) { Text(stringResource(R.string.action_subscribed)) }
                 } else {
-                    Button(onClick = { watch.toggleSubscribe(onLogin) }, enabled = !ui.subscribeBusy && channel.id != null) { Text(stringResource(R.string.action_subscribe)) }
+                    Button(shapes = ButtonDefaults.shapes(), onClick = { watch.toggleSubscribe(onLogin) }, enabled = !ui.subscribeBusy && channel.id != null) { Text(stringResource(R.string.action_subscribe)) }
                 }
             }
         }
@@ -438,5 +439,5 @@ private fun LazyListScope.commentsList(ui: WatchUiState, auth: AuthState, watch:
         )
     }
     if (c.loadingMore) item(key = "comments-more") { Box(Modifier.fillMaxWidth().padding(Spacing.md), contentAlignment = Alignment.Center) { androidx.compose.material3.LoadingIndicator() } }
-    if (c.loadMoreError) item(key = "comments-more-error") { TextButton(onClick = watch::loadMoreComments) { Text(stringResource(R.string.feed_load_more_failed)) } }
+    if (c.loadMoreError) item(key = "comments-more-error") { TextButton(shapes = ButtonDefaults.shapes(), onClick = watch::loadMoreComments) { Text(stringResource(R.string.feed_load_more_failed)) } }
 }

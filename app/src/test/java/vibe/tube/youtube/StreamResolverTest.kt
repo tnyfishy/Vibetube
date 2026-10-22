@@ -109,6 +109,29 @@ class StreamResolverTest {
     }
 
     @Test
+    fun plannerHonoursFrameRateCapButFallsBackWhenOnlyHigherFpsExists() {
+        fun f(itag: Int, h: Int, fps: Int) =
+            StreamFormat(itag, "https://v/$itag", "video/mp4", "avc1", 100, null, h, fps, null, null, null, false, null)
+        val both = media(f(298, 720, 60), f(136, 720, 30), f(299, 1080, 60), f(137, 1080, 30), fmt(140, "audio/mp4", null, codecs = "mp4a.40.2"))
+        assertEquals(299, MediaPlanner.plan(both, 1080, maxFps = 60)!!.video!!.itag)
+        assertEquals(137, MediaPlanner.plan(both, 1080, maxFps = 30)!!.video!!.itag)
+        assertEquals(136, MediaPlanner.plan(both, 720, maxFps = 30)!!.video!!.itag)
+        val only60 = media(f(299, 1080, 60), fmt(140, "audio/mp4", null, codecs = "mp4a.40.2"))
+        assertEquals(299, MediaPlanner.plan(only60, 1080, maxFps = 30)!!.video!!.itag)
+    }
+
+    @Test
+    fun qualityCapLabelsCoverEveryHeightAndFrameRate() {
+        assertNull(vibe.tube.data.settings.QualityCap.Auto.label)
+        assertEquals("1080p60", vibe.tube.data.settings.QualityCap.P1080F60.label)
+        assertEquals("1080p", vibe.tube.data.settings.QualityCap.P1080.label)
+        assertEquals("4320p60", vibe.tube.data.settings.QualityCap.P4320F60.label)
+        assertEquals("144p", vibe.tube.data.settings.QualityCap.P144.label)
+        val labels = vibe.tube.data.settings.QualityCap.entries.mapNotNull { it.label }
+        assertEquals(labels.size, labels.toSet().size)
+    }
+
+    @Test
     fun plannerPrefersHlsForLiveAndSelectsRequestedAudioTrack() {
         assertEquals(PlanKind.Hls, MediaPlanner.plan(media(live = true, hls = "https://h/live.m3u8"), null)!!.kind)
         val m = media(

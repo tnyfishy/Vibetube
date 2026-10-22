@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -41,12 +40,17 @@ import vibe.tube.ui.VIcon
 import vibe.tube.ui.components.CenterLoading
 import vibe.tube.ui.components.StateMessage
 import vibe.tube.ui.components.TooltipIconButton
+import vibe.tube.ui.components.VibeLinearProgress
 import vibe.tube.ui.theme.Spacing
 
-private const val LOGIN_URL =
-    "https://accounts.google.com/ServiceLogin?service=youtube&uilel=3&passive=true" +
-        "&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26hl%3D%s" +
-        "&hl=%s&ec=66426"
+// Built by concatenation: the percent-encoded `continue` URL contains sequences such as `%2F`
+// that String.format would parse as format specifiers and crash on.
+private fun loginUrl(language: String): String {
+    val hl = android.net.Uri.encode(language)
+    return "https://accounts.google.com/ServiceLogin?service=youtube&uilel=3&passive=true" +
+        "&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26hl%3D" + hl +
+        "&hl=" + hl + "&ec=66426"
+}
 
 private val allowedHosts = listOf("google.com", "youtube.com", "gstatic.com", "googleusercontent.com", "ggpht.com", "googleapis.com")
 
@@ -87,7 +91,7 @@ fun LoginScreen(onClose: () -> Unit, viewModel: LoginViewModel = hiltViewModel()
                 LoginUiState.Browsing, LoginUiState.Verifying, LoginUiState.Done -> {
                     Column(Modifier.fillMaxSize()) {
                         if (progress in 1..99) {
-                            LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth())
+                            VibeLinearProgress(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.xs))
                         }
                         Text(
                             stringResource(R.string.login_hint),
@@ -96,7 +100,7 @@ fun LoginScreen(onClose: () -> Unit, viewModel: LoginViewModel = hiltViewModel()
                             modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm),
                         )
                         LoginWebView(
-                            loginUrl = LOGIN_URL.format(language, language),
+                            loginUrl = remember(language) { loginUrl(language) },
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             onProgress = { progress = it },
                             onCreated = { webView = it },

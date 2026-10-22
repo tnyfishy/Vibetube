@@ -123,6 +123,18 @@ class InnerTubeProviderTest {
     }
 
     @Test
+    fun guestTrendingUsesWeeklyMostViewedVideoSearchWithoutAuth() = runBlocking {
+        enqueueJson(Fixtures.text("search_videos.json"))
+        val page = provider.trending(ProviderCall(locale, null), null)
+        val request = server.takeRequest()
+        assertTrue(request.path!!.contains("/search"))
+        val body = Fixtures.json.parseToJsonElement(request.body!!.utf8()).jsonObject
+        assertEquals(InnerTubeProvider.TRENDING_SEARCH_PARAMS, body["params"]!!.jsonPrimitive.content)
+        assertTrue(body["query"]!!.jsonPrimitive.content.isNotBlank())
+        assertTrue(page.items.isNotEmpty())
+    }
+
+    @Test
     fun loggedOutResponseToAuthenticatedRequestRaisesSessionExpired() = runBlocking {
         enqueueJson(Fixtures.text("home_guest.json"))
         val failure = runCatching { provider.home(ProviderCall(locale, auth("acc-9")), null) }.exceptionOrNull()

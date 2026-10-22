@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
@@ -186,7 +187,7 @@ fun FeedContent(
             if (state.loadMoreFailed) {
                 item(key = "more-failed", span = { GridItemSpan(maxLineSpan) }) {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        TextButton(onClick = onLoadMore) { Text(stringResource(R.string.feed_load_more_failed)) }
+                        TextButton(shapes = ButtonDefaults.shapes(), onClick = onLoadMore) { Text(stringResource(R.string.feed_load_more_failed)) }
                     }
                 }
             }

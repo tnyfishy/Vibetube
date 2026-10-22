@@ -15,7 +15,7 @@ Mức kiểm chứng:
 | Mã hóa phiên Keystore | T, U | AES-GCM kiểm thử với khóa bộ nhớ; `AndroidKeyStore` chưa chạy trên thiết bị |
 | Đăng xuất xóa đúng phiên | T | `FeedControllerTest.logout…` (vault, cache, hủy request, về chế độ khách) |
 | Home cá nhân hóa | T, U | Parser, continuation, refresh, đổi tài khoản, phản hồi cũ, hết hạn phiên có test; phản hồi có tài khoản chưa thử |
-| Chế độ khách (không fallback) | L, T | Phản hồi Home khách rỗng + nudge; UI không hiển thị feed thay thế |
+| Chế độ khách: feed thịnh hành | T | Khách xem video nhiều lượt xem nhất trong tuần (tìm kiếm công khai); chưa chạy thử trực tiếp trong môi trường này |
 | Cache theo tài khoản/locale/region | T | Room + test cách ly, TTL 24h |
 | Tìm kiếm video/kênh/playlist, bộ lọc, phân trang | L | |
 | Gợi ý tìm kiếm, lịch sử tìm kiếm cục bộ | L, T | |

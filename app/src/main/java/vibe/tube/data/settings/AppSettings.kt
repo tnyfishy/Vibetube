@@ -5,12 +5,31 @@ import java.util.Locale
 
 enum class ThemeMode { System, Light, Dark, Amoled }
 
-enum class QualityCap(val maxHeight: Int?) {
+/**
+ * Default playback quality. [maxFps] null means "no frame-rate limit"; entries named `*P60` allow
+ * 60 fps while the plain ones prefer 30 fps. Enum names are persisted, so existing names must stay.
+ */
+enum class QualityCap(val maxHeight: Int?, val maxFps: Int? = null) {
     Auto(null),
-    P1080(1080),
-    P720(720),
+    P4320F60(4320, 60),
+    P4320(4320, 30),
+    P2160F60(2160, 60),
+    P2160(2160, 30),
+    P1440F60(1440, 60),
+    P1440(1440, 30),
+    P1080F60(1080, 60),
+    P1080(1080, 30),
+    P720F60(720, 60),
+    P720(720, 30),
     P480(480),
     P360(360),
+    P240(240),
+    P144(144),
+    ;
+
+    /** Human label such as `1080p60`; null for [Auto]. */
+    val label: String?
+        get() = maxHeight?.let { h -> if (maxFps == 60) "${h}p60" else "${h}p" }
 }
 
 data class AppSettings(

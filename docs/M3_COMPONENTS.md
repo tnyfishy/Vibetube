@@ -7,10 +7,11 @@ Nguồn: danh mục tại m3.material.io/components. Thư viện: `androidx.comp
 | App bars (top) | Mọi màn hình | `TopAppBar`, `CenterAlignedTopAppBar`, `TopAppBarDefaults.enterAlwaysScrollBehavior` | Dùng |
 | Badges | Gallery | `Badge`, `BadgedBox` | Chỉ gallery; không có luồng cần huy hiệu số |
 | Bottom app bar | — | — | Không áp dụng: điều hướng chính dùng navigation suite |
-| Buttons (common) | Toàn ứng dụng | `Button`, `FilledTonalButton`, `OutlinedButton`, `TextButton`, `ElevatedButton` (gallery) | Dùng |
-| Icon buttons | App bar, player, thẻ | `IconButton` + `TooltipBox` (`TooltipIconButton`), `FilledIconButton`, `FilledTonalIconButton` (gallery) | Dùng |
+| Buttons (common) | Toàn ứng dụng | `Button`, `FilledTonalButton`, `OutlinedButton`, `TextButton`, `ElevatedButton` (gallery), tất cả dùng `ButtonDefaults.shapes()` | Dùng (Expressive: shape morph khi nhấn) |
+| Icon buttons | App bar, player, thẻ | `IconButton(shapes = IconButtonDefaults.shapes())` + `TooltipBox` (`TooltipIconButton`), `FilledIconButton` (nút phát), `FilledTonalIconButton` (gallery) | Dùng (Expressive: shape morph khi nhấn) |
 | FAB / Extended FAB | Danh sách phát | `ExtendedFloatingActionButton`; `FloatingActionButton` (gallery) | Dùng |
-| Button groups / Segmented / Split buttons | Gallery | `SegmentedButton` | Chỉ gallery; cài đặt dùng hộp thoại lựa chọn |
+| Button groups (connected) | Bộ lọc loại kết quả tìm kiếm; gallery | `ToggleButton` + `ButtonGroupDefaults.connected*ButtonShapes()` qua `ConnectedChoiceGroup` | Dùng |
+| Segmented / Split buttons | Gallery | `SegmentedButton` | Chỉ gallery |
 | Cards | Thẻ tài khoản; gallery | `Card`, `ElevatedCard`, `OutlinedCard` | Dùng (thẻ video là bề mặt tùy biến theo shape token) |
 | Carousel | — | — | Không áp dụng: không có luồng cuộn ngang |
 | Checkbox | Thêm vào playlist | `Checkbox` | Dùng |
@@ -22,7 +23,7 @@ Nguồn: danh mục tại m3.material.io/components. Thư viện: `androidx.comp
 | Loading indicator | Tải trang đầu, load more, player | `LoadingIndicator` | Dùng |
 | Menus | Menu video, sắp xếp, đổi tên/xóa | `DropdownMenu`, `DropdownMenuItem` | Dùng |
 | Navigation bar / rail / drawer | Điều hướng chính thích ứng | `NavigationSuiteScaffold` (bar, rail, drawer theo kích thước) | Dùng |
-| Progress indicators | Tiến độ xem dở, mini-player, WebView | `LinearProgressIndicator` (`CircularProgressIndicator` ở gallery) | Dùng |
+| Progress indicators | Mini-player, tải trang đăng nhập, gallery | `LinearWavyProgressIndicator`, `CircularWavyProgressIndicator` qua `VibeLinearProgress` / `VibeCircularProgress`; thanh xem dở trên ảnh thu nhỏ giữ `LinearProgressIndicator` phẳng (quá mỏng để vẽ sóng) | Dùng (Expressive: dạng sóng) |
 | Radio button | Kênh Brand, lựa chọn | `RadioButton` | Dùng |
 | Search | Màn hình tìm kiếm | `SearchBarDefaults.InputField` | Dùng |
 | Sheets (bottom) | Lưu vào playlist, tùy chọn phát | `ModalBottomSheet` | Dùng |

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -168,6 +169,8 @@ fun AddToPlaylistSheet(video: VideoItem, onDismiss: () -> Unit, onLogin: () -> U
                         }
                     }
                     OutlinedButton(
+                       shapes = ButtonDefaults.shapes(),
+                        shapes = ButtonDefaults.shapes(),
                         onClick = { creating = true },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm),
                     ) {

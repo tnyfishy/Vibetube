@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -40,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import vibe.tube.R
 import vibe.tube.feature.home.FeedItemContent
 import vibe.tube.ui.VIcon
+import vibe.tube.ui.components.ConnectedChoiceGroup
 import vibe.tube.ui.components.FeedContent
 import vibe.tube.ui.components.TooltipIconButton
 import vibe.tube.ui.components.VIconImage
@@ -92,20 +94,19 @@ fun SearchScreen(onBack: () -> Unit, onLogin: () -> Unit, viewModel: SearchViewM
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.gutter),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
-                        items(SearchKind.entries.toList()) { kind ->
-                            FilterChip(
-                                selected = ui.kind == kind,
-                                onClick = { viewModel.setKind(kind) },
-                                label = {
-                                    Text(
-                                        stringResource(
-                                            when (kind) {
-                                                SearchKind.All -> R.string.search_filter_all
-                                                SearchKind.Video -> R.string.search_filter_video
-                                                SearchKind.Channel -> R.string.search_filter_channel
-                                                SearchKind.Playlist -> R.string.search_filter_playlist
-                                            },
-                                        ),
+                        item {
+                            ConnectedChoiceGroup(
+                                options = SearchKind.entries.toList(),
+                                selected = ui.kind,
+                                onSelect = viewModel::setKind,
+                                label = { kind ->
+                                    stringResource(
+                                        when (kind) {
+                                            SearchKind.All -> R.string.search_filter_all
+                                            SearchKind.Video -> R.string.search_filter_video
+                                            SearchKind.Channel -> R.string.search_filter_channel
+                                            SearchKind.Playlist -> R.string.search_filter_playlist
+                                        },
                                     )
                                 },
                             )
@@ -167,7 +168,7 @@ fun SearchScreen(onBack: () -> Unit, onLogin: () -> Unit, viewModel: SearchViewM
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(stringResource(R.string.search_recent), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                            TextButton(onClick = { confirmClear = true }) { Text(stringResource(R.string.action_clear)) }
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { confirmClear = true }) { Text(stringResource(R.string.action_clear)) }
                         }
                     }
                     items(recent, key = { "r:$it" }) { query ->
@@ -189,8 +190,8 @@ fun SearchScreen(onBack: () -> Unit, onLogin: () -> Unit, viewModel: SearchViewM
             onDismissRequest = { confirmClear = false },
             title = { Text(stringResource(R.string.dialog_clear_search_title)) },
             text = { Text(stringResource(R.string.dialog_clear_search_body)) },
-            confirmButton = { TextButton(onClick = { confirmClear = false; viewModel.clearRecent() }) { Text(stringResource(R.string.action_clear)) } },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.action_cancel)) } },
+            confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { confirmClear = false; viewModel.clearRecent() }) { Text(stringResource(R.string.action_clear)) } },
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { confirmClear = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -75,11 +76,11 @@ fun ChannelScreen(
                             }
                             val subscribed = detail.subscribed
                             if (subscribed == true) {
-                                FilledTonalButton(onClick = { detailViewModel.toggleSubscribe(onLogin) }, enabled = !detail.busy) {
+                                FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { detailViewModel.toggleSubscribe(onLogin) }, enabled = !detail.busy) {
                                     Text(stringResource(R.string.action_subscribed))
                                 }
                             } else {
-                                Button(onClick = { detailViewModel.toggleSubscribe(onLogin) }, enabled = !detail.busy && d != null) {
+                                Button(shapes = ButtonDefaults.shapes(), onClick = { detailViewModel.toggleSubscribe(onLogin) }, enabled = !detail.busy && d != null) {
                                     Text(stringResource(R.string.action_subscribe))
                                 }
                             }

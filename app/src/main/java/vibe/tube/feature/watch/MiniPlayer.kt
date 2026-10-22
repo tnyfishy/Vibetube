@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -42,6 +41,7 @@ import vibe.tube.player.PlayerController
 import vibe.tube.ui.VIcon
 import vibe.tube.ui.components.RemoteImage
 import vibe.tube.ui.components.TooltipIconButton
+import vibe.tube.ui.components.VibeLinearProgress
 import vibe.tube.ui.theme.Sizing
 import vibe.tube.ui.theme.Spacing
 import vibe.tube.ui.theme.VibeMotion
@@ -109,7 +109,7 @@ fun MiniPlayer(controller: PlayerController, modifier: Modifier = Modifier) {
                     TooltipIconButton(VIcon.Close, stringResource(R.string.action_close_player), controller::dismiss)
                 }
                 val fraction = if (state.durationMs > 0) (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f
-                LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+                VibeLinearProgress(progress = { fraction }, modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.sm))
             }
         }
     }

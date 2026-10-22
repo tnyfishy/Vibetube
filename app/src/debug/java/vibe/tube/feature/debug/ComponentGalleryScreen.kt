@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Badge
@@ -19,7 +20,6 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -34,8 +34,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.InputChip
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -76,7 +76,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import vibe.tube.ui.VIcon
+import vibe.tube.ui.components.ConnectedChoiceGroup
 import vibe.tube.ui.components.TooltipIconButton
+import vibe.tube.ui.components.VibeCircularProgress
+import vibe.tube.ui.components.VibeLinearProgress
 import vibe.tube.ui.components.VIconImage
 import vibe.tube.ui.theme.Spacing
 
@@ -134,16 +137,22 @@ fun ComponentGalleryScreen(onBack: () -> Unit, onDiagnostics: () -> Unit) {
             item {
                 Section("Buttons") {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                        Button(onClick = {}) { Text("Filled") }
-                        FilledTonalButton(onClick = {}) { Text("Tonal") }
-                        ElevatedButton(onClick = {}) { Text("Elevated") }
-                        OutlinedButton(onClick = {}) { Text("Outlined") }
-                        TextButton(onClick = {}) { Text("Text") }
-                        Button(onClick = {}, enabled = false) { Text("Disabled") }
-                        FilledIconButton(onClick = {}) { VIconImage(VIcon.PlayArrowFilled, "Play") }
-                        FilledTonalIconButton(onClick = {}) { VIconImage(VIcon.ThumbUp, "Like") }
+                        Button(shapes = ButtonDefaults.shapes(), onClick = {}) { Text("Filled") }
+                        FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = {}) { Text("Tonal") }
+                        ElevatedButton(shapes = ButtonDefaults.shapes(), onClick = {}) { Text("Elevated") }
+                        OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = {}) { Text("Outlined") }
+                        TextButton(shapes = ButtonDefaults.shapes(), onClick = {}) { Text("Text") }
+                        Button(shapes = ButtonDefaults.shapes(), onClick = {}, enabled = false) { Text("Disabled") }
+                        FilledIconButton(onClick = {}, shapes = IconButtonDefaults.shapes()) { VIconImage(VIcon.PlayArrowFilled, "Play") }
+                        FilledTonalIconButton(onClick = {}, shapes = IconButtonDefaults.shapes()) { VIconImage(VIcon.ThumbUp, "Like") }
                         TooltipIconButton(VIcon.OpenInNew, "Share", {})
                     }
+                    ConnectedChoiceGroup(
+                        options = listOf(0, 1, 2),
+                        selected = segmented,
+                        onSelect = { segmented = it },
+                        label = { listOf("Day", "Night", "AMOLED")[it] },
+                    )
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         listOf("Day", "Night", "AMOLED").forEachIndexed { index, label ->
                             SegmentedButton(
@@ -200,9 +209,11 @@ fun ComponentGalleryScreen(onBack: () -> Unit, onDiagnostics: () -> Unit) {
             }
             item {
                 Section("Progress") {
-                    LinearProgressIndicator(progress = { slider }, modifier = Modifier.fillMaxWidth())
+                    VibeLinearProgress(progress = { slider }, modifier = Modifier.fillMaxWidth())
+                    VibeLinearProgress(modifier = Modifier.fillMaxWidth())
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator()
+                        VibeCircularProgress(progress = { slider })
+                        VibeCircularProgress()
                         LoadingIndicator()
                     }
                 }
@@ -235,15 +246,15 @@ fun ComponentGalleryScreen(onBack: () -> Unit, onDiagnostics: () -> Unit) {
                 Section("Menus, dialogs, sheets, snackbars") {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         Box {
-                            OutlinedButton(onClick = { menu = true }) { Text("Menu") }
+                            OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { menu = true }) { Text("Menu") }
                             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                                 DropdownMenuItem(text = { Text("Item one") }, onClick = { menu = false })
                                 DropdownMenuItem(text = { Text("Item two") }, onClick = { menu = false })
                             }
                         }
-                        OutlinedButton(onClick = { dialog = true }) { Text("Dialog") }
-                        OutlinedButton(onClick = { sheet = true }) { Text("Bottom sheet") }
-                        OutlinedButton(onClick = { scope.launch { snackbar.showSnackbar("Snackbar message") } }) { Text("Snackbar") }
+                        OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { dialog = true }) { Text("Dialog") }
+                        OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { sheet = true }) { Text("Bottom sheet") }
+                        OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { scope.launch { snackbar.showSnackbar("Snackbar message") } }) { Text("Snackbar") }
                     }
                 }
             }
@@ -255,8 +266,8 @@ fun ComponentGalleryScreen(onBack: () -> Unit, onDiagnostics: () -> Unit) {
             onDismissRequest = { dialog = false },
             title = { Text("Dialog") },
             text = { Text("Nội dung hộp thoại") },
-            confirmButton = { TextButton(onClick = { dialog = false }) { Text("OK") } },
-            dismissButton = { TextButton(onClick = { dialog = false }) { Text("Cancel") } },
+            confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { dialog = false }) { Text("OK") } },
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { dialog = false }) { Text("Cancel") } },
         )
     }
     if (sheet) {

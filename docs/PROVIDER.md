@@ -18,7 +18,8 @@ APK/mã trích xuất của Pure Tuber **không được cung cấp** trong môi
 | Chức năng | Endpoint | Ghi chú |
 | --- | --- | --- |
 | Xác minh phiên | `account/account_menu`, `account/accounts_list` | Cần `activeAccountHeaderRenderer` |
-| Home | `browse` `FEwhat_to_watch` (+`continuation`) | Cần đăng nhập |
+| Home | `browse` `FEwhat_to_watch` (+`continuation`) | Cần đăng nhập; khách dùng `trending` |
+| Trending (khách) | `search` với `params=CAMSBAgDEAE%3D` (video, tuần này, nhiều lượt xem) | Công khai; YouTube đã bỏ tab Trending và Home khách trả về rỗng |
 | Đăng ký | `browse` `FEsubscriptions`, `FEchannels` | Cần đăng nhập |
 | Thư viện | `FEplaylist_aggregation`, `VLLL`, `VLWL`, `FEhistory`, `VL<playlistId>` | Playlist công khai chạy ở chế độ khách |
 | Tìm kiếm | `search` (+`params` loại/sắp xếp, `continuation`) | Live, khách |

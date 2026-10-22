@@ -13,7 +13,13 @@ class FeedRepository(
     private fun controller(spec: FeedSpec, scope: CoroutineScope) = FeedController(spec, env, scope)
 
     fun home(scope: CoroutineScope) = controller(
-        FeedSpec("home", requiresAuth = true, cacheable = true) { c, t -> provider.home(c, t) }, scope,
+        FeedSpec(
+            "home",
+            requiresAuth = true,
+            cacheable = true,
+            guestFetch = { c, t -> provider.trending(c, t) },
+        ) { c, t -> provider.home(c, t) },
+        scope,
     )
 
     fun subscriptions(scope: CoroutineScope) = controller(

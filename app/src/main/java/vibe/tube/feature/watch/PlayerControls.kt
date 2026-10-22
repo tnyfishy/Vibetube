@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -167,7 +168,7 @@ fun VideoSurface(
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Button(onClick = { if (error.failure == PlaybackFailure.LoginRequired) onLogin() else onRetry() }) {
+                Button(shapes = ButtonDefaults.shapes(), onClick = { if (error.failure == PlaybackFailure.LoginRequired) onLogin() else onRetry() }) {
                     Text(
                         stringResource(
                             if (error.failure == PlaybackFailure.LoginRequired) R.string.action_sign_in else R.string.action_retry,
@@ -229,6 +230,7 @@ private fun Controls(
             TooltipIconButton(VIcon.SkipPrevious, stringResource(R.string.action_previous), { onInteract(); onPrevious() }, tint = MediaOverlayColors.onScrim)
             FilledIconButton(
                 onClick = { onInteract(); onTogglePlay() },
+                shapes = IconButtonDefaults.shapes(),
                 modifier = Modifier.size(64.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
             ) {

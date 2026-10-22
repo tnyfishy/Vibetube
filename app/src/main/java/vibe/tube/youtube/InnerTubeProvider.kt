@@ -92,6 +92,16 @@ class InnerTubeProvider(
         return page(browse(call, "FEwhat_to_watch", continuation))
     }
 
+    override suspend fun trending(call: ProviderCall, continuation: String?): Page<FeedItem> {
+        val body = buildJsonObject {
+            if (continuation != null) put("continuation", continuation) else {
+                put("query", if (call.locale.language == "vi") "thịnh hành" else "trending")
+                put("params", TRENDING_SEARCH_PARAMS)
+            }
+        }
+        return page(client.post("search", body, call.locale, call.auth))
+    }
+
     override suspend fun subscriptionsFeed(call: ProviderCall, continuation: String?): Page<FeedItem> {
         requireAuth(call, "subscriptions")
         return page(browse(call, "FEsubscriptions", continuation))
@@ -358,6 +368,9 @@ class InnerTubeProvider(
 
     companion object {
         const val VIDEOS_TAB_PARAMS = "EgZ2aWRlb3PyBgQKAjoA"
+
+        /** Search filter: type = video, uploaded this week, sorted by view count. */
+        const val TRENDING_SEARCH_PARAMS = "CAMSBAgDEAE%3D"
         const val SUBSCRIBE_PARAMS = "EgIIAhgA"
     }
 }

@@ -42,6 +42,7 @@ open class FakeProvider : YouTubeProvider {
         verifyResults[session.id] ?: defaultVerify(session)
 
     override suspend fun home(call: ProviderCall, continuation: String?): Page<FeedItem> = notImplemented()
+    override suspend fun trending(call: ProviderCall, continuation: String?): Page<FeedItem> = notImplemented()
     override suspend fun subscriptionsFeed(call: ProviderCall, continuation: String?): Page<FeedItem> = notImplemented()
     override suspend fun subscribedChannels(call: ProviderCall, continuation: String?): Page<FeedItem> = notImplemented()
     override suspend fun userPlaylists(call: ProviderCall, continuation: String?): Page<FeedItem> = notImplemented()

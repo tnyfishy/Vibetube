@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -89,9 +90,9 @@ fun CreatePlaylistDialog(onDismiss: () -> Unit, onCreate: (String, PlaylistPriva
             }
         },
         confirmButton = {
-            TextButton(onClick = { onCreate(title, privacy) }, enabled = title.isNotBlank()) { Text(stringResource(R.string.action_create)) }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = { onCreate(title, privacy) }, enabled = title.isNotBlank()) { Text(stringResource(R.string.action_create)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -166,6 +167,8 @@ fun PlaylistScreen(
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                             Button(
+                               shapes = ButtonDefaults.shapes(),
+                                shapes = ButtonDefaults.shapes(),
                                 onClick = { actions.playPlaylist(id, shuffle = false) },
                                 enabled = state.items.isNotEmpty(),
                             ) {
@@ -173,6 +176,8 @@ fun PlaylistScreen(
                                 Text(stringResource(R.string.action_play_all), Modifier.padding(start = Spacing.sm))
                             }
                             FilledTonalButton(
+                               shapes = ButtonDefaults.shapes(),
+                                shapes = ButtonDefaults.shapes(),
                                 onClick = { actions.playPlaylist(id, shuffle = true) },
                                 enabled = state.items.isNotEmpty(),
                             ) {
@@ -207,11 +212,12 @@ fun PlaylistScreen(
             },
             confirmButton = {
                 TextButton(
+                    shapes = ButtonDefaults.shapes(),
                     enabled = name.isNotBlank(),
                     onClick = { renaming = false; manage.rename(id, name, null, onDone = viewModel::refresh) },
                 ) { Text(stringResource(R.string.action_save)) }
             },
-            dismissButton = { TextButton(onClick = { renaming = false }) { Text(stringResource(R.string.action_cancel)) } },
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { renaming = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
     if (confirmDelete) {
@@ -220,11 +226,11 @@ fun PlaylistScreen(
             title = { Text(stringResource(R.string.dialog_delete_playlist_title)) },
             text = { Text(stringResource(R.string.dialog_delete_playlist_body, title)) },
             confirmButton = {
-                TextButton(onClick = { confirmDelete = false; manage.delete(id, onDone = onBack) }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { confirmDelete = false; manage.delete(id, onDone = onBack) }) {
                     Text(stringResource(R.string.action_delete_playlist))
                 }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } },
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }

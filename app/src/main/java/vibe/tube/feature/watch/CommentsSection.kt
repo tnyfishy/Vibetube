@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -66,7 +67,7 @@ fun CommentItem(
                     }
                 }
                 if (canReply && comment.replyParams != null && !nested) {
-                    TextButton(onClick = { replying = !replying }) { Text(stringResource(R.string.comment_reply)) }
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { replying = !replying }) { Text(stringResource(R.string.comment_reply)) }
                 }
             }
             if (replying) {
@@ -78,14 +79,15 @@ fun CommentItem(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Button(
+                        shapes = ButtonDefaults.shapes(),
                         enabled = draft.isNotBlank(),
                         onClick = { onReply(draft) { draft = ""; replying = false } },
                     ) { Text(stringResource(R.string.comment_send)) }
-                    TextButton(onClick = { replying = false }) { Text(stringResource(R.string.action_cancel)) }
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { replying = false }) { Text(stringResource(R.string.action_cancel)) }
                 }
             }
             if (comment.repliesToken != null && !nested) {
-                TextButton(onClick = onToggleReplies) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = onToggleReplies) {
                     Text(
                         if (replies?.expanded == true) stringResource(R.string.comment_hide_replies)
                         else stringResource(R.string.comment_show_replies, comment.replyCountText.orEmpty()),
@@ -102,10 +104,10 @@ fun CommentItem(
             Row(Modifier.fillMaxWidth().padding(Spacing.md), horizontalArrangement = Arrangement.Center) { LoadingIndicator(Modifier.size(32.dp)) }
         }
         if (replies.failed) {
-            TextButton(onClick = onToggleReplies) { Text(stringResource(R.string.action_retry)) }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onToggleReplies) { Text(stringResource(R.string.action_retry)) }
         }
         if (replies.continuation != null && !replies.loading) {
-            TextButton(onClick = onMoreReplies, modifier = Modifier.padding(start = Spacing.xl)) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onMoreReplies, modifier = Modifier.padding(start = Spacing.xl)) {
                 Text(stringResource(R.string.comment_more_replies))
             }
         }
@@ -131,7 +133,7 @@ fun CommentsHeader(
             )
             if (state.sorts.size > 1) {
                 androidx.compose.foundation.layout.Box {
-                    OutlinedButton(onClick = { menu = true }) {
+                    OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { menu = true }) {
                         VIconImage(VIcon.Sort, null)
                         Text(state.sorts.firstOrNull { it.selected }?.title ?: stringResource(R.string.comments_sort), Modifier.padding(start = Spacing.sm))
                     }
@@ -154,12 +156,13 @@ fun CommentsHeader(
                         enabled = !state.posting,
                     )
                     Button(
+                        shapes = ButtonDefaults.shapes(),
                         enabled = draft.isNotBlank() && !state.posting,
                         onClick = { onPost(draft) { draft = "" } },
                     ) { Text(stringResource(R.string.comment_post)) }
                 }
             } else {
-                OutlinedButton(onClick = onLogin, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.comment_sign_in_to_comment)) }
+                OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = onLogin, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.comment_sign_in_to_comment)) }
             }
         }
     }

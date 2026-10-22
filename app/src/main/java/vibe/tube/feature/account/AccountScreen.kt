@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -139,7 +140,7 @@ fun AccountScreen(
                             if (isActive) {
                                 AssistChip(onClick = {}, label = { Text(stringResource(R.string.account_active)) })
                             } else {
-                                TextButton(onClick = { confirm = Confirm.Logout(account.id) }) { Text(stringResource(R.string.action_sign_out)) }
+                                TextButton(shapes = ButtonDefaults.shapes(), onClick = { confirm = Confirm.Logout(account.id) }) { Text(stringResource(R.string.action_sign_out)) }
                             }
                         },
                     )
@@ -147,7 +148,7 @@ fun AccountScreen(
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    FilledTonalButton(onClick = onLogin) {
+                    FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = onLogin) {
                         VIconImage(VIcon.PersonAdd, null)
                         Text(stringResource(R.string.account_add), Modifier.padding(start = Spacing.sm))
                     }
@@ -157,15 +158,15 @@ fun AccountScreen(
                 item {
                     HorizontalDivider()
                     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.padding(top = Spacing.sm)) {
-                        OutlinedButton(onClick = { confirm = Confirm.Wipe(active.id) }, modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { confirm = Confirm.Wipe(active.id) }, modifier = Modifier.fillMaxWidth()) {
                             Text(stringResource(R.string.account_clear_local_data))
                         }
-                        OutlinedButton(onClick = { confirm = Confirm.Logout(active.id) }, modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { confirm = Confirm.Logout(active.id) }, modifier = Modifier.fillMaxWidth()) {
                             VIconImage(VIcon.Logout, null)
                             Text(stringResource(R.string.action_sign_out), Modifier.padding(start = Spacing.sm))
                         }
                         if (sessions.size > 1) {
-                            TextButton(onClick = { confirm = Confirm.LogoutAll }, modifier = Modifier.fillMaxWidth()) {
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { confirm = Confirm.LogoutAll }, modifier = Modifier.fillMaxWidth()) {
                                 Text(stringResource(R.string.account_sign_out_all))
                             }
                         }
@@ -193,8 +194,8 @@ fun AccountScreen(
             onDismissRequest = { confirm = null },
             title = { Text(stringResource(title)) },
             text = { Text(stringResource(body)) },
-            confirmButton = { TextButton(onClick = { confirm = null; action() }) { Text(stringResource(R.string.action_confirm)) } },
-            dismissButton = { TextButton(onClick = { confirm = null }) { Text(stringResource(R.string.action_cancel)) } },
+            confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { confirm = null; action() }) { Text(stringResource(R.string.action_confirm)) } },
+            dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { confirm = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -205,7 +206,7 @@ private fun GuestCard(onLogin: () -> Unit) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(stringResource(R.string.account_guest_title), style = MaterialTheme.typography.titleLarge)
             Text(stringResource(R.string.account_guest_body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Button(onClick = onLogin) { Text(stringResource(R.string.action_sign_in)) }
+            Button(shapes = ButtonDefaults.shapes(), onClick = onLogin) { Text(stringResource(R.string.action_sign_in)) }
         }
     }
 }
@@ -241,7 +242,7 @@ private fun ActiveCard(account: AccountSession, auth: AuthState, onRefresh: () -
                     content = MaterialTheme.colorScheme.onErrorContainer,
                 )
             }
-            OutlinedButton(onClick = onRefresh) {
+            OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = onRefresh) {
                 VIconImage(VIcon.Refresh, null)
                 Text(stringResource(R.string.account_refresh), Modifier.padding(start = Spacing.sm))
             }

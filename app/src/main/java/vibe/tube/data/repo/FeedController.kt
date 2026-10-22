@@ -62,8 +62,13 @@ data class FeedSpec(
     val requiresAuth: Boolean,
     val cacheable: Boolean,
     val extra: String = "",
+    /** When set, guests (no account) load this feed instead of being asked to sign in. */
+    val guestFetch: (suspend (ProviderCall, String?) -> Page<FeedItem>)? = null,
     val fetch: suspend (ProviderCall, String?) -> Page<FeedItem>,
-)
+) {
+    internal fun fetcherFor(guest: Boolean): suspend (ProviderCall, String?) -> Page<FeedItem> =
+        if (guest && guestFetch != null) guestFetch else fetch
+}
 
 class FeedEnvironment(
     val session: SessionManager,
@@ -131,7 +136,7 @@ class FeedController(
         activeJob = scope.launch {
             try {
                 val call = buildCall(key) ?: return@launch
-                val page = spec.fetch(call, cont)
+                val page = spec.fetcherFor(key.scope == GUEST_SCOPE)(call, cont)
                 if (!isCurrent(key, gen)) return@launch
                 val existing = mutableState.value
                 val seen = existing.items.mapTo(HashSet()) { it.key() }
@@ -159,7 +164,7 @@ class FeedController(
     private fun cacheKey(key: Key) = "${key.scope}|${key.locale.tag}|${spec.type}|${spec.extra}"
 
     private suspend fun initialLoad(key: Key, gen: Long) {
-        if (spec.requiresAuth && key.scope == GUEST_SCOPE) {
+        if (spec.requiresAuth && key.scope == GUEST_SCOPE && spec.guestFetch == null) {
             mutableState.value = mutableState.value.copy(phase = FeedPhase.Idle, failure = FeedFailure.LoginRequired, guest = true)
             return
         }
@@ -180,7 +185,8 @@ class FeedController(
     }
 
     private suspend fun buildCall(key: Key): ProviderCall? {
-        val ctx = if (spec.requiresAuth) {
+        val guestAllowed = key.scope == GUEST_SCOPE && spec.guestFetch != null
+        val ctx = if (spec.requiresAuth && !guestAllowed) {
             env.session.ensureVerified() ?: return null
         } else {
             env.session.currentContext()?.takeIf { env.session.authState.value is AuthState.Verified }
@@ -207,11 +213,12 @@ class FeedController(
                 mutableState.value = mutableState.value.copy(phase = FeedPhase.Idle, failure = FeedFailure.LoginRequired)
                 return
             }
-            var result = spec.fetch(call, null)
+            val fetch = spec.fetcherFor(key.scope == GUEST_SCOPE)
+            var result = fetch(call, null)
             var guard = 0
             while (result.items.isEmpty() && result.continuation != null && guard < MAX_EMPTY_HOPS) {
                 guard++
-                result = spec.fetch(call, result.continuation)
+                result = fetch(call, result.continuation)
             }
             page = result
             if (!isCurrent(key, gen)) return

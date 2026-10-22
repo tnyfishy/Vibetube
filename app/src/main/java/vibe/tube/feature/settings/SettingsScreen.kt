@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -73,7 +74,7 @@ fun <T> ChoiceDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
     )
 }
 
@@ -240,8 +241,8 @@ private fun ConfirmDialog(title: Int, body: Int, onDismiss: () -> Unit, onConfir
         onDismissRequest = onDismiss,
         title = { Text(stringResource(title)) },
         text = { Text(stringResource(body)) },
-        confirmButton = { TextButton(onClick = { onDismiss(); onConfirm() }) { Text(stringResource(R.string.action_confirm)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { onDismiss(); onConfirm() }) { Text(stringResource(R.string.action_confirm)) } },
+        dismissButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -293,7 +294,7 @@ private fun themeLabel(mode: ThemeMode): String = stringResource(
 @Composable
 private fun qualityLabel(cap: QualityCap): String = when (cap) {
     QualityCap.Auto -> stringResource(R.string.quality_auto)
-    else -> "${cap.maxHeight}p"
+    else -> cap.label.orEmpty()
 }
 
 private fun languageLabel(code: String, systemLabel: String, display: Locale): String =

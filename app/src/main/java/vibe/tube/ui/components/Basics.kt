@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
@@ -72,7 +73,12 @@ fun TooltipIconButton(
         tooltip = { PlainTooltip { Text(label) } },
         state = rememberTooltipState(),
     ) {
-        IconButton(onClick = onClick, modifier = modifier.size(Sizing.minTouchTarget), enabled = enabled) {
+        IconButton(
+            onClick = onClick,
+            shapes = IconButtonDefaults.shapes(),
+            modifier = modifier.size(Sizing.minTouchTarget),
+            enabled = enabled,
+        ) {
             VIconImage(icon, label, tint = tint)
         }
     }
@@ -145,10 +151,10 @@ fun StateMessage(
         }
         if (primaryLabel != null && onPrimary != null) {
             Spacer(Modifier.height(Spacing.xs))
-            Button(onClick = onPrimary) { Text(primaryLabel) }
+            Button(shapes = ButtonDefaults.shapes(), onClick = onPrimary) { Text(primaryLabel) }
         }
         if (secondaryLabel != null && onSecondary != null) {
-            FilledTonalButton(onClick = onSecondary) { Text(secondaryLabel) }
+            FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = onSecondary) { Text(secondaryLabel) }
         }
     }
 }
@@ -179,7 +185,7 @@ fun Banner(
             VIconImage(icon, null, Modifier.size(Sizing.iconMedium))
             Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             if (actionLabel != null && onAction != null) {
-                androidx.compose.material3.TextButton(onClick = onAction) { Text(actionLabel) }
+                androidx.compose.material3.TextButton(shapes = ButtonDefaults.shapes(), onClick = onAction) { Text(actionLabel) }
             }
         }
     }

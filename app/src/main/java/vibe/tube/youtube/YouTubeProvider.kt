@@ -38,6 +38,9 @@ interface YouTubeProvider {
     suspend fun verify(session: AccountSession, locale: ContentLocale): VerifyResult
 
     suspend fun home(call: ProviderCall, continuation: String?): Page<FeedItem>
+
+    /** Public "popular right now" feed used by guest mode (YouTube's guest home is empty and the Trending tab is gone). */
+    suspend fun trending(call: ProviderCall, continuation: String?): Page<FeedItem>
     suspend fun subscriptionsFeed(call: ProviderCall, continuation: String?): Page<FeedItem>
     suspend fun subscribedChannels(call: ProviderCall, continuation: String?): Page<FeedItem>
     suspend fun userPlaylists(call: ProviderCall, continuation: String?): Page<FeedItem>

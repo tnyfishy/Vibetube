@@ -39,6 +39,13 @@ class FeedControllerTest {
         val calls = mutableListOf<Triple<String?, String?, String?>>()
         var handler: suspend (ProviderCall, String?) -> Page<FeedItem> = { _, _ -> Page(emptyList(), null) }
 
+        val trendingCalls = mutableListOf<String?>()
+
+        override suspend fun trending(call: ProviderCall, continuation: String?): Page<FeedItem> {
+            trendingCalls += continuation
+            return Page(listOf(video("t1"), video("t2")), null)
+        }
+
         override suspend fun home(call: ProviderCall, continuation: String?): Page<FeedItem> {
             calls += Triple(call.auth?.accountId, continuation, call.auth?.jar?.valueOf("SAPISID"))
             return handler(call, continuation)
@@ -59,16 +66,17 @@ class FeedControllerTest {
     }
 
     @Test
-    fun guestSeesLoginRequiredAndProviderIsNeverCalled() = runTest(StandardTestDispatcher()) {
+    fun guestSeesTrendingFeedAndPersonalHomeIsNeverCalled() = runTest(StandardTestDispatcher()) {
         val provider = HomeProvider()
         val (_, _, repo) = setup(provider)
         val controller = repo.home(appScope())
         advanceUntilIdle()
         val state = controller.state.value
-        assertEquals(FeedFailure.LoginRequired, state.failure)
+        assertNull(state.failure)
         assertTrue(state.guest)
-        assertTrue(state.items.isEmpty())
+        assertEquals(listOf("t1", "t2"), state.items.map { it.id })
         assertTrue(provider.calls.isEmpty())
+        assertEquals(1, provider.trendingCalls.size)
     }
 
     @Test
@@ -287,8 +295,9 @@ class FeedControllerTest {
         assertNull(env.manager.currentSession())
         assertEquals(1, env.vault.loadAll().size)
         assertTrue(env.cache.entries.keys.none { it.startsWith(bobId) })
-        assertEquals(FeedFailure.LoginRequired, controller.state.value.failure)
-        assertTrue(controller.state.value.items.isEmpty())
+        assertNull(controller.state.value.failure)
+        assertTrue(controller.state.value.guest)
+        assertEquals(listOf("t1", "t2"), controller.state.value.items.map { it.id })
         assertTrue(bobId in env.hooks.cancelled)
         assertTrue(bobId in env.hooks.wiped)
     }

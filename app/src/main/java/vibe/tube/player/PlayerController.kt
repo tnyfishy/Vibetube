@@ -185,10 +185,9 @@ class PlayerController @Inject constructor(
         return caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
     }
 
-    private fun heightCap(): Int? {
+    private fun defaultCap(): QualityCap {
         val s = settings.latest.value
-        val cap: QualityCap = if (isUnmetered()) s.wifiQuality else s.mobileQuality
-        return cap.maxHeight
+        return if (isUnmetered()) s.wifiQuality else s.mobileQuality
     }
 
     private fun ensureService() {
@@ -246,8 +245,11 @@ class PlayerController @Inject constructor(
     private fun startPlayback(media: ResolvedMedia, video: VideoItem, resumeMs: Long?) {
         currentMedia = media
         val s = mutable.value
-        val effectiveCap = s.selectedHeight ?: heightCap()
-        val plan = MediaPlanner.plan(media, effectiveCap, s.selectedAudioTrack, allowWebm = !avoidWebm)
+        val cap = defaultCap()
+        val effectiveCap = s.selectedHeight ?: cap.maxHeight
+        // An explicit height picked in the player options sheet is not frame-rate limited.
+        val effectiveFps = if (s.selectedHeight != null) null else cap.maxFps
+        val plan = MediaPlanner.plan(media, effectiveCap, s.selectedAudioTrack, allowWebm = !avoidWebm, maxFps = effectiveFps)
         if (plan == null) {
             fail(
                 if (media.skippedCipherFormats > 0) PlaybackFailure.CipherUnsupported else PlaybackFailure.NoCompatibleStream,
