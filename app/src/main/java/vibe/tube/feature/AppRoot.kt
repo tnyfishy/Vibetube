@@ -42,6 +42,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -216,11 +220,33 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     val miniVisible = playerState.visible && !playerState.expanded && !playerState.inPip
     val miniPadding = if (miniVisible) Sizing.miniPlayerHeight + 16.dp else 0.dp
 
-    val hiddenIds = remember(settings.hiddenChannels) { settings.hiddenChannelIds }
+    val hiddenIds = remember(settings.hiddenChannels)  { settings.hiddenChannelIds }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val isBar = showNav && windowConfig.screenWidthDp < 600
+    val barBody = 60.dp
+    val navInset = WindowInsets.navigationBars.getBottom(density)
+    val barFullPx = with(density) { barBody.roundToPx() } + navInset
+    var hide by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    LaunchedEffect(currentTab, isBar) { hide = 0f }
+    val barScroll = remember(barFullPx) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                if (barFullPx > 0 && available.y != 0f) hide = (hide - available.y / barFullPx).coerceIn(0f, 1f)
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: androidx.compose.ui.unit.Velocity, available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                val target = if (hide > 0.5f) 1f else 0f
+                androidx.compose.animation.core.animate(hide, target, animationSpec = androidx.compose.animation.core.tween(180)) { v, _ -> hide = v }
+                return androidx.compose.ui.unit.Velocity.Zero
+            }
+        }
+    }
+    val hideInsetDp = with(density) { (navInset - barFullPx * (1f - hide)).coerceAtLeast(0f).toDp() }
     CompositionLocalProvider(LocalVideoActions provides actions, LocalMiniPlayerPadding provides miniPadding, vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds) {
         Box(Modifier.fillMaxSize()) {
             NavigationSuiteScaffold(
-                layoutType = suiteType,
+                layoutType = if (isBar) NavigationSuiteType.None else suiteType,
                 navigationSuiteItems = {
                     tabs.forEach { tab ->
                         val selected = destination?.hasRoute(tab.route::class) == true
@@ -233,10 +259,13 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                     }
                 },
             ) {
+                Column(Modifier.fillMaxSize()) {
                 Box(
                     Modifier
-                        .fillMaxSize()
+                        .weight(1f)
+                        .fillMaxWidth()
                         .onGloballyPositioned { contentBottomPx = (it.positionInRoot().y + it.size.height).roundToInt() }
+                        .then(if (isBar) Modifier.nestedScroll(barScroll) else Modifier)
                         .tabSwipe(enabled = currentTab >= 0 && !(playerState.visible && playerState.expanded)) { direction ->
                             tabs.getOrNull(currentTab + direction)?.let(goToTab)
                         },
@@ -247,15 +276,38 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                         enabled = classicPlayer,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .then(if (showNav) Modifier else Modifier.windowInsetsPadding(WindowInsets.navigationBars)),
+                            .then(if (!showNav) Modifier.windowInsetsPadding(WindowInsets.navigationBars) else if (isBar) Modifier.padding(bottom = hideInsetDp) else Modifier),
                     )
                     SnackbarHost(
                         snackbar,
                         Modifier
                             .align(Alignment.BottomCenter)
                             .padding(bottom = miniPadding)
-                            .then(if (showNav) Modifier else Modifier.windowInsetsPadding(WindowInsets.navigationBars)),
+                            .then(if (!showNav) Modifier.windowInsetsPadding(WindowInsets.navigationBars) else if (isBar) Modifier.padding(bottom = hideInsetDp) else Modifier),
                     )
+                }
+                if (isBar) {
+                    androidx.compose.material3.NavigationBar(
+                        modifier = Modifier
+                            .layout { measurable, constraints ->
+                                val full = barFullPx
+                                val p = measurable.measure(constraints.copy(minHeight = full, maxHeight = full))
+                                val h = (full * (1f - hide)).roundToInt()
+                                layout(p.width, h) { p.place(0, 0) }
+                            }
+                            .clipToBounds(),
+                    ) {
+                        tabs.forEach { tab ->
+                            val selected = destination?.hasRoute(tab.route::class) == true
+                            androidx.compose.material3.NavigationBarItem(
+                                selected = selected,
+                                onClick = { goToTab(tab) },
+                                icon = { VIconImage(if (selected) tab.iconSelected else tab.icon, null) },
+                                label = { Text(stringResource(tab.label), maxLines = 1) },
+                            )
+                        }
+                    }
+                }
                 }
             }
             PlayerOverlay(

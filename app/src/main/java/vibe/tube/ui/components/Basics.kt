@@ -17,7 +17,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
@@ -155,7 +155,7 @@ fun Avatar(url: String?, size: Dp, modifier: Modifier = Modifier, description: S
 @Composable
 fun CenterLoading(modifier: Modifier = Modifier) {
     androidx.compose.foundation.layout.Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        LoadingIndicator()
+        ContainedLoadingIndicator()
     }
 }
 

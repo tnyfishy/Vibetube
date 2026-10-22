@@ -13,7 +13,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -172,7 +172,7 @@ fun FeedContent(
             } else if (state.items.isEmpty() && state.phase == FeedPhase.LoadingFirst) {
                 item(key = "loading", span = { GridItemSpan(maxLineSpan) }) {
                     Box(Modifier.fillMaxWidth().padding(vertical = Spacing.xxl * 2), contentAlignment = Alignment.Center) {
-                        LoadingIndicator()
+                        ContainedLoadingIndicator()
                     }
                 }
             } else if (visible.isEmpty() && state.isEmptyContent) {
@@ -186,7 +186,7 @@ fun FeedContent(
             }
             if (state.phase == FeedPhase.LoadingMore) {
                 item(key = "more-loading", span = { GridItemSpan(maxLineSpan) }) {
-                    Box(Modifier.fillMaxWidth().padding(Spacing.lg), contentAlignment = Alignment.Center) { LoadingIndicator() }
+                    Box(Modifier.fillMaxWidth().padding(Spacing.lg), contentAlignment = Alignment.Center) { ContainedLoadingIndicator() }
                 }
             }
             if (state.loadMoreFailed) {

@@ -93,6 +93,16 @@ fun SearchScreen(
         }
     }
 
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    // Once a search has been submitted the keyboard has done its job: drop focus and hide it.
+    LaunchedEffect(ui.submitted) {
+        if (ui.submitted != null) {
+            focusManager.clearFocus()
+            keyboard?.hide()
+        }
+    }
+
     // Open the keyboard only once the pill has finished expanding into the screen.
     LaunchedEffect(Unit) {
         if (ui.submitted == null) {

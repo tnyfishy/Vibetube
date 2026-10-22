@@ -73,6 +73,19 @@ fun LoginScreen(onClose: () -> Unit, viewModel: LoginViewModel = hiltViewModel()
     LaunchedEffect(state) {
         if (state is LoginUiState.Done) onClose()
     }
+    // Google finishes sign-in with script redirects that do not always reach a WebViewClient callback, so also
+    // watch for the session cookies while the page is open (this is what the reload button used to trigger).
+    LaunchedEffect(state) {
+        if (state != LoginUiState.Browsing) return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(700)
+            val header = CookieManager.getInstance().getCookie("https://www.youtube.com")
+            if (viewModel.hasSessionCookies(header)) {
+                viewModel.onCookieHeader(header.orEmpty())
+                break
+            }
+        }
+    }
     BackHandler(enabled = webView?.canGoBack() == true && state is LoginUiState.Browsing) { webView?.goBack() }
 
     Scaffold(

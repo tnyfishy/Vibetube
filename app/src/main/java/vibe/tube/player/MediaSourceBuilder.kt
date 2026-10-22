@@ -64,7 +64,9 @@ class MediaSourceBuilder(private val http: OkHttpClient) {
                 .setLabel(track.name)
                 .setSelectionFlags(0)
                 .build()
-            SingleSampleMediaSource.Factory(factory).createMediaSource(configuration, C.TIME_UNSET)
+            SingleSampleMediaSource.Factory(factory)
+                .setTreatLoadErrorsAsEndOfStream(true) // a failing caption file must never take the video down with it
+                .createMediaSource(configuration, C.TIME_UNSET)
         }
         return MergingMediaSource(source, *subtitleSources.toTypedArray())
     }

@@ -113,6 +113,8 @@ internal fun MorphPlayer(
     val deviceCorner = with(density) { vibe.tube.ui.rememberDeviceCornerRadius().toPx() }
     val dismiss = remember { Animatable(0f) }
     var pendingVelocity by remember { mutableFloatStateOf(0f) }
+    // True while a finger is dragging the card: the node that owns the gesture must stay composed until it ends.
+    var dragging by remember { mutableStateOf(false) }
 
     val target = if (state.visible && state.expanded) 1f else 0f
     LaunchedEffect(target) {
@@ -180,8 +182,10 @@ internal fun MorphPlayer(
         val dragModifier = Modifier.draggable(
             orientation = Orientation.Vertical,
             state = dragState,
+            onDragStarted = { dragging = true },
             onDragStopped = { velocity ->
                 scope.launch {
+                    try {
                     if (dismiss.value > 0f) {
                         val threshold = with(density) { 72.dp.toPx() }
                         if (dismiss.value > threshold || velocity > 1400f) {
@@ -202,6 +206,9 @@ internal fun MorphPlayer(
                             pendingVelocity = v
                             if (goExpanded) controller.expand() else controller.collapse()
                         }
+                    }
+                    } finally {
+                        dragging = false
                     }
                 }
             },
@@ -279,7 +286,7 @@ internal fun MorphPlayer(
                     onRetry = controller::retry,
                     onLogin = onLogin,
                     modifier = Modifier.fillMaxSize(),
-                    dragModifier = if (controlsOn || !miniish) dragModifier else Modifier,
+                    dragModifier = if (controlsOn || !miniish || dragging) dragModifier else Modifier,
                 )
                 // Playback progress rides inside the thumbnail while minimized.
                 val fraction = if (state.durationMs > 0) (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f
@@ -287,15 +294,23 @@ internal fun MorphPlayer(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
+                        .padding(start = 6.dp, end = 6.dp, bottom = 3.dp)
                         .graphicsLayer { alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f) },
                 ) {
-                    LinearWavyProgressIndicator(progress = { fraction }, wavelength = 14.dp, modifier = Modifier.fillMaxWidth())
+                    val miniStroke = androidx.compose.ui.graphics.drawscope.Stroke(width = with(density) { 2.dp.toPx() }, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    LinearWavyProgressIndicator(
+                        progress = { fraction },
+                        wavelength = 9.dp,
+                        stroke = miniStroke,
+                        trackStroke = miniStroke,
+                        amplitude = { 0.6f },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
 
             // 3. Minimized card: tap to expand, drag up to expand, drag down to dismiss.
-            if (miniish) {
+            if (miniish || dragging) {
                 Box(
                     Modifier
                         .placedRect(containerX, containerY, containerW, containerH)

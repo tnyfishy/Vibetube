@@ -143,6 +143,15 @@ class InnerTubeProvider(
     }
 
     override suspend fun playlist(call: ProviderCall, playlistId: String, continuation: String?): PlaylistDetail {
+        if (playlistId.startsWith("RD") && continuation == null) {
+            // Mixes are not browsable; they come from the watch-next panel.
+            val body = buildJsonObject {
+                playlistId.removePrefix("RD").takeIf { it.length == 11 }?.let { put("videoId", it) }
+                put("playlistId", playlistId)
+            }
+            val (title, videos) = WatchParser.parseQueuePanel(client.post("next", body, call.locale, call.auth).root)
+            return PlaylistDetail(playlistId, title.orEmpty(), null, null, null, null, videos, null)
+        }
         val browseId = if (playlistId.startsWith("VL")) playlistId else "VL$playlistId"
         if (browseId == "VLLL" || browseId == "VLWL") requireAuth(call, "library")
         val response = browse(call, browseId, continuation)
@@ -389,8 +398,8 @@ class InnerTubeProvider(
     companion object {
         const val VIDEOS_TAB_PARAMS = "EgZ2aWRlb3PyBgQKAjoA"
 
-        /** Search filter: type = video, uploaded this week, sorted by view count. */
-        const val TRENDING_SEARCH_PARAMS = "CAMSBAgDEAE%3D"
+        /** Search filter: type = video only (sorting by views surfaced the same few global, mostly Indian, videos). */
+        const val TRENDING_SEARCH_PARAMS = "EgIQAQ%3D%3D"
         const val SUBSCRIBE_PARAMS = "EgIIAhgA"
 
         /** Topic searches per region (first entry = the default "trending" query). The empty key is the fallback. */

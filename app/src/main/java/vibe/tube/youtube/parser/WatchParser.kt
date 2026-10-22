@@ -99,6 +99,13 @@ object WatchParser {
     fun entityPayloads(root: JsonElement): List<JsonElement> =
         root.path("frameworkUpdates", "entityBatchUpdate", "mutations").list().mapNotNull { it.at("payload") }
 
+    /** Title and videos of the queue panel in a `next` response (how YouTube Mixes, "RD…" lists, are delivered). */
+    fun parseQueuePanel(root: JsonElement): Pair<String?, List<VideoItem>> {
+        val panel = root.path("contents", "twoColumnWatchNextResults", "playlist", "playlist")
+        val items = panel.at("contents").list().mapNotNull { parsePanelVideo(it.at("playlistPanelVideoRenderer")) }
+        return panel.at("title").textOf() to items
+    }
+
     private fun parsePanelVideo(node: JsonElement?): VideoItem? {
         node ?: return null
         val id = node.at("videoId").str ?: return null

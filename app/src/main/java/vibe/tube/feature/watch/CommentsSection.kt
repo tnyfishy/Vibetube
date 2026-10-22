@@ -10,7 +10,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -101,7 +101,7 @@ fun CommentItem(
             CommentItem(reply, null, false, {}, {}, { _, _ -> }, nested = true)
         }
         if (replies.loading) {
-            Row(Modifier.fillMaxWidth().padding(Spacing.md), horizontalArrangement = Arrangement.Center) { LoadingIndicator(Modifier.size(32.dp)) }
+            Row(Modifier.fillMaxWidth().padding(Spacing.md), horizontalArrangement = Arrangement.Center) { ContainedLoadingIndicator(Modifier.size(40.dp)) }
         }
         if (replies.failed) {
             TextButton(shapes = ButtonDefaults.shapes(), onClick = onToggleReplies) { Text(stringResource(R.string.action_retry)) }
@@ -171,7 +171,7 @@ fun CommentsHeader(
 @Composable
 fun CommentsEmptyStates(state: CommentsUiState, onRetry: () -> Unit) {
     when {
-        state.loading -> Row(Modifier.fillMaxWidth().padding(Spacing.xl), horizontalArrangement = Arrangement.Center) { LoadingIndicator() }
+        state.loading -> Row(Modifier.fillMaxWidth().padding(Spacing.xl), horizontalArrangement = Arrangement.Center) { ContainedLoadingIndicator() }
         state.error -> StateMessage(VIcon.Error, stringResource(R.string.comments_error_title), null, primaryLabel = stringResource(R.string.action_retry), onPrimary = onRetry)
         state.disabledMessage != null -> StateMessage(
             VIcon.Lock,

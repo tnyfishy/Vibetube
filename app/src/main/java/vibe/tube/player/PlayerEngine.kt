@@ -41,7 +41,7 @@ class PlayerEngine @Inject constructor(@ApplicationContext private val context: 
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .setLoadControl(
                 DefaultLoadControl.Builder()
-                    .setBufferDurationsMs(30_000, 90_000, 1_500, 3_000)
+                    .setBufferDurationsMs(40_000, 120_000, 1_000, 2_500)
                     .build(),
             )
             .setSeekBackIncrementMs(10_000)

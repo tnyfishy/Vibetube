@@ -23,7 +23,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -146,7 +146,7 @@ fun VideoSurface(
         )
         val busy = state.phase == PlayerPhase.Resolving || state.phase == PlayerPhase.Buffering
         if (busy && state.error == null && showControls) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { ContainedLoadingIndicator() }
         }
         val error = state.error
         if (state.phase == PlayerPhase.Error && error != null && showControls) {
@@ -222,8 +222,9 @@ private fun Controls(
             }
             TooltipIconButton(VIcon.Settings, stringResource(R.string.player_options), { onInteract(); onOptions() }, tint = MediaOverlayColors.onScrim)
         }
+        val centerAlpha by androidx.compose.animation.core.animateFloatAsState(if (dragging) 0f else 1f, androidx.compose.animation.core.tween(150), label = "centerAlpha")
         Row(
-            Modifier.align(Alignment.Center),
+            Modifier.align(Alignment.Center).graphicsLayer { alpha = centerAlpha },
             horizontalArrangement = Arrangement.spacedBy(Spacing.xl),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -263,6 +264,10 @@ private fun Controls(
             }
             if (!state.isLive) {
                 val label = stringResource(R.string.player_seek_bar)
+                // Wavy (M3 Expressive) while playing, flattening to a straight line while the thumb is held.
+                val amplitude by androidx.compose.animation.core.animateFloatAsState(if (dragging) 0f else 1f, androidx.compose.animation.core.tween(220), label = "seekAmplitude")
+                val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { 3.dp.toPx() }
+                val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = strokePx, cap = androidx.compose.ui.graphics.StrokeCap.Round)
                 Slider(
                     value = fraction,
                     onValueChange = { dragging = true; dragValue = it; onInteract() },
@@ -270,12 +275,26 @@ private fun Controls(
                         onSeek((dragValue * duration).toLong())
                         dragging = false
                     },
-                    modifier = Modifier.fillMaxWidth().semantics { contentDescription = label },
-                    colors = SliderDefaults.colors(
-                        inactiveTrackColor = MediaOverlayColors.onScrim.copy(alpha = 0.3f),
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                    ),
+                    modifier = Modifier.fillMaxWidth().height(28.dp).semantics { contentDescription = label },
+                    thumb = {
+                        SliderDefaults.Thumb(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            thumbSize = androidx.compose.ui.unit.DpSize(4.dp, 20.dp),
+                            colors = SliderDefaults.colors(thumbColor = MaterialTheme.colorScheme.primary),
+                        )
+                    },
+                    track = {
+                        androidx.compose.material3.LinearWavyProgressIndicator(
+                            progress = { fraction },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MediaOverlayColors.onScrim.copy(alpha = 0.3f),
+                            stroke = stroke,
+                            trackStroke = stroke,
+                            amplitude = { amplitude },
+                            wavelength = 20.dp,
+                        )
+                    },
                 )
             }
         }

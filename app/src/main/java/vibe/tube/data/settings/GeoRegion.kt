@@ -26,7 +26,7 @@ class GeoRegion(
 ) {
     private val prefs = context.getSharedPreferences("geo_region", Context.MODE_PRIVATE)
     private val client = http.newBuilder().callTimeout(6, TimeUnit.SECONDS).build()
-    private val mutableRegion = MutableStateFlow(prefs.getString(KEY_REGION, null))
+    private val mutableRegion = MutableStateFlow(prefs.getString(KEY_REGION, null) ?: regionFromTimeZone())
 
     /** `null` until the first lookup (or cache entry) is available. */
     val region: StateFlow<String?> = mutableRegion.asStateFlow()
@@ -37,7 +37,7 @@ class GeoRegion(
 
     private suspend fun refreshIfStale() {
         val fetchedAt = prefs.getLong(KEY_AT, 0L)
-        if (mutableRegion.value != null && now() - fetchedAt < TTL_MS) return
+        if (prefs.getString(KEY_REGION, null) != null && now() - fetchedAt < TTL_MS) return
         val code = withContext(io) { lookup() } ?: return
         prefs.edit().putString(KEY_REGION, code).putLong(KEY_AT, now()).apply()
         mutableRegion.value = code
@@ -54,6 +54,18 @@ class GeoRegion(
             if (code != null && code.length == 2 && code.all { it in 'A'..'Z' }) return code
         }
         return null
+    }
+
+    private fun regionFromTimeZone(): String? = when (java.util.TimeZone.getDefault().id) {
+        "Asia/Ho_Chi_Minh", "Asia/Saigon" -> "VN"
+        "Asia/Tokyo" -> "JP"
+        "Asia/Seoul" -> "KR"
+        "Asia/Bangkok" -> "TH"
+        "Asia/Jakarta" -> "ID"
+        "Asia/Manila" -> "PH"
+        "Asia/Singapore" -> "SG"
+        "Asia/Taipei" -> "TW"
+        else -> null
     }
 
     private companion object {

@@ -434,7 +434,7 @@ private fun LazyListScope.upNext(ui: WatchUiState, state: PlayerUiState, control
             else -> Unit
         }
     }
-    if (ui.relatedLoading) item(key = "related-loading") { Box(Modifier.fillMaxWidth().padding(Spacing.md), contentAlignment = Alignment.Center) { androidx.compose.material3.LoadingIndicator() } }
+    if (ui.relatedLoading) item(key = "related-loading") { Box(Modifier.fillMaxWidth().padding(Spacing.md), contentAlignment = Alignment.Center) { androidx.compose.material3.ContainedLoadingIndicator() } }
 }
 
 private object LocalVideoActionsDelegate {
@@ -459,6 +459,6 @@ private fun LazyListScope.commentsList(ui: WatchUiState, auth: AuthState, watch:
             onReply = { text, done -> watch.postReply(comment, text, done) },
         )
     }
-    if (c.loadingMore) item(key = "comments-more") { Box(Modifier.fillMaxWidth().padding(Spacing.md), contentAlignment = Alignment.Center) { androidx.compose.material3.LoadingIndicator() } }
+    if (c.loadingMore) item(key = "comments-more") { Box(Modifier.fillMaxWidth().padding(Spacing.md), contentAlignment = Alignment.Center) { androidx.compose.material3.ContainedLoadingIndicator() } }
     if (c.loadMoreError) item(key = "comments-more-error") { TextButton(shapes = ButtonDefaults.shapes(), onClick = watch::loadMoreComments) { Text(stringResource(R.string.feed_load_more_failed)) } }
 }

@@ -147,7 +147,7 @@ fun Modifier.searchBounds(visibilityScope: AnimatedVisibilityScope?, cornerRadiu
 }
 
 /**
- * Pill that looks like a search field. Pressing squishes it; letting go swells it back and stretches it
+ * Pill that looks like a search field. Tapping stretches it
  * leftwards over the heading ([expansion] 0..1 over [expandDistance] px) before the search screen opens.
  */
 @Composable
@@ -159,18 +159,7 @@ fun SearchPill(
     expandDistance: () -> Float = { 0f },
 ) {
     val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
     val reduced = LocalReducedMotion.current
-    val scaleX by animateFloatAsState(
-        if (pressed && !reduced) 0.95f else 1f,
-        spring(dampingRatio = 1f, stiffness = 900f),
-        label = "pillX",
-    )
-    val scaleY by animateFloatAsState(
-        if (pressed && !reduced) 0.84f else 1f,
-        spring(dampingRatio = 1f, stiffness = 900f),
-        label = "pillY",
-    )
     val scope = rememberCoroutineScope()
     Surface(
         onClick = {
@@ -190,11 +179,7 @@ fun SearchPill(
                 layout(constraints.maxWidth, placeable.height) { placeable.place(-extra, 0) }
             }
             .height(48.dp)
-            .searchBounds(visibilityScope)
-            .graphicsLayer {
-                this.scaleX = scaleX
-                this.scaleY = scaleY
-            },
+            .searchBounds(visibilityScope),
     ) {
         Row(
             Modifier.padding(horizontal = Spacing.lg),
