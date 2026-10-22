@@ -230,6 +230,11 @@ private fun ActionRow(
             leadingIcon = { VIconImage(VIcon.Schedule, null) },
         )
         AssistChip(
+            onClick = { state.current?.let(actions::download) },
+            label = { Text(stringResource(R.string.action_download)) },
+            leadingIcon = { VIconImage(VIcon.Download, null) },
+        )
+        AssistChip(
             onClick = { state.current?.let(actions::share) },
             label = { Text(stringResource(R.string.action_share)) },
             leadingIcon = { VIconImage(VIcon.OpenInNew, null) },
@@ -250,6 +255,7 @@ internal fun Details(
 ) {
     var tab by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
+    val hiddenChannels = vibe.tube.ui.components.LocalHiddenChannels.current
     val comments = ui.comments
     LaunchedEffect(listState, tab, comments.comments.size, ui.related.size) {
         snapshotFlow {
@@ -277,7 +283,7 @@ internal fun Details(
                     )
                 }
             }
-            if (tab == 0) upNext(ui, state, controller, watch) else commentsList(ui, auth, watch, onLogin)
+            if (tab == 0) upNext(ui, state, controller, watch, hiddenChannels) else commentsList(ui, auth, watch, onLogin)
         }
     }
 }
@@ -294,6 +300,7 @@ private fun SidePanel(
 ) {
     var tab by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
+    val hiddenChannels = vibe.tube.ui.components.LocalHiddenChannels.current
     LaunchedEffect(listState, tab, ui.comments.comments.size, ui.related.size) {
         snapshotFlow {
             val info = listState.layoutInfo
@@ -310,7 +317,7 @@ private fun SidePanel(
             contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            if (tab == 0) upNext(ui, state, controller, watch) else commentsList(ui, auth, watch, onLogin)
+            if (tab == 0) upNext(ui, state, controller, watch, hiddenChannels) else commentsList(ui, auth, watch, onLogin)
         }
     }
 }
@@ -392,7 +399,7 @@ private fun LazyListScope.detailsHeader(ui: WatchUiState, state: PlayerUiState, 
     }
 }
 
-private fun LazyListScope.upNext(ui: WatchUiState, state: PlayerUiState, controller: PlayerController, watch: WatchViewModel) {
+private fun LazyListScope.upNext(ui: WatchUiState, state: PlayerUiState, controller: PlayerController, watch: WatchViewModel, hiddenChannels: Set<String>) {
     if (state.queue.size > 1) {
         item(key = "queue-title") {
             Text(
@@ -419,7 +426,7 @@ private fun LazyListScope.upNext(ui: WatchUiState, state: PlayerUiState, control
         item(key = "related-title") { Text(stringResource(R.string.player_related), style = MaterialTheme.typography.titleSmall) }
     }
     val queueIds = state.queue.mapTo(HashSet()) { it.id }
-    val related = ui.related.filterNot { it is VideoItem && it.id in queueIds }
+    val related = ui.related.filterNot { it is VideoItem && (it.id in queueIds || it.channelId in hiddenChannels) }
     items(related.size, key = { "r:${related[it].id}:$it" }) { index ->
         when (val item = related[index]) {
             is VideoItem -> VideoRow(item, emptyList())

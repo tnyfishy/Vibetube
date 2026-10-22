@@ -71,6 +71,10 @@ data class AppSettings(
     val saveLocalHistory: Boolean = true,
     val privateMode: Boolean = false,
     val hideShorts: Boolean = true,
+    /** Folder (SAF tree URI) chosen for downloads; blank means the default `Download/VibeTube`. */
+    val downloadDir: String = "",
+    /** Channels the user asked not to be recommended, stored as `channelId|name`. */
+    val hiddenChannels: Set<String> = emptySet(),
 ) {
     fun contentLocale(device: Locale = Locale.getDefault()): ContentLocale {
         val language = if (contentLanguage == SYSTEM) device.language.ifBlank { "en" } else contentLanguage
@@ -79,6 +83,8 @@ data class AppSettings(
     }
 
     val recordsLocalHistory: Boolean get() = saveLocalHistory && !privateMode
+
+    val hiddenChannelIds: Set<String> get() = hiddenChannels.mapTo(HashSet()) { it.substringBefore('|') }
 
     companion object {
         const val SYSTEM = "system"

@@ -113,7 +113,12 @@ fun FeedContent(
     header: (LazyGridScope.() -> Unit)? = null,
     itemContent: @Composable (FeedItem, List<VideoItem>) -> Unit,
 ) {
-    val visible = if (hideShorts) state.items.filterNot { it is VideoItem && it.isShort } else state.items
+    val hidden = LocalHiddenChannels.current
+    // Playlists and history are opened on purpose (queue mode), so hidden channels only affect recommendations.
+    val applyHidden = hidden.isNotEmpty() && !LocalQueueMode.current
+    val visible = state.items.filterNot { item ->
+        item is VideoItem && ((hideShorts && item.isShort) || (applyHidden && item.channelId in hidden))
+    }
     val queue = visible.filterIsInstance<VideoItem>()
     val refreshing = state.phase == FeedPhase.Refreshing
     val blockingFailure = state.failure.takeIf { state.items.isEmpty() }

@@ -25,6 +25,17 @@ class UiEvents {
     private val saveTargetState = MutableStateFlow<VideoItem?>(null)
     val saveTarget: StateFlow<VideoItem?> = saveTargetState.asStateFlow()
 
+    private val downloadTargetState = MutableStateFlow<VideoItem?>(null)
+    val downloadTarget: StateFlow<VideoItem?> = downloadTargetState.asStateFlow()
+
+    fun requestDownload(video: VideoItem) {
+        downloadTargetState.value = video
+    }
+
+    fun dismissDownload() {
+        downloadTargetState.value = null
+    }
+
     fun post(message: UiMessage) {
         messageFlow.tryEmit(message)
     }

@@ -44,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -123,6 +124,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     val settings by appViewModel.settings.collectAsStateWithLifecycle()
     val avatarUrl by appViewModel.avatarUrl.collectAsStateWithLifecycle()
     val saveTarget by appViewModel.events.saveTarget.collectAsStateWithLifecycle()
+    val downloadTarget by appViewModel.events.downloadTarget.collectAsStateWithLifecycle()
     val backStack by nav.currentBackStackEntryAsState()
     val destination = backStack?.destination
     val onTopLevel = tabs.any { destination?.hasRoute(it.route::class) == true }
@@ -163,6 +165,8 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                 nav.navigate(LoginRoute)
             }
             override fun playPlaylist(playlistId: String, shuffle: Boolean) = controller.playPlaylist(playlistId, shuffle)
+            override fun hideChannel(video: VideoItem) = appViewModel.hideChannel(video)
+            override fun download(video: VideoItem) = appViewModel.events.requestDownload(video)
         }
     }
 
@@ -189,7 +193,8 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     val miniVisible = playerState.visible && !playerState.expanded && !playerState.inPip
     val miniPadding = if (miniVisible) Sizing.miniPlayerHeight + 16.dp else 0.dp
 
-    CompositionLocalProvider(LocalVideoActions provides actions, LocalMiniPlayerPadding provides miniPadding) {
+    val hiddenIds = remember(settings.hiddenChannels) { settings.hiddenChannelIds }
+    CompositionLocalProvider(LocalVideoActions provides actions, LocalMiniPlayerPadding provides miniPadding, vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds) {
         Box(Modifier.fillMaxSize()) {
             NavigationSuiteScaffold(
                 layoutType = suiteType,
@@ -242,6 +247,13 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                 Box(Modifier.align(Alignment.BottomCenter)) {
                     SnackbarHost(snackbar, Modifier.windowInsetsPadding(WindowInsets.navigationBars))
                 }
+            }
+            downloadTarget?.let { video ->
+                vibe.tube.feature.watch.DownloadDialog(
+                    video = video,
+                    onDismiss = appViewModel.events::dismissDownload,
+                    onChoose = { kind -> appViewModel.events.dismissDownload(); appViewModel.download(video, kind) },
+                )
             }
             saveTarget?.let { video ->
                 AddToPlaylistSheet(

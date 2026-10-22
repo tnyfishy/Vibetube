@@ -145,12 +145,24 @@ fun VideoMenu(
                 leadingIcon = { VIconImage(VIcon.OpenInNew, null) },
                 onClick = { open = false; actions.share(video) },
             )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.action_download)) },
+                leadingIcon = { VIconImage(VIcon.Download, null) },
+                onClick = { open = false; actions.download(video) },
+            )
             val channelId = video.channelId
             if (channelId != null) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.action_open_channel)) },
                     leadingIcon = { VIconImage(VIcon.Person, null) },
                     onClick = { open = false; actions.openChannel(channelId) },
+                )
+            }
+            if (channelId != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.action_hide_channel)) },
+                    leadingIcon = { VIconImage(VIcon.VisibilityOff, null) },
+                    onClick = { open = false; actions.hideChannel(video) },
                 )
             }
             extra.forEach { entry ->

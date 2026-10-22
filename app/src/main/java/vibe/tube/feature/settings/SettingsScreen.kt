@@ -81,7 +81,7 @@ fun <T> ChoiceDialog(
 private val contentLanguages = listOf("en", "vi", "ja", "ko", "zh", "es", "fr", "de", "pt", "ru", "id", "th", "hi", "ar", "it", "tr")
 private val contentRegions = listOf("US", "VN", "GB", "JP", "KR", "DE", "FR", "ES", "BR", "IN", "ID", "TH", "RU", "AU", "CA", "SG", "TW", "PH", "MY")
 
-private enum class Dialog { Theme, Font, RefreshRate, UiLanguage, ContentLanguage, Region, WifiQuality, MobileQuality, ClearCache, ClearHistory, ClearSearch }
+private enum class Dialog { Theme, Font, RefreshRate, HiddenChannels, DownloadDir, UiLanguage, ContentLanguage, Region, WifiQuality, MobileQuality, ClearCache, ClearHistory, ClearSearch }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,6 +96,19 @@ fun SettingsScreen(
     val systemLabel = stringResource(R.string.settings_system_default)
     val displayLocale = Locale.getDefault()
     val context = LocalContext.current
+    val pickFolder = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            viewModel.update { it.copy(downloadDir = uri.toString()) }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -174,6 +187,13 @@ fun SettingsScreen(
                 SwitchRow(VIcon.ClosedCaption, R.string.settings_subtitles, R.string.settings_subtitles_desc, settings.subtitlesEnabled) { v -> viewModel.update { it.copy(subtitlesEnabled = v) } }
             }
             item {
+                SettingRow(
+                    VIcon.VisibilityOff, R.string.settings_hidden_channels,
+                    if (settings.hiddenChannels.isEmpty()) stringResource(R.string.settings_hidden_channels_none)
+                    else stringResource(R.string.settings_hidden_channels_count, settings.hiddenChannels.size),
+                ) { dialog = Dialog.HiddenChannels }
+            }
+            item {
                 SwitchRow(VIcon.VisibilityOff, R.string.settings_hide_shorts, R.string.settings_hide_shorts_desc, settings.hideShorts) { v -> viewModel.update { it.copy(hideShorts = v) } }
             }
             section(R.string.settings_section_privacy)
@@ -194,6 +214,12 @@ fun SettingsScreen(
                 )
             }
             section(R.string.settings_section_storage)
+            item {
+                SettingRow(
+                    VIcon.Download, R.string.settings_download_dir,
+                    downloadDirLabel(settings.downloadDir),
+                ) { dialog = Dialog.DownloadDir }
+            }
             item { SettingRow(VIcon.Storage, R.string.settings_clear_cache, R.string.settings_clear_cache_desc) { dialog = Dialog.ClearCache } }
             section(R.string.settings_section_about)
             item { SettingRow(VIcon.Info, R.string.settings_version, BuildConfig.VERSION_NAME, onClick = null) }
@@ -211,6 +237,60 @@ fun SettingsScreen(
             settings.themeMode,
             { dialog = null },
         ) { v -> viewModel.update { it.copy(themeMode = v) }; dialog = null }
+        Dialog.DownloadDir -> AlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text(stringResource(R.string.settings_download_dir)) },
+            text = {
+                Column {
+                    Text(downloadDirLabel(settings.downloadDir), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        stringResource(R.string.settings_download_dir_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = Spacing.sm),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { dialog = null; pickFolder.launch(null) }) {
+                    Text(stringResource(R.string.settings_download_dir_choose))
+                }
+            },
+            dismissButton = {
+                Row {
+                    if (settings.downloadDir.isNotBlank()) {
+                        TextButton(shapes = ButtonDefaults.shapes(), onClick = { viewModel.update { it.copy(downloadDir = "") }; dialog = null }) {
+                            Text(stringResource(R.string.settings_download_dir_default))
+                        }
+                    }
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { dialog = null }) { Text(stringResource(R.string.action_close)) }
+                }
+            },
+        )
+        Dialog.HiddenChannels -> AlertDialog(
+            onDismissRequest = { dialog = null },
+            title = { Text(stringResource(R.string.settings_hidden_channels)) },
+            text = {
+                if (settings.hiddenChannels.isEmpty()) {
+                    Text(stringResource(R.string.settings_hidden_channels_none))
+                } else {
+                    androidx.compose.foundation.lazy.LazyColumn {
+                        val entries = settings.hiddenChannels.toList().sortedBy { it.substringAfter('|').lowercase() }
+                        items(entries.size) { index ->
+                            val entry = entries[index]
+                            Row(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                                Text(entry.substringAfter('|'), Modifier.weight(1f), maxLines = 2)
+                                TextButton(
+                                    shapes = ButtonDefaults.shapes(),
+                                    onClick = { viewModel.update { it.copy(hiddenChannels = it.hiddenChannels - entry) } },
+                                ) { Text(stringResource(R.string.action_show_again)) }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { dialog = null }) { Text(stringResource(R.string.action_close)) } },
+        )
         Dialog.RefreshRate -> {
             val rates = remember { vibe.tube.ui.RefreshRate.supportedRates(context) }
             ChoiceDialog(
@@ -256,6 +336,13 @@ fun SettingsScreen(
         Dialog.ClearSearch -> ConfirmDialog(R.string.dialog_clear_search_title, R.string.dialog_clear_search_body, { dialog = null }) { viewModel.clearSearchHistory() }
         null -> Unit
     }
+}
+
+@Composable
+private fun downloadDirLabel(dir: String): String {
+    if (dir.isBlank()) return stringResource(R.string.settings_download_dir_default_label)
+    val id = runCatching { android.provider.DocumentsContract.getTreeDocumentId(android.net.Uri.parse(dir)) }.getOrNull()
+    return id?.substringAfter(':')?.ifBlank { null } ?: id ?: dir
 }
 
 @Composable

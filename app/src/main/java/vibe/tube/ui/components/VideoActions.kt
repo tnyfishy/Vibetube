@@ -12,6 +12,8 @@ interface VideoActions {
     fun share(video: VideoItem)
     fun login()
     fun playPlaylist(playlistId: String, shuffle: Boolean)
+    fun hideChannel(video: VideoItem)
+    fun download(video: VideoItem)
 }
 
 object NoOpVideoActions : VideoActions {
@@ -23,6 +25,8 @@ object NoOpVideoActions : VideoActions {
     override fun share(video: VideoItem) = Unit
     override fun login() = Unit
     override fun playPlaylist(playlistId: String, shuffle: Boolean) = Unit
+    override fun hideChannel(video: VideoItem) = Unit
+    override fun download(video: VideoItem) = Unit
 }
 
 val LocalVideoActions = staticCompositionLocalOf<VideoActions> { NoOpVideoActions }
@@ -32,3 +36,6 @@ data class MenuEntry(val label: String, val icon: Int, val onClick: () -> Unit)
 val LocalMiniPlayerPadding = staticCompositionLocalOf { androidx.compose.ui.unit.Dp.Hairline }
 
 val LocalQueueMode = staticCompositionLocalOf { false }
+
+/** Channel ids the user asked not to be recommended; feeds drop their videos. */
+val LocalHiddenChannels = staticCompositionLocalOf<Set<String>> { emptySet() }

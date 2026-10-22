@@ -22,12 +22,13 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AppViewModel @Inject constructor(
-    settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository,
     private val session: SessionManager,
     private val actions: AccountActions,
     val events: UiEvents,
     val playerController: PlayerController,
     val engine: PlayerEngine,
+    private val downloads: vibe.tube.download.DownloadManager,
 ) : ViewModel() {
 
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.latest.value)
@@ -36,6 +37,31 @@ class AppViewModel @Inject constructor(
         session.currentSession()?.let { it.activeIdentity?.avatarUrl ?: it.avatarUrl }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
     val activeSession = session
+
+    fun hideChannel(video: VideoItem) {
+        val id = video.channelId ?: return
+        val name = video.channelName?.takeIf { it.isNotBlank() } ?: id
+        viewModelScope.launch {
+            settingsRepository.update { it.copy(hiddenChannels = it.hiddenChannels.filterNot { e -> e.substringBefore('|') == id }.toSet() + "$id|$name") }
+            events.post(
+                vibe.tube.feature.common.UiMessage(
+                    R.string.msg_channel_hidden,
+                    listOf(name),
+                    R.string.action_undo,
+                ) { showChannelAgain(id) },
+            )
+        }
+    }
+
+    private fun showChannelAgain(id: String) {
+        viewModelScope.launch {
+            settingsRepository.update { it.copy(hiddenChannels = it.hiddenChannels.filterNot { e -> e.substringBefore('|') == id }.toSet()) }
+        }
+    }
+
+    fun download(video: VideoItem, kind: vibe.tube.download.DownloadKind) {
+        downloads.enqueue(video, kind)
+    }
 
     fun watchLater(video: VideoItem) {
         viewModelScope.launch {

@@ -15,6 +15,7 @@ object VIcon {
     @DrawableRes val CloudOff: Int = R.drawable.ic_cloud_off
     @DrawableRes val Delete: Int = R.drawable.ic_delete
     @DrawableRes val DeleteSweep: Int = R.drawable.ic_delete_sweep
+    @DrawableRes val Download: Int = R.drawable.ic_download
     @DrawableRes val Edit: Int = R.drawable.ic_edit
     @DrawableRes val Error: Int = R.drawable.ic_error
     @DrawableRes val ExpandMore: Int = R.drawable.ic_expand_more

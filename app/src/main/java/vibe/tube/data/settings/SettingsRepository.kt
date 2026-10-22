@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -58,6 +59,8 @@ class SettingsRepository(
             saveLocalHistory = this[LOCAL_HISTORY] ?: d.saveLocalHistory,
             privateMode = this[PRIVATE] ?: d.privateMode,
             hideShorts = this[HIDE_SHORTS] ?: d.hideShorts,
+            downloadDir = this[DOWNLOAD_DIR] ?: d.downloadDir,
+            hiddenChannels = this[HIDDEN_CHANNELS] ?: d.hiddenChannels,
         )
     }
 
@@ -82,6 +85,8 @@ class SettingsRepository(
         this[LOCAL_HISTORY] = s.saveLocalHistory
         this[PRIVATE] = s.privateMode
         this[HIDE_SHORTS] = s.hideShorts
+        this[DOWNLOAD_DIR] = s.downloadDir
+        this[HIDDEN_CHANNELS] = s.hiddenChannels
     }
 
     private inline fun <reified E : Enum<E>> enumOr(name: String?, default: E): E =
@@ -108,6 +113,8 @@ class SettingsRepository(
         private val LOCAL_HISTORY = booleanPreferencesKey("local_history")
         private val PRIVATE = booleanPreferencesKey("private_mode")
         private val HIDE_SHORTS = booleanPreferencesKey("hide_shorts")
+        private val DOWNLOAD_DIR = stringPreferencesKey("download_dir")
+        private val HIDDEN_CHANNELS = stringSetPreferencesKey("hidden_channels")
 
         private const val BOOT_PREFS = "boot_theme"
 
