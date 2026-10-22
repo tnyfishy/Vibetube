@@ -9,7 +9,11 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import vibe.tube.ui.components.HeaderSurface
-import vibe.tube.ui.components.SearchPill
+import vibe.tube.ui.components.SearchHeaderRow
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -64,18 +68,25 @@ fun HomeScreen(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
         topBar = {
             HeaderSurface(scrolled) {
-                Row(
-                    Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.xs, top = Spacing.xs, bottom = Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                SearchHeaderRow(
+                    title = stringResource(R.string.app_name),
+                    onSearch = onSearch,
+                    modifier = Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.xs, bottom = Spacing.sm),
+                    visibilityScope = visibilityScope,
                 ) {
-                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, maxLines = 1)
-                    SearchPill(onSearch, Modifier.weight(1f), visibilityScope)
-                    TooltipIconButton(
-                        if (auth is AuthState.Guest) VIcon.Login else VIcon.AccountCircle,
-                        stringResource(if (auth is AuthState.Guest) R.string.action_sign_in else R.string.nav_account),
-                        if (auth is AuthState.Guest) onLogin else onAccount,
-                    )
+                    if (auth is AuthState.Guest) {
+                        TooltipIconButton(VIcon.Login, stringResource(R.string.action_sign_in), onLogin)
+                    } else {
+                        androidx.compose.foundation.layout.Box(
+                            Modifier
+                                .size(44.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = stringResource(R.string.nav_account), onClick = onAccount),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Avatar(avatarUrl, 36.dp, description = stringResource(R.string.nav_account))
+                        }
+                    }
                 }
             }
         },
@@ -130,14 +141,12 @@ fun SubscriptionsScreen(
             Column {
                 HeaderSurface(scrolled) {
                     Column {
-                        Row(
-                            Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.xs, bottom = Spacing.sm),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-                        ) {
-                            Text(stringResource(R.string.nav_subscriptions), style = MaterialTheme.typography.titleLarge, maxLines = 1)
-                            SearchPill(onSearch, Modifier.weight(1f), visibilityScope)
-                        }
+                        SearchHeaderRow(
+                            title = stringResource(R.string.nav_subscriptions),
+                            onSearch = onSearch,
+                            modifier = Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.xs, bottom = Spacing.sm),
+                            visibilityScope = visibilityScope,
+                        )
                         PrimaryTabRow(selectedTabIndex = tab, containerColor = androidx.compose.ui.graphics.Color.Transparent) {
                             Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.subs_tab_latest)) })
                             Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.subs_tab_channels)) })

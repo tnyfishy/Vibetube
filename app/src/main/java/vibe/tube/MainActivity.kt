@@ -46,13 +46,6 @@ class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var controller: PlayerController
     @Inject lateinit var settingsRepository: SettingsRepository
-    private var refreshPreference = vibe.tube.ui.RefreshRate.MAX
-
-    override fun onResume() {
-        super.onResume()
-        // Display modes can change while we are in the background (battery saver, external display).
-        vibe.tube.ui.RefreshRate.apply(window, this, refreshPreference)
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         if (SettingsRepository.readBootTheme(this) == ThemeMode.Amoled) {
@@ -69,12 +62,6 @@ class MainActivity : AppCompatActivity() {
             settingsRepository.settings.map { it.uiLanguage }.distinctUntilChanged().collect { language ->
                 val wanted = if (language == AppSettings.SYSTEM) LocaleListCompat.getEmptyLocaleList() else LocaleListCompat.forLanguageTags(language)
                 if (AppCompatDelegate.getApplicationLocales() != wanted) AppCompatDelegate.setApplicationLocales(wanted)
-            }
-        }
-        lifecycleScope.launch {
-            settingsRepository.settings.map { it.refreshRate }.distinctUntilChanged().collect { refresh ->
-                refreshPreference = refresh
-                vibe.tube.ui.RefreshRate.apply(window, this@MainActivity, refresh)
             }
         }
         lifecycleScope.launch {

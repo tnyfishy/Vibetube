@@ -64,6 +64,9 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.max
 import kotlin.math.roundToInt
 
+/** Critically damped: glides to the end without overshooting or bouncing. */
+private val MORPH_SPEC = spring<Float>(dampingRatio = 1f, stiffness = 380f)
+
 private fun lerpF(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
 /** Positions and sizes a child in absolute pixels; every lambda is read in the layout phase (no recomposition per frame). */
@@ -86,7 +89,7 @@ private fun Modifier.fixedTopStart(width: Int, height: Int): Modifier = layout {
 /**
  * The player as one card that morphs between a full-screen page (progress 1) and the mini player
  * (progress 0). The finger drives `progress` directly while dragging; releasing springs it to the
- * nearest end, carrying the fling velocity so a hard swipe overshoots and bounces back. Dragging the
+ * nearest end, carrying the fling velocity with no overshoot. Dragging the
  * minimized card further down fades it out and stops playback.
  */
 @Composable
@@ -106,7 +109,8 @@ internal fun MorphPlayer(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
 
-    val progress = remember { Animatable(if (state.visible && state.expanded) 1f else 0f) }
+    val progress = remember { Animatable(if (state.visible && state.expanded) 1f else 0f).apply { updateBounds(0f, 1f) } }
+    val deviceCorner = with(density) { vibe.tube.ui.rememberDeviceCornerRadius().toPx() }
     val dismiss = remember { Animatable(0f) }
     var pendingVelocity by remember { mutableFloatStateOf(0f) }
 
@@ -114,7 +118,7 @@ internal fun MorphPlayer(
     LaunchedEffect(target) {
         val velocity = pendingVelocity
         pendingVelocity = 0f
-        progress.animateTo(target, spring(dampingRatio = 0.7f, stiffness = 320f), initialVelocity = velocity)
+        progress.animateTo(target, MORPH_SPEC, initialVelocity = velocity)
     }
     LaunchedEffect(state.visible) {
         if (!state.visible) {
@@ -128,7 +132,7 @@ internal fun MorphPlayer(
             events.collect { event -> progress.snapTo(1f - event.progress * 0.9f) }
             controller.collapse()
         } catch (cancelled: CancellationException) {
-            scope.launch { progress.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 400f)) }
+            scope.launch { progress.animateTo(1f, MORPH_SPEC) }
             throw cancelled
         }
     }
@@ -152,7 +156,7 @@ internal fun MorphPlayer(
         val dragRange = max(miniTop, 1f)
         val fadeRange = with(density) { 140.dp.toPx() }
 
-        val p: () -> Float = { progress.value.coerceIn(-0.12f, 1.1f) }
+        val p: () -> Float = { progress.value.coerceIn(0f, 1f) }
         val t: () -> Float = { progress.value.coerceIn(0f, 1f) }
 
         val showPage by remember { derivedStateOf { progress.value > 0.05f } }
@@ -169,7 +173,7 @@ internal fun MorphPlayer(
                 if (progress.value <= 0.002f && (delta > 0f || dismiss.value > 0f)) {
                     dismiss.snapTo((dismiss.value + delta).coerceAtLeast(0f))
                 } else {
-                    progress.snapTo((progress.value - delta / dragRange).coerceIn(0f, 1.05f))
+                    progress.snapTo((progress.value - delta / dragRange).coerceIn(0f, 1f))
                 }
             }
         }
@@ -183,7 +187,7 @@ internal fun MorphPlayer(
                         if (dismiss.value > threshold || velocity > 1400f) {
                             fadeOutAndDismiss()
                         } else {
-                            dismiss.animateTo(0f, spring(dampingRatio = 0.6f, stiffness = 400f))
+                            dismiss.animateTo(0f, tween(220, easing = vibe.tube.ui.components.EmphasizedDecelerate))
                         }
                     } else {
                         val goExpanded = when {
@@ -193,7 +197,7 @@ internal fun MorphPlayer(
                         }
                         val v = -velocity / dragRange
                         if (goExpanded == state.expanded) {
-                            progress.animateTo(if (goExpanded) 1f else 0f, spring(dampingRatio = 0.7f, stiffness = 320f), initialVelocity = v)
+                            progress.animateTo(if (goExpanded) 1f else 0f, MORPH_SPEC, initialVelocity = v)
                         } else {
                             pendingVelocity = v
                             if (goExpanded) controller.expand() else controller.collapse()
@@ -226,7 +230,7 @@ internal fun MorphPlayer(
                     .placedRect(containerX, containerY, containerW, containerH)
                     .graphicsLayer {
                         val tt = t()
-                        shape = RoundedCornerShape(CornerSize(lerpF(16.dp.toPx(), 0f, tt)))
+                        shape = RoundedCornerShape(CornerSize(lerpF(16.dp.toPx(), deviceCorner, tt)))
                         clip = true
                         shadowElevation = (1f - tt) * 6.dp.toPx()
                     }

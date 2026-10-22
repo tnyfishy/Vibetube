@@ -101,7 +101,7 @@ fun AccountScreen(
                     )
                 }
                 if (active == null) GuestCard(onLogin, saved.takeIf { sessions.isNotEmpty() })
-                else ActiveCard(active, auth, viewModel::refresh, onLogin, saved)
+                else ActiveCard(active, auth, onLogin, saved)
             }
             if (active != null && active.identities.size > 1) {
                 item {
@@ -190,7 +190,7 @@ private fun GuestCard(onLogin: () -> Unit, saved: (@Composable () -> Unit)?) {
 }
 
 @Composable
-private fun ActiveCard(account: AccountSession, auth: AuthState, onRefresh: () -> Unit, onLogin: () -> Unit, saved: @Composable () -> Unit) {
+private fun ActiveCard(account: AccountSession, auth: AuthState, onLogin: () -> Unit, saved: @Composable () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
@@ -220,10 +220,6 @@ private fun ActiveCard(account: AccountSession, auth: AuthState, onRefresh: () -
                     content = MaterialTheme.colorScheme.onErrorContainer,
                 )
             }
-            OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = onRefresh) {
-                VIconImage(VIcon.Refresh, null)
-                Text(stringResource(R.string.account_refresh), Modifier.padding(start = Spacing.sm))
-            }
             HorizontalDivider()
             saved()
         }
@@ -240,8 +236,8 @@ private fun SavedAccounts(
     onAdd: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    val rotation by animateFloatAsState(if (expanded) 180f else 0f, MaterialTheme.motionScheme.defaultSpatialSpec(), label = "chevron")
-    Column(Modifier.animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec())) {
+    val rotation by animateFloatAsState(if (expanded) 180f else 0f, androidx.compose.animation.core.tween(240, easing = vibe.tube.ui.components.EmphasizedDecelerate), label = "chevron")
+    Column(Modifier.animateContentSize(androidx.compose.animation.core.tween(240, easing = vibe.tube.ui.components.EmphasizedDecelerate))) {
         Row(
             Modifier
                 .fillMaxWidth()
@@ -262,12 +258,6 @@ private fun SavedAccounts(
             VIconImage(VIcon.ExpandMore, null, Modifier.rotate(rotation))
         }
         if (expanded) {
-            Text(
-                stringResource(R.string.account_isolation_note),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = Spacing.xs),
-            )
             sessions.forEach { account ->
                 val isActive = account.id == activeId
                 ListItem(

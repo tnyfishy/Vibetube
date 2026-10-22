@@ -14,7 +14,10 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import vibe.tube.data.settings.GeoRegion
 import kotlinx.serialization.json.Json
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
@@ -149,26 +152,37 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun geoRegion(
+        @ApplicationContext context: Context,
+        http: OkHttpClient,
+        @ApplicationScope scope: CoroutineScope,
+        @IoDispatcher io: CoroutineDispatcher,
+    ): GeoRegion = GeoRegion(context, http, scope, io)
+
+    @Provides
+    @Singleton
     fun sessionManager(
         vault: SessionVault,
         provider: YouTubeProvider,
         hooks: SessionHooks,
         settings: SettingsRepository,
+        geo: GeoRegion,
         clock: Clock,
-    ): SessionManager = SessionManager(vault, provider, hooks, { settings.latest.value.contentLocale() }, clock)
+    ): SessionManager = SessionManager(vault, provider, hooks, { settings.latest.value.contentLocale(ipRegion = geo.region.value) }, clock)
 
     @Provides
     @Singleton
     fun feedEnvironment(
         session: SessionManager,
         settings: SettingsRepository,
+        geo: GeoRegion,
         cache: FeedCache,
         diagnostics: Diagnostics,
         provider: YouTubeProvider,
         clock: Clock,
     ): FeedEnvironment = FeedEnvironment(
         session = session,
-        localeFlow = settings.settings.map { it.contentLocale() },
+        localeFlow = combine(settings.settings, geo.region) { s, region -> s.contentLocale(ipRegion = region) }.distinctUntilChanged(),
         cache = cache,
         diagnostics = diagnostics,
         providerName = provider.name,
@@ -181,6 +195,6 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun accountActions(provider: YouTubeProvider, session: SessionManager, settings: SettingsRepository): AccountActions =
-        AccountActions(provider, session) { settings.latest.value.contentLocale() }
+    fun accountActions(provider: YouTubeProvider, session: SessionManager, settings: SettingsRepository, geo: GeoRegion): AccountActions =
+        AccountActions(provider, session) { settings.latest.value.contentLocale(ipRegion = geo.region.value) }
 }

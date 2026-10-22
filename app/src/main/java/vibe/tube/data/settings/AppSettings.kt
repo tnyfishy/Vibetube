@@ -49,8 +49,6 @@ enum class QualityCap(val maxHeight: Int?, val maxFps: Int? = null) {
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.System,
     val dynamicColor: Boolean = true,
-    /** 0 = highest supported, -1 = system default, otherwise a rate in Hz (see [vibe.tube.ui.RefreshRate]). */
-    val refreshRate: Int = 0,
     val font: AppFont = AppFont.System,
     /** Added to every text role's weight; 0 is stock Material 3. */
     val fontWeightOffset: Int = 0,
@@ -76,9 +74,10 @@ data class AppSettings(
     /** Channels the user asked not to be recommended, stored as `channelId|name`. */
     val hiddenChannels: Set<String> = emptySet(),
 ) {
-    fun contentLocale(device: Locale = Locale.getDefault()): ContentLocale {
+    /** [ipRegion] is the country of the public IP; it stands in for "system default" before the device locale. */
+    fun contentLocale(device: Locale = Locale.getDefault(), ipRegion: String? = null): ContentLocale {
         val language = if (contentLanguage == SYSTEM) device.language.ifBlank { "en" } else contentLanguage
-        val region = if (contentRegion == SYSTEM) device.country.ifBlank { "US" } else contentRegion
+        val region = if (contentRegion == SYSTEM) ipRegion ?: device.country.ifBlank { "US" } else contentRegion
         return ContentLocale(language, region)
     }
 

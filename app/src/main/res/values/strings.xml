@@ -124,11 +124,9 @@
     <string name="account_status_expired">Session expired</string>
     <string name="account_status_unverified">Not verified (offline?)</string>
     <string name="account_status_guest">Guest</string>
-    <string name="account_refresh">Refresh account info</string>
     <string name="account_channels">Channels</string>
     <string name="account_channels_note">Brand accounts and channels linked to this Google account. Switching changes which channel YouTube requests act as.</string>
     <string name="account_saved_accounts">Accounts on this device</string>
-    <string name="account_isolation_note">Each account keeps its own encrypted cookie store. Sign-in uses a temporary web view that is wiped afterwards.</string>
     <string name="account_active">Active</string>
     <string name="account_no_handle">No handle</string>
     <string name="account_add">Add account</string>
@@ -158,10 +156,6 @@
     <string name="settings_font_preview_title">Vibetube — Watch with ease</string>
     <string name="settings_font_preview_body">The quick brown fox jumps over the lazy dog. Tiếng Việt có dấu: ăn quả nhớ kẻ trồng cây.</string>
     <string name="settings_font_preview_label">Aa Bb Cc 0123456789</string>
-    <string name="settings_refresh_rate">Refresh rate</string>
-    <string name="refresh_rate_max">Highest available (default)</string>
-    <string name="refresh_rate_system">System default</string>
-    <string name="refresh_rate_hz">%1$d Hz</string>
     <string name="action_hide_channel">Don\'t recommend this channel</string>
     <string name="action_undo">Undo</string>
     <string name="action_show_again">Show again</string>

@@ -4,7 +4,9 @@ import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.VisibilityThreshold
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -42,13 +44,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import vibe.tube.R
 import vibe.tube.ui.VIcon
@@ -68,7 +72,7 @@ fun Modifier.pressScale(interactionSource: InteractionSource, pressedScale: Floa
     val reduced = LocalReducedMotion.current
     val scale by animateFloatAsState(
         targetValue = if (pressed && !reduced) pressedScale else 1f,
-        animationSpec = spring(dampingRatio = 0.45f, stiffness = 520f),
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 700f),
         label = "pressScale",
     )
     return graphicsLayer {
@@ -113,6 +117,9 @@ fun Modifier.staggeredReveal(index: Int, baseDelayMs: Int = 170, stepMs: Int = 4
 
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 
+/** Material 3 emphasized-decelerate: fast start, long soft landing, never overshoots. */
+val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+
 private const val SEARCH_BOUNDS_KEY = "vibetube-search-bounds"
 
 /**
@@ -131,7 +138,7 @@ fun Modifier.searchBounds(visibilityScope: AnimatedVisibilityScope?, cornerRadiu
             enter = fadeIn(tween(if (reduced) 0 else 140)),
             exit = fadeOut(tween(if (reduced) 0 else 100)),
             boundsTransform = BoundsTransform { _, _ ->
-                if (reduced) tween(0) else spring(dampingRatio = 0.68f, stiffness = 340f, visibilityThreshold = Rect.VisibilityThreshold)
+                if (reduced) tween(0) else tween(durationMillis = 340, easing = EmphasizedDecelerate)
             },
             resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
             clipInOverlayDuringTransition = OverlayClip(RoundedCornerShape(cornerRadius.dp)),
@@ -139,33 +146,49 @@ fun Modifier.searchBounds(visibilityScope: AnimatedVisibilityScope?, cornerRadiu
     }
 }
 
-/** Full-width pill that looks like a search field; tapping it squishes, then opens the search screen. */
+/**
+ * Pill that looks like a search field. Pressing squishes it; letting go swells it back and stretches it
+ * leftwards over the heading ([expansion] 0..1 over [expandDistance] px) before the search screen opens.
+ */
 @Composable
 fun SearchPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     visibilityScope: AnimatedVisibilityScope? = null,
+    expansion: Animatable<Float, AnimationVector1D>? = null,
+    expandDistance: () -> Float = { 0f },
 ) {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val reduced = LocalReducedMotion.current
     val scaleX by animateFloatAsState(
-        if (pressed && !reduced) 0.94f else 1f,
-        spring(dampingRatio = 0.38f, stiffness = 420f),
+        if (pressed && !reduced) 0.95f else 1f,
+        spring(dampingRatio = 1f, stiffness = 900f),
         label = "pillX",
     )
     val scaleY by animateFloatAsState(
-        if (pressed && !reduced) 0.86f else 1f,
-        spring(dampingRatio = 0.38f, stiffness = 420f),
+        if (pressed && !reduced) 0.84f else 1f,
+        spring(dampingRatio = 1f, stiffness = 900f),
         label = "pillY",
     )
     val scope = rememberCoroutineScope()
     Surface(
-        onClick = { scope.launch { if (!reduced) delay(70); onClick() } },
+        onClick = {
+            scope.launch {
+                if (expansion != null && !reduced) expansion.animateTo(1f, tween(260, easing = EmphasizedDecelerate))
+                onClick()
+            }
+        },
         interactionSource = source,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = modifier
+            .layout { measurable, constraints ->
+                val extra = ((expansion?.value ?: 0f) * expandDistance()).roundToInt().coerceAtLeast(0)
+                val width = constraints.maxWidth + extra
+                val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+                layout(constraints.maxWidth, placeable.height) { placeable.place(-extra, 0) }
+            }
             .height(48.dp)
             .searchBounds(visibilityScope)
             .graphicsLayer {
@@ -187,6 +210,56 @@ fun SearchPill(
                 maxLines = 1,
             )
         }
+    }
+}
+
+/**
+ * Header row of a top-level screen: heading, the search pill, then [trailing] (e.g. the account avatar).
+ * The pill pushes across the heading when tapped and the heading fades out right at the pill's leading edge.
+ */
+@Composable
+fun SearchHeaderRow(
+    title: String,
+    onSearch: () -> Unit,
+    modifier: Modifier = Modifier,
+    visibilityScope: AnimatedVisibilityScope? = null,
+    trailing: @Composable () -> Unit = {},
+) {
+    val expansion = remember { Animatable(0f) }
+    var titleWidth by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val gap = with(androidx.compose.ui.platform.LocalDensity.current) { Spacing.md.toPx() }
+    val fade = with(androidx.compose.ui.platform.LocalDensity.current) { 36.dp.toPx() }
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleLarge,
+            maxLines = 1,
+            modifier = Modifier
+                .onSizeChanged { titleWidth = it.width }
+                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    val edge = titleWidth + gap - expansion.value * (titleWidth + gap)
+                    if (expansion.value > 0f) {
+                        drawRect(
+                            brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                colors = listOf(androidx.compose.ui.graphics.Color.Black, androidx.compose.ui.graphics.Color.Transparent),
+                                startX = edge - fade,
+                                endX = edge,
+                            ),
+                            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                        )
+                    }
+                },
+        )
+        SearchPill(
+            onClick = onSearch,
+            modifier = Modifier.weight(1f),
+            visibilityScope = visibilityScope,
+            expansion = expansion,
+            expandDistance = { titleWidth + gap },
+        )
+        trailing()
     }
 }
 

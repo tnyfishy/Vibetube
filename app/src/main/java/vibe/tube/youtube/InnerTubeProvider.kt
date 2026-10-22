@@ -100,10 +100,22 @@ class InnerTubeProvider(
         return page(browse(call, "FEwhat_to_watch", continuation))
     }
 
+    private val trendingCursor = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /**
+     * Guest home feed: the first load is the region's plain "trending" search, every later first-page load
+     * (pull to refresh) moves on to another topic so refreshing really brings different videos.
+     */
+    private fun nextTrendingQuery(locale: ContentLocale): String {
+        val pool = TRENDING_QUERIES[locale.region] ?: if (locale.language == "vi") TRENDING_QUERIES.getValue("VN") else TRENDING_QUERIES.getValue("")
+        val index = trendingCursor.getAndIncrement()
+        return if (index == 0) pool.first() else pool[1 + (index - 1 + (System.nanoTime() % 7).toInt().coerceAtLeast(0)) % (pool.size - 1)]
+    }
+
     override suspend fun trending(call: ProviderCall, continuation: String?): Page<FeedItem> {
         val body = buildJsonObject {
             if (continuation != null) put("continuation", continuation) else {
-                put("query", if (call.locale.language == "vi") "thịnh hành" else "trending")
+                put("query", nextTrendingQuery(call.locale))
                 put("params", TRENDING_SEARCH_PARAMS)
             }
         }
@@ -380,5 +392,13 @@ class InnerTubeProvider(
         /** Search filter: type = video, uploaded this week, sorted by view count. */
         const val TRENDING_SEARCH_PARAMS = "CAMSBAgDEAE%3D"
         const val SUBSCRIBE_PARAMS = "EgIIAhgA"
+
+        /** Topic searches per region (first entry = the default "trending" query). The empty key is the fallback. */
+        private val TRENDING_QUERIES: Map<String, List<String>> = mapOf(
+            "VN" to listOf("thịnh hành", "nhạc thịnh hành", "tin tức hôm nay", "giải trí", "game", "ẩm thực", "du lịch", "bóng đá"),
+            "JP" to listOf("急上昇", "音楽 人気", "ニュース", "ゲーム", "料理", "旅行", "アニメ"),
+            "KR" to listOf("인기 급상승", "음악 인기", "뉴스", "게임", "먹방", "여행", "예능"),
+            "" to listOf("trending", "trending music", "news today", "gaming", "entertainment", "cooking", "travel", "sports"),
+        )
     }
 }

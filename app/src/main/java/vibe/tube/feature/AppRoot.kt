@@ -2,14 +2,26 @@ package vibe.tube.feature
 
 import android.content.Context
 import android.content.Intent
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavGraphBuilder
+import vibe.tube.ui.rememberDeviceCornerRadius
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
+import vibe.tube.ui.components.EmphasizedDecelerate
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.rememberUpdatedState
@@ -172,10 +184,21 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
 
     val goToTab = remember(nav) {
         { tab: Tab ->
-            nav.navigate(tab.route) {
-                popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                launchSingleTop = true
-                restoreState = true
+            val startRoute = nav.graph.findStartDestination()
+            val onStart = tab.route::class.let { cls -> startRoute.hasRoute(cls) }
+            if (onStart) {
+                // Home is the bottom of the stack: pop straight back to it instead of re-navigating.
+                if (nav.currentBackStackEntry?.destination?.hasRoute(tab.route::class) != true) {
+                    if (!nav.popBackStack(tab.route, inclusive = false)) {
+                        nav.navigate(tab.route) { launchSingleTop = true }
+                    }
+                }
+            } else {
+                nav.navigate(tab.route) {
+                    popUpTo(startRoute.id) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
             }
         }
     }
@@ -218,7 +241,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                             tabs.getOrNull(currentTab + direction)?.let(goToTab)
                         },
                 ) {
-                    AppNavHost(nav, appViewModel, avatarUrl)
+                    AppNavHost(nav, appViewModel, avatarUrl, onTab = { route -> tabs.firstOrNull { it.route == route }?.let(goToTab) })
                     MiniPlayer(
                         controller,
                         enabled = classicPlayer,
@@ -267,14 +290,16 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
 }
 
 @Composable
-private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel: AppViewModel, avatarUrl: String?) {
+private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel: AppViewModel, avatarUrl: String?, onTab: (Any) -> Unit) {
     val noPadding = PaddingValues(0.dp)
     val authState by appViewModel.authState.collectAsStateWithLifecycle()
     val isGuest = authState is vibe.tube.account.AuthState.Guest
-    val motion = MaterialTheme.motionScheme
-    val offsetSpec = motion.defaultSpatialSpec<IntOffset>()
-    val fadeSpec = motion.defaultEffectsSpec<Float>()
     val reduced = LocalReducedMotion.current
+    // Plain tweens with M3 emphasized easing: no springs, so nothing overshoots or bounces.
+    val enterSpec = tween<IntOffset>(300, easing = EmphasizedDecelerate)
+    val exitSpec = tween<IntOffset>(220, easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f))
+    val fadeInSpec = tween<Float>(220, delayMillis = 40, easing = LinearOutSlowInEasing)
+    val fadeOutSpec = tween<Float>(120, easing = LinearEasing)
 
     fun tabIndex(d: NavDestination): Int = tabs.indexOfFirst { d.hasRoute(it.route::class) }
     fun isSearch(d: NavDestination) = d.hasRoute(SearchRoute::class)
@@ -286,13 +311,13 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
         val from = tabIndex(initial)
         val to = tabIndex(target)
         return when {
-            isSearch(initial) || isSearch(target) -> fadeIn(fadeSpec)
+            isSearch(initial) || isSearch(target) -> fadeIn(fadeInSpec)
             from >= 0 && to >= 0 -> {
                 val dir = if (to > from) 1 else -1
-                slideInHorizontally(offsetSpec) { dir * it / 3 } + fadeIn(fadeSpec)
+                slideInHorizontally(enterSpec) { dir * it / 4 } + fadeIn(fadeInSpec)
             }
-            popping -> slideInHorizontally(offsetSpec) { -it / 6 } + fadeIn(fadeSpec)
-            else -> slideInHorizontally(offsetSpec) { it / 6 } + fadeIn(fadeSpec)
+            popping -> slideInHorizontally(enterSpec) { -it / 8 } + fadeIn(fadeInSpec)
+            else -> slideInHorizontally(enterSpec) { it / 5 } + fadeIn(fadeInSpec)
         }
     }
 
@@ -301,13 +326,13 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
         val from = tabIndex(initial)
         val to = tabIndex(target)
         return when {
-            isSearch(initial) || isSearch(target) -> fadeOut(fadeSpec)
+            isSearch(initial) || isSearch(target) -> fadeOut(fadeOutSpec)
             from >= 0 && to >= 0 -> {
                 val dir = if (to > from) 1 else -1
-                slideOutHorizontally(offsetSpec) { -dir * it / 3 } + fadeOut(fadeSpec)
+                slideOutHorizontally(exitSpec) { -dir * it / 4 } + fadeOut(fadeOutSpec)
             }
-            popping -> slideOutHorizontally(offsetSpec) { it / 6 } + fadeOut(fadeSpec)
-            else -> slideOutHorizontally(offsetSpec) { -it / 6 } + fadeOut(fadeSpec)
+            popping -> slideOutHorizontally(exitSpec) { it / 5 } + fadeOut(fadeOutSpec)
+            else -> slideOutHorizontally(exitSpec) { -it / 8 } + fadeOut(fadeOutSpec)
         }
     }
 
@@ -320,18 +345,22 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
                 exitTransition = { exit(initialState.destination, targetState.destination, popping = false) },
                 popEnterTransition = { enter(initialState.destination, targetState.destination, popping = true) },
                 popExitTransition = { exit(initialState.destination, targetState.destination, popping = true) },
+                // The back-gesture preview: the leaving page just follows the finger to the right (clipped to the
+                // device's corner radius) while the page below is already in place. No default 0.9 scale-down.
+                predictivePopEnterTransition = { EnterTransition.None },
+                predictivePopExitTransition = { _ -> slideOutHorizontally(tween(300, easing = LinearEasing)) { it } },
             ) {
-                composable<HomeRoute> {
+                page<HomeRoute> {
                     HomeScreen(
                         onSearch = { nav.navigate(SearchRoute()) },
                         onLogin = { nav.navigate(LoginRoute) },
-                        onAccount = { nav.navigate(AccountRoute) { launchSingleTop = true } },
+                        onAccount = { onTab(AccountRoute) },
                         avatarUrl = avatarUrl,
                         contentPadding = noPadding,
                         visibilityScope = this,
                     )
                 }
-                composable<SubscriptionsRoute> {
+                page<SubscriptionsRoute> {
                     SubscriptionsScreen(
                         onSearch = { nav.navigate(SearchRoute()) },
                         onLogin = { nav.navigate(LoginRoute) },
@@ -339,7 +368,7 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
                         visibilityScope = this,
                     )
                 }
-                composable<LibraryRoute> {
+                page<LibraryRoute> {
                     LibraryScreen(
                         onOpenHistory = { nav.navigate(YoutubeHistoryRoute) },
                         onOpenLocalHistory = { nav.navigate(LocalHistoryRoute) },
@@ -351,38 +380,59 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
                         contentPadding = noPadding,
                     )
                 }
-                composable<AccountRoute> {
+                page<AccountRoute> {
                     AccountScreen(onLogin = { nav.navigate(LoginRoute) }, onSettings = { nav.navigate(SettingsRoute) }, contentPadding = noPadding)
                 }
-                composable<SearchRoute> {
+                page<SearchRoute> {
                     SearchScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }, visibilityScope = this)
                 }
-                composable<PlaylistRoute> {
+                page<PlaylistRoute> {
                     CompositionLocalProvider(LocalQueueMode provides true) {
                         PlaylistScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }, session = appViewModel.activeSession)
                     }
                 }
-                composable<ChannelRoute> { ChannelScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }) }
-                composable<YoutubeHistoryRoute> {
+                page<ChannelRoute> { ChannelScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }) }
+                page<YoutubeHistoryRoute> {
                     CompositionLocalProvider(LocalQueueMode provides true) {
                         YoutubeHistoryScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) })
                     }
                 }
-                composable<LocalHistoryRoute> { LocalHistoryScreen(onBack = { nav.popBackStack() }) }
-                composable<PlaylistsRoute> { PlaylistsScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }) }
-                composable<SettingsRoute> {
+                page<LocalHistoryRoute> { LocalHistoryScreen(onBack = { nav.popBackStack() }) }
+                page<PlaylistsRoute> { PlaylistsScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }) }
+                page<SettingsRoute> {
                     SettingsScreen(
                         onBack = { nav.popBackStack() },
                         onLicenses = { nav.navigate(LicensesRoute) },
                         onDebug = if (BuildConfig.DEBUG) ({ nav.navigate(GalleryRoute) }) else null,
                     )
                 }
-                composable<LicensesRoute> { LicensesScreen(onBack = { nav.popBackStack() }) }
-                composable<LoginRoute> { LoginScreen(onClose = { nav.popBackStack() }) }
+                page<LicensesRoute> { LicensesScreen(onBack = { nav.popBackStack() }) }
+                page<LoginRoute> { LoginScreen(onClose = { nav.popBackStack() }) }
                 debugDestinations(nav)
             }
         }
     }
+}
+
+/**
+ * Wraps a destination so that, while it enters or leaves (including the back-gesture preview), it is opaque and
+ * clipped to the device's own corner radius; at rest it adds nothing.
+ */
+@Composable
+private fun PageFrame(scope: AnimatedContentScope, content: @Composable () -> Unit) {
+    val transition = scope.transition
+    val moving = transition.currentState != EnterExitState.Visible || transition.targetState != EnterExitState.Visible
+    val radius = rememberDeviceCornerRadius()
+    val background = MaterialTheme.colorScheme.background
+    Box(
+        if (moving) Modifier.clip(RoundedCornerShape(radius)).background(background) else Modifier,
+    ) { content() }
+}
+
+private inline fun <reified T : Any> NavGraphBuilder.page(
+    noinline content: @Composable AnimatedContentScope.(NavBackStackEntry) -> Unit,
+) {
+    composable<T> { entry -> PageFrame(this) { content(entry) } }
 }
 
 /** Swipe horizontally on a top-level screen to move to the neighbouring tab (+1 = next, -1 = previous). */

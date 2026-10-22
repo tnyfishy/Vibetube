@@ -123,11 +123,9 @@
     <string name="account_status_expired">Phiên đã hết hạn</string>
     <string name="account_status_unverified">Chưa xác minh (có thể đang offline)</string>
     <string name="account_status_guest">Khách</string>
-    <string name="account_refresh">Làm mới thông tin tài khoản</string>
     <string name="account_channels">Kênh</string>
     <string name="account_channels_note">Brand Account và các kênh gắn với tài khoản Google này. Chuyển đổi sẽ thay đổi kênh mà các yêu cầu tới YouTube hoạt động thay mặt.</string>
     <string name="account_saved_accounts">Tài khoản trên thiết bị này</string>
-    <string name="account_isolation_note">Mỗi tài khoản có kho cookie mã hóa riêng. Đăng nhập dùng WebView tạm và được xóa sạch sau đó.</string>
     <string name="account_active">Đang dùng</string>
     <string name="account_no_handle">Chưa có handle</string>
     <string name="account_add">Thêm tài khoản</string>
@@ -157,10 +155,6 @@
     <string name="settings_font_preview_title">Vibetube — Xem video thật êm</string>
     <string name="settings_font_preview_body">Con cáo nâu nhanh nhẹn nhảy qua chú chó lười. Tiếng Việt có dấu: ăn quả nhớ kẻ trồng cây.</string>
     <string name="settings_font_preview_label">Aa Bb Cc 0123456789</string>
-    <string name="settings_refresh_rate">Tần số quét màn hình</string>
-    <string name="refresh_rate_max">Cao nhất của máy (mặc định)</string>
-    <string name="refresh_rate_system">Theo hệ thống</string>
-    <string name="refresh_rate_hz">%1$d Hz</string>
     <string name="action_hide_channel">Không đề xuất kênh này</string>
     <string name="action_undo">Hoàn tác</string>
     <string name="action_show_again">Hiện lại</string>

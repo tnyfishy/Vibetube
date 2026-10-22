@@ -1,7 +1,10 @@
 package vibe.tube.feature.settings
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -81,7 +84,7 @@ fun <T> ChoiceDialog(
 private val contentLanguages = listOf("en", "vi", "ja", "ko", "zh", "es", "fr", "de", "pt", "ru", "id", "th", "hi", "ar", "it", "tr")
 private val contentRegions = listOf("US", "VN", "GB", "JP", "KR", "DE", "FR", "ES", "BR", "IN", "ID", "TH", "RU", "AU", "CA", "SG", "TW", "PH", "MY")
 
-private enum class Dialog { Theme, Font, RefreshRate, HiddenChannels, DownloadDir, UiLanguage, ContentLanguage, Region, WifiQuality, MobileQuality, ClearCache, ClearHistory, ClearSearch }
+private enum class Dialog { Theme, Font, HiddenChannels, DownloadDir, UiLanguage, ContentLanguage, Region, WifiQuality, MobileQuality, ClearCache, ClearHistory, ClearSearch }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,12 +140,6 @@ fun SettingsScreen(
                     VIcon.Edit, R.string.settings_font,
                     fontLabel(settings.font),
                 ) { dialog = Dialog.Font }
-            }
-            item {
-                SettingRow(
-                    VIcon.Tune, R.string.settings_refresh_rate,
-                    refreshLabel(settings.refreshRate),
-                ) { dialog = Dialog.RefreshRate }
             }
             section(R.string.settings_section_language)
             item {
@@ -291,15 +288,6 @@ fun SettingsScreen(
             },
             confirmButton = { TextButton(shapes = ButtonDefaults.shapes(), onClick = { dialog = null }) { Text(stringResource(R.string.action_close)) } },
         )
-        Dialog.RefreshRate -> {
-            val rates = remember { vibe.tube.ui.RefreshRate.supportedRates(context) }
-            ChoiceDialog(
-                stringResource(R.string.settings_refresh_rate),
-                (listOf(vibe.tube.ui.RefreshRate.MAX, vibe.tube.ui.RefreshRate.SYSTEM) + rates.reversed()).map { Choice(it, refreshLabel(it)) },
-                settings.refreshRate,
-                { dialog = null },
-            ) { v -> viewModel.update { it.copy(refreshRate = v) }; dialog = null }
-        }
         Dialog.Font -> FontSheet(settings, { change -> viewModel.update { it.change() } }) { dialog = null }
         Dialog.UiLanguage -> ChoiceDialog(
             stringResource(R.string.settings_ui_language),
@@ -346,13 +334,6 @@ private fun downloadDirLabel(dir: String): String {
 }
 
 @Composable
-private fun refreshLabel(rate: Int): String = when (rate) {
-    vibe.tube.ui.RefreshRate.MAX -> stringResource(R.string.refresh_rate_max)
-    vibe.tube.ui.RefreshRate.SYSTEM -> stringResource(R.string.refresh_rate_system)
-    else -> stringResource(R.string.refresh_rate_hz, rate)
-}
-
-@Composable
 private fun ConfirmDialog(title: Int, body: Int, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -377,26 +358,54 @@ private fun androidx.compose.foundation.lazy.LazyListScope.section(title: Int) {
     }
 }
 
+/** One settings line: icon, title (+ optional summary) and trailing control, all vertically centred together. */
+@Composable
+private fun SettingLine(
+    icon: Int,
+    title: String,
+    summary: String?,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        VIconImage(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (summary != null) {
+                Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        trailing?.invoke()
+    }
+}
+
 @Composable
 private fun SettingRow(icon: Int, title: Int, summary: Any?, onClick: (() -> Unit)?) {
-    ListItem(
-        modifier = Modifier.then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier),
-        leadingContent = { VIconImage(icon, null) },
-        headlineContent = { Text(stringResource(title)) },
-        supportingContent = summary?.let { s -> { Text(if (s is Int) stringResource(s) else s.toString()) } },
+    SettingLine(
+        icon,
+        stringResource(title),
+        summary?.let { if (it is Int) stringResource(it) else it.toString() },
+        Modifier.then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier),
     )
 }
 
 @Composable
 private fun SwitchRow(icon: Int, title: Int, summary: Int, checked: Boolean, onChange: (Boolean) -> Unit) {
-    ListItem(
-        modifier = Modifier.selectable(checked, role = Role.Switch) { onChange(!checked) },
-        leadingContent = { VIconImage(icon, null) },
-        headlineContent = { Text(stringResource(title)) },
-        supportingContent = { Text(stringResource(summary)) },
-        trailingContent = { Switch(checked = checked, onCheckedChange = null) },
-    )
+    SettingLine(
+        icon,
+        stringResource(title),
+        stringResource(summary),
+        Modifier.selectable(checked, role = Role.Switch) { onChange(!checked) },
+    ) { Switch(checked = checked, onCheckedChange = null) }
 }
+
 
 @Composable
 private fun themeLabel(mode: ThemeMode): String = stringResource(
