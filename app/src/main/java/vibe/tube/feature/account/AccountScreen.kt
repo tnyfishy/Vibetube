@@ -119,6 +119,10 @@ fun AccountScreen(
                     HorizontalDivider()
                     Text(stringResource(R.string.account_saved_accounts), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.sm))
                     Text(
+                        androidx.compose.ui.res.pluralStringResource(R.plurals.account_count, sessions.size, sessions.size),
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    Text(
                         stringResource(R.string.account_isolation_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

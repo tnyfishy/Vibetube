@@ -68,6 +68,27 @@ class LiveProbeTest {
     }
 
     @Test
+    fun publicPlaylistAndChannelPagesParseLive() = runBlocking {
+        assumeTrue(enabled)
+        val provider = InnerTubeProvider(newClient())
+        val call = ProviderCall(locale, null)
+        val search = provider.search(call, "music", SearchKind.Playlist, SearchSort.Relevance, null)
+        val playlist = search.items.filterIsInstance<vibe.tube.youtube.model.PlaylistItem>().first()
+        val detail = provider.playlist(call, playlist.id, null)
+        println("LIVE playlist id=${playlist.id} items=${detail.items.size} title=${detail.title.take(40)} continuation=${detail.continuation != null}")
+        assertTrue(detail.items.isNotEmpty())
+        val more = provider.playlist(call, playlist.id, detail.continuation!!)
+        println("LIVE playlist page2 videos=${more.items.size} (recommended-playlist shelves are not videos)")
+        assertTrue(more.items.all { it is VideoItem })
+        val channel = provider.channel(call, "UCuAXFkgsw1L7xaCfnd5JJOw")
+        println("LIVE channel name=${channel.name} handle=${channel.handle} subs=${channel.subscriberText} avatar=${channel.avatar != null}")
+        assertTrue(channel.name.isNotBlank())
+        val videos = provider.channelVideos(call, channel.id, null)
+        println("LIVE channelVideos=${videos.items.size} continuation=${videos.continuation != null}")
+        assertTrue(videos.items.isNotEmpty())
+    }
+
+    @Test
     fun suggestionsEndpointAnswers() = runBlocking {
         assumeTrue(enabled)
         val provider = InnerTubeProvider(newClient())

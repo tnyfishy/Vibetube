@@ -148,7 +148,7 @@
     <string name="login_title">Sign in to Google / YouTube</string>
     <string name="login_hint">You are on the official Google sign-in page. Vibetube never sees your password; it only keeps the YouTube session after YouTube confirms it.</string>
     <string name="login_verifying">Asking YouTube to confirm your session…</string>
-    <string name="login_blocked_title">Google blocked sign-in in this embedded browser</string>
+    <string name="login_blocked_title">Google blocked sign-in inside this embedded browser</string>
     <string name="login_blocked_body">Google may refuse sign-in inside app web views (%1$s). Vibetube does not bypass this. Browser sessions in Chrome or other apps cannot be transferred to Vibetube. You can keep using guest mode for search and playback.</string>
     <string name="login_not_confirmed_title">YouTube did not confirm the sign-in</string>
     <string name="login_not_confirmed_body">No account was saved. Try signing in again.</string>

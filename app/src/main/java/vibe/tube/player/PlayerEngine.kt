@@ -1,5 +1,9 @@
+@file:OptIn(UnstableApi::class)
+
 package vibe.tube.player
 
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 import android.content.Context
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C

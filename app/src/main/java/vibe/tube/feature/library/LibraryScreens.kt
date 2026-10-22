@@ -153,6 +153,14 @@ fun LocalHistoryScreen(onBack: () -> Unit, viewModel: LibraryViewModel = hiltVie
                 icon = VIcon.Info,
                 modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.sm),
             )
+            if (recent.isNotEmpty()) {
+                Text(
+                    androidx.compose.ui.res.pluralStringResource(R.plurals.video_count, recent.size, recent.size),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.gutter),
+                )
+            }
             if (recent.isEmpty()) {
                 StateMessage(VIcon.History, stringResource(R.string.local_history_empty_title), stringResource(R.string.local_history_empty_body))
             } else {

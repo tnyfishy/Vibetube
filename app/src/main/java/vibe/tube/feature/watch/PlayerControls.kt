@@ -1,5 +1,9 @@
+@file:OptIn(UnstableApi::class)
+
 package vibe.tube.feature.watch
 
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
@@ -36,6 +41,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import androidx.media3.ui.AspectRatioFrameLayout
@@ -47,7 +54,6 @@ import vibe.tube.core.PlaybackFailure
 import vibe.tube.player.PlayerPhase
 import vibe.tube.player.PlayerUiState
 import vibe.tube.ui.VIcon
-import vibe.tube.ui.components.StateMessage
 import vibe.tube.ui.components.TooltipIconButton
 import vibe.tube.ui.components.VIconImage
 import vibe.tube.ui.theme.MediaOverlayColors
@@ -144,16 +150,30 @@ fun VideoSurface(
         val error = state.error
         if (state.phase == PlayerPhase.Error && error != null) {
             val (title, body) = failureText(error.failure)
-            Box(Modifier.fillMaxSize().background(MediaOverlayColors.scrim), contentAlignment = Alignment.Center) {
-                StateMessage(
-                    icon = VIcon.Error,
-                    title = title,
-                    body = body,
-                    primaryLabel = stringResource(
-                        if (error.failure == PlaybackFailure.LoginRequired) R.string.action_sign_in else R.string.action_retry,
-                    ),
-                    onPrimary = { if (error.failure == PlaybackFailure.LoginRequired) onLogin() else onRetry() },
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .background(MediaOverlayColors.scrim)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs, Alignment.CenterVertically),
+            ) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = MediaOverlayColors.onScrim, textAlign = TextAlign.Center)
+                Text(
+                    body,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MediaOverlayColors.onScrim,
+                    textAlign = TextAlign.Center,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                Button(onClick = { if (error.failure == PlaybackFailure.LoginRequired) onLogin() else onRetry() }) {
+                    Text(
+                        stringResource(
+                            if (error.failure == PlaybackFailure.LoginRequired) R.string.action_sign_in else R.string.action_retry,
+                        ),
+                    )
+                }
             }
         }
         if (!state.inPip) {
