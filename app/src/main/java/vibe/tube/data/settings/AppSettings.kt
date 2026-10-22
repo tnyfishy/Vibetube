@@ -49,6 +49,8 @@ enum class QualityCap(val maxHeight: Int?, val maxFps: Int? = null) {
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.System,
     val dynamicColor: Boolean = true,
+    /** 0 = highest supported, -1 = system default, otherwise a rate in Hz (see [vibe.tube.ui.RefreshRate]). */
+    val refreshRate: Int = 0,
     val font: AppFont = AppFont.System,
     /** Added to every text role's weight; 0 is stock Material 3. */
     val fontWeightOffset: Int = 0,

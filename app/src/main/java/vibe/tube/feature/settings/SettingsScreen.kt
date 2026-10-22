@@ -81,7 +81,7 @@ fun <T> ChoiceDialog(
 private val contentLanguages = listOf("en", "vi", "ja", "ko", "zh", "es", "fr", "de", "pt", "ru", "id", "th", "hi", "ar", "it", "tr")
 private val contentRegions = listOf("US", "VN", "GB", "JP", "KR", "DE", "FR", "ES", "BR", "IN", "ID", "TH", "RU", "AU", "CA", "SG", "TW", "PH", "MY")
 
-private enum class Dialog { Theme, Font, UiLanguage, ContentLanguage, Region, WifiQuality, MobileQuality, ClearCache, ClearHistory, ClearSearch }
+private enum class Dialog { Theme, Font, RefreshRate, UiLanguage, ContentLanguage, Region, WifiQuality, MobileQuality, ClearCache, ClearHistory, ClearSearch }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,6 +95,7 @@ fun SettingsScreen(
     var dialog by remember { mutableStateOf<Dialog?>(null) }
     val systemLabel = stringResource(R.string.settings_system_default)
     val displayLocale = Locale.getDefault()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -123,6 +124,12 @@ fun SettingsScreen(
                     VIcon.Edit, R.string.settings_font,
                     fontLabel(settings.font),
                 ) { dialog = Dialog.Font }
+            }
+            item {
+                SettingRow(
+                    VIcon.Tune, R.string.settings_refresh_rate,
+                    refreshLabel(settings.refreshRate),
+                ) { dialog = Dialog.RefreshRate }
             }
             section(R.string.settings_section_language)
             item {
@@ -204,6 +211,15 @@ fun SettingsScreen(
             settings.themeMode,
             { dialog = null },
         ) { v -> viewModel.update { it.copy(themeMode = v) }; dialog = null }
+        Dialog.RefreshRate -> {
+            val rates = remember { vibe.tube.ui.RefreshRate.supportedRates(context) }
+            ChoiceDialog(
+                stringResource(R.string.settings_refresh_rate),
+                (listOf(vibe.tube.ui.RefreshRate.MAX, vibe.tube.ui.RefreshRate.SYSTEM) + rates.reversed()).map { Choice(it, refreshLabel(it)) },
+                settings.refreshRate,
+                { dialog = null },
+            ) { v -> viewModel.update { it.copy(refreshRate = v) }; dialog = null }
+        }
         Dialog.Font -> FontSheet(settings, { change -> viewModel.update { it.change() } }) { dialog = null }
         Dialog.UiLanguage -> ChoiceDialog(
             stringResource(R.string.settings_ui_language),
@@ -240,6 +256,13 @@ fun SettingsScreen(
         Dialog.ClearSearch -> ConfirmDialog(R.string.dialog_clear_search_title, R.string.dialog_clear_search_body, { dialog = null }) { viewModel.clearSearchHistory() }
         null -> Unit
     }
+}
+
+@Composable
+private fun refreshLabel(rate: Int): String = when (rate) {
+    vibe.tube.ui.RefreshRate.MAX -> stringResource(R.string.refresh_rate_max)
+    vibe.tube.ui.RefreshRate.SYSTEM -> stringResource(R.string.refresh_rate_system)
+    else -> stringResource(R.string.refresh_rate_hz, rate)
 }
 
 @Composable

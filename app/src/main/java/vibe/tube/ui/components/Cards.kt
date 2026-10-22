@@ -177,8 +177,7 @@ fun VideoCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(VibeShape.card)
-            .clickable(role = Role.Button) { actions.play(video, if (queueMode) queue else listOf(video)) }
+            .bouncyClickable(VibeShape.card) { actions.play(video, if (queueMode) queue else listOf(video)) }
             .semantics(mergeDescendants = true) { contentDescription = description },
     ) {
         VideoThumbnail(video, Modifier.fillMaxWidth())
@@ -223,8 +222,7 @@ fun VideoRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(VibeShape.card)
-            .clickable(enabled = !unavailable, role = Role.Button) { actions.play(video, if (queueMode) queue else listOf(video)) }
+            .bouncyClickable(VibeShape.card, enabled = !unavailable) { actions.play(video, if (queueMode) queue else listOf(video)) }
             .semantics(mergeDescendants = true) { contentDescription = description }
             .padding(vertical = Spacing.xs),
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -262,8 +260,7 @@ fun PlaylistCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(VibeShape.card)
-            .clickable(role = Role.Button) { actions.openPlaylist(playlist.id, playlist.title) }
+            .bouncyClickable(VibeShape.card) { actions.openPlaylist(playlist.id, playlist.title) }
             .semantics(mergeDescendants = true) { contentDescription = description },
     ) {
         Box(
@@ -302,8 +299,7 @@ fun ChannelRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(VibeShape.card)
-            .clickable(role = Role.Button) { actions.openChannel(channel.id) }
+            .bouncyClickable(VibeShape.card) { actions.openChannel(channel.id) }
             .semantics(mergeDescendants = true) { contentDescription = description }
             .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg),

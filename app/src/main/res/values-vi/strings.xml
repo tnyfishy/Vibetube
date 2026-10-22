@@ -157,6 +157,10 @@
     <string name="settings_font_preview_title">Vibetube — Xem video thật êm</string>
     <string name="settings_font_preview_body">Con cáo nâu nhanh nhẹn nhảy qua chú chó lười. Tiếng Việt có dấu: ăn quả nhớ kẻ trồng cây.</string>
     <string name="settings_font_preview_label">Aa Bb Cc 0123456789</string>
+    <string name="settings_refresh_rate">Tần số quét màn hình</string>
+    <string name="refresh_rate_max">Cao nhất của máy (mặc định)</string>
+    <string name="refresh_rate_system">Theo hệ thống</string>
+    <string name="refresh_rate_hz">%1$d Hz</string>
     <string name="settings_theme">Chủ đề</string>
     <string name="settings_dynamic_color">Màu động</string>
     <string name="settings_dynamic_color_desc">Dùng màu từ hình nền khi thiết bị hỗ trợ</string>
