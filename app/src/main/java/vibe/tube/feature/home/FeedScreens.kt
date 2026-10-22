@@ -1,26 +1,31 @@
 package vibe.tube.feature.home
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import vibe.tube.ui.components.HeaderSurface
+import vibe.tube.ui.components.SearchPill
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,29 +52,32 @@ fun HomeScreen(
     onAccount: () -> Unit,
     avatarUrl: String?,
     contentPadding: PaddingValues,
+    visibilityScope: AnimatedVisibilityScope? = null,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.controller.state.collectAsStateWithLifecycle()
     val hideShorts by viewModel.hideShorts.collectAsStateWithLifecycle()
     val auth by viewModel.authState.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val scrolled by remember { derivedStateOf { gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 0 } }
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.app_name)) },
-                actions = {
-                    TooltipIconButton(VIcon.Search, stringResource(R.string.action_search), onSearch)
+            HeaderSurface(scrolled) {
+                Row(
+                    Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.xs, top = Spacing.xs, bottom = Spacing.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                ) {
+                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, maxLines = 1)
+                    SearchPill(onSearch, Modifier.weight(1f), visibilityScope)
                     TooltipIconButton(
                         if (auth is AuthState.Guest) VIcon.Login else VIcon.AccountCircle,
                         stringResource(if (auth is AuthState.Guest) R.string.action_sign_in else R.string.nav_account),
                         if (auth is AuthState.Guest) onLogin else onAccount,
                     )
-                },
-                scrollBehavior = scrollBehavior,
-            )
+                }
+            }
         },
     ) { inner ->
         FeedContent(
@@ -100,6 +108,7 @@ fun SubscriptionsScreen(
     onSearch: () -> Unit,
     onLogin: () -> Unit,
     contentPadding: PaddingValues,
+    visibilityScope: AnimatedVisibilityScope? = null,
     feedViewModel: SubscriptionsFeedViewModel = hiltViewModel(),
     channelsViewModel: SubscribedChannelsViewModel = hiltViewModel(),
 ) {
@@ -109,17 +118,31 @@ fun SubscriptionsScreen(
     val hideShorts by feedViewModel.hideShorts.collectAsStateWithLifecycle()
     val feedGrid = rememberLazyGridState()
     val channelGrid = rememberLazyGridState()
+    val scrolled by remember {
+        derivedStateOf {
+            val g = if (tab == 0) feedGrid else channelGrid
+            g.firstVisibleItemIndex > 0 || g.firstVisibleItemScrollOffset > 0
+        }
+    }
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
         topBar = {
-            androidx.compose.foundation.layout.Column {
-                TopAppBar(
-                    title = { Text(stringResource(R.string.nav_subscriptions)) },
-                    actions = { TooltipIconButton(VIcon.Search, stringResource(R.string.action_search), onSearch) },
-                )
-                PrimaryTabRow(selectedTabIndex = tab) {
-                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.subs_tab_latest)) })
-                    Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.subs_tab_channels)) })
+            Column {
+                HeaderSurface(scrolled) {
+                    Column {
+                        Row(
+                            Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.lg, top = Spacing.xs, bottom = Spacing.sm),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                        ) {
+                            Text(stringResource(R.string.nav_subscriptions), style = MaterialTheme.typography.titleLarge, maxLines = 1)
+                            SearchPill(onSearch, Modifier.weight(1f), visibilityScope)
+                        }
+                        PrimaryTabRow(selectedTabIndex = tab, containerColor = androidx.compose.ui.graphics.Color.Transparent) {
+                            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.subs_tab_latest)) })
+                            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.subs_tab_channels)) })
+                        }
+                    }
                 }
             }
         },

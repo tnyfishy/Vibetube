@@ -8,6 +8,19 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.composed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.navigation.NavDestination
+import vibe.tube.ui.components.LocalSharedTransitionScope
+import vibe.tube.ui.theme.LocalReducedMotion
+import kotlin.math.abs
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -110,6 +123,9 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     val backStack by nav.currentBackStackEntryAsState()
     val destination = backStack?.destination
     val onTopLevel = tabs.any { destination?.hasRoute(it.route::class) == true }
+    val onSearch = destination?.hasRoute(SearchRoute::class) == true
+    // The bottom bar stays visible on the tabs and in search.
+    val showNav = onTopLevel || onSearch
     val snackbar = remember { SnackbarHostState() }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
 
@@ -147,9 +163,20 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
         }
     }
 
+    val goToTab = remember(nav) {
+        { tab: Tab ->
+            nav.navigate(tab.route) {
+                popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+    val currentTab = tabs.indexOfFirst { destination?.hasRoute(it.route::class) == true }
+
     val adaptive = currentWindowAdaptiveInfo()
     val suiteType = when {
-        !onTopLevel -> NavigationSuiteType.None
+        !showNav -> NavigationSuiteType.None
         adaptive.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXTRA_LARGE_LOWER_BOUND) -> NavigationSuiteType.NavigationDrawer
         else -> NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptive)
     }
@@ -165,33 +192,33 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                         val selected = destination?.hasRoute(tab.route::class) == true
                         item(
                             selected = selected,
-                            onClick = {
-                                nav.navigate(tab.route) {
-                                    popUpTo(nav.graph.findStartDestination().id) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                            onClick = { goToTab(tab) },
                             icon = { VIconImage(if (selected) tab.iconSelected else tab.icon, null) },
                             label = { Text(stringResource(tab.label)) },
                         )
                     }
                 },
             ) {
-                Box(Modifier.fillMaxSize()) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .tabSwipe(enabled = currentTab >= 0 && !(playerState.visible && playerState.expanded)) { direction ->
+                            tabs.getOrNull(currentTab + direction)?.let(goToTab)
+                        },
+                ) {
                     AppNavHost(nav, appViewModel, avatarUrl)
                     MiniPlayer(
                         controller,
                         Modifier
                             .align(Alignment.BottomCenter)
-                            .then(if (onTopLevel) Modifier else Modifier.windowInsetsPadding(WindowInsets.navigationBars)),
+                            .then(if (showNav) Modifier else Modifier.windowInsetsPadding(WindowInsets.navigationBars)),
                     )
                     SnackbarHost(
                         snackbar,
                         Modifier
                             .align(Alignment.BottomCenter)
                             .padding(bottom = miniPadding)
-                            .then(if (onTopLevel) Modifier else Modifier.windowInsetsPadding(WindowInsets.navigationBars)),
+                            .then(if (showNav) Modifier else Modifier.windowInsetsPadding(WindowInsets.navigationBars)),
                     )
                 }
             }
@@ -223,66 +250,136 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
     val noPadding = PaddingValues(0.dp)
     val authState by appViewModel.authState.collectAsStateWithLifecycle()
     val isGuest = authState is vibe.tube.account.AuthState.Guest
-    val enter = { slideInHorizontally(initialOffsetX = { it / 8 }) + fadeIn() }
-    NavHost(
-        navController = nav,
-        startDestination = HomeRoute,
-        enterTransition = { fadeIn() },
-        exitTransition = { fadeOut() },
-        popEnterTransition = { fadeIn() },
-        popExitTransition = { fadeOut() },
-    ) {
-        composable<HomeRoute> {
-            HomeScreen(
-                onSearch = { nav.navigate(SearchRoute()) },
-                onLogin = { nav.navigate(LoginRoute) },
-                onAccount = { nav.navigate(AccountRoute) { launchSingleTop = true } },
-                avatarUrl = avatarUrl,
-                contentPadding = noPadding,
-            )
+    val motion = MaterialTheme.motionScheme
+    val offsetSpec = motion.defaultSpatialSpec<IntOffset>()
+    val fadeSpec = motion.defaultEffectsSpec<Float>()
+    val reduced = LocalReducedMotion.current
+
+    fun tabIndex(d: NavDestination): Int = tabs.indexOfFirst { d.hasRoute(it.route::class) }
+    fun isSearch(d: NavDestination) = d.hasRoute(SearchRoute::class)
+
+    // Direction-aware shared-axis motion: tabs slide sideways in the swipe direction, detail screens
+    // drift in from the right, and search only fades (its container transform does the rest).
+    fun enter(initial: NavDestination, target: NavDestination, popping: Boolean): EnterTransition {
+        if (reduced) return fadeIn(tween(0))
+        val from = tabIndex(initial)
+        val to = tabIndex(target)
+        return when {
+            isSearch(initial) || isSearch(target) -> fadeIn(fadeSpec)
+            from >= 0 && to >= 0 -> {
+                val dir = if (to > from) 1 else -1
+                slideInHorizontally(offsetSpec) { dir * it / 3 } + fadeIn(fadeSpec)
+            }
+            popping -> slideInHorizontally(offsetSpec) { -it / 6 } + fadeIn(fadeSpec)
+            else -> slideInHorizontally(offsetSpec) { it / 6 } + fadeIn(fadeSpec)
         }
-        composable<SubscriptionsRoute> {
-            SubscriptionsScreen(onSearch = { nav.navigate(SearchRoute()) }, onLogin = { nav.navigate(LoginRoute) }, contentPadding = noPadding)
+    }
+
+    fun exit(initial: NavDestination, target: NavDestination, popping: Boolean): ExitTransition {
+        if (reduced) return fadeOut(tween(0))
+        val from = tabIndex(initial)
+        val to = tabIndex(target)
+        return when {
+            isSearch(initial) || isSearch(target) -> fadeOut(fadeSpec)
+            from >= 0 && to >= 0 -> {
+                val dir = if (to > from) 1 else -1
+                slideOutHorizontally(offsetSpec) { -dir * it / 3 } + fadeOut(fadeSpec)
+            }
+            popping -> slideOutHorizontally(offsetSpec) { it / 6 } + fadeOut(fadeSpec)
+            else -> slideOutHorizontally(offsetSpec) { -it / 6 } + fadeOut(fadeSpec)
         }
-        composable<LibraryRoute> {
-            LibraryScreen(
-                onOpenHistory = { nav.navigate(YoutubeHistoryRoute) },
-                onOpenLocalHistory = { nav.navigate(LocalHistoryRoute) },
-                onOpenLiked = { nav.navigate(PlaylistRoute("LL")) },
-                onOpenWatchLater = { nav.navigate(PlaylistRoute("WL")) },
-                onOpenPlaylists = { nav.navigate(PlaylistsRoute) },
-                onLogin = { nav.navigate(LoginRoute) },
-                isGuest = isGuest,
-                contentPadding = noPadding,
-            )
-        }
-        composable<AccountRoute> {
-            AccountScreen(onLogin = { nav.navigate(LoginRoute) }, onSettings = { nav.navigate(SettingsRoute) }, contentPadding = noPadding)
-        }
-        composable<SearchRoute> { SearchScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }) }
-        composable<PlaylistRoute> {
-            CompositionLocalProvider(LocalQueueMode provides true) {
-                PlaylistScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }, session = appViewModel.activeSession)
+    }
+
+    SharedTransitionLayout(Modifier.fillMaxSize()) {
+        CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+            NavHost(
+                navController = nav,
+                startDestination = HomeRoute,
+                enterTransition = { enter(initialState.destination, targetState.destination, popping = false) },
+                exitTransition = { exit(initialState.destination, targetState.destination, popping = false) },
+                popEnterTransition = { enter(initialState.destination, targetState.destination, popping = true) },
+                popExitTransition = { exit(initialState.destination, targetState.destination, popping = true) },
+            ) {
+                composable<HomeRoute> {
+                    HomeScreen(
+                        onSearch = { nav.navigate(SearchRoute()) },
+                        onLogin = { nav.navigate(LoginRoute) },
+                        onAccount = { nav.navigate(AccountRoute) { launchSingleTop = true } },
+                        avatarUrl = avatarUrl,
+                        contentPadding = noPadding,
+                        visibilityScope = this,
+                    )
+                }
+                composable<SubscriptionsRoute> {
+                    SubscriptionsScreen(
+                        onSearch = { nav.navigate(SearchRoute()) },
+                        onLogin = { nav.navigate(LoginRoute) },
+                        contentPadding = noPadding,
+                        visibilityScope = this,
+                    )
+                }
+                composable<LibraryRoute> {
+                    LibraryScreen(
+                        onOpenHistory = { nav.navigate(YoutubeHistoryRoute) },
+                        onOpenLocalHistory = { nav.navigate(LocalHistoryRoute) },
+                        onOpenLiked = { nav.navigate(PlaylistRoute("LL")) },
+                        onOpenWatchLater = { nav.navigate(PlaylistRoute("WL")) },
+                        onOpenPlaylists = { nav.navigate(PlaylistsRoute) },
+                        onLogin = { nav.navigate(LoginRoute) },
+                        isGuest = isGuest,
+                        contentPadding = noPadding,
+                    )
+                }
+                composable<AccountRoute> {
+                    AccountScreen(onLogin = { nav.navigate(LoginRoute) }, onSettings = { nav.navigate(SettingsRoute) }, contentPadding = noPadding)
+                }
+                composable<SearchRoute> {
+                    SearchScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }, visibilityScope = this)
+                }
+                composable<PlaylistRoute> {
+                    CompositionLocalProvider(LocalQueueMode provides true) {
+                        PlaylistScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }, session = appViewModel.activeSession)
+                    }
+                }
+                composable<ChannelRoute> { ChannelScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }) }
+                composable<YoutubeHistoryRoute> {
+                    CompositionLocalProvider(LocalQueueMode provides true) {
+                        YoutubeHistoryScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) })
+                    }
+                }
+                composable<LocalHistoryRoute> { LocalHistoryScreen(onBack = { nav.popBackStack() }) }
+                composable<PlaylistsRoute> { PlaylistsScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }) }
+                composable<SettingsRoute> {
+                    SettingsScreen(
+                        onBack = { nav.popBackStack() },
+                        onLicenses = { nav.navigate(LicensesRoute) },
+                        onDebug = if (BuildConfig.DEBUG) ({ nav.navigate(GalleryRoute) }) else null,
+                    )
+                }
+                composable<LicensesRoute> { LicensesScreen(onBack = { nav.popBackStack() }) }
+                composable<LoginRoute> { LoginScreen(onClose = { nav.popBackStack() }) }
+                debugDestinations(nav)
             }
         }
-        composable<ChannelRoute> { ChannelScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }) }
-        composable<YoutubeHistoryRoute> {
-            CompositionLocalProvider(LocalQueueMode provides true) {
-                YoutubeHistoryScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) })
-            }
-        }
-        composable<LocalHistoryRoute> { LocalHistoryScreen(onBack = { nav.popBackStack() }) }
-        composable<PlaylistsRoute> { PlaylistsScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }) }
-        composable<SettingsRoute> {
-            SettingsScreen(
-                onBack = { nav.popBackStack() },
-                onLicenses = { nav.navigate(LicensesRoute) },
-                onDebug = if (BuildConfig.DEBUG) ({ nav.navigate(GalleryRoute) }) else null,
-            )
-        }
-        composable<LicensesRoute> { LicensesScreen(onBack = { nav.popBackStack() }) }
-        composable<LoginRoute> { LoginScreen(onClose = { nav.popBackStack() }) }
-        debugDestinations(nav)
+    }
+}
+
+/** Swipe horizontally on a top-level screen to move to the neighbouring tab (+1 = next, -1 = previous). */
+private fun Modifier.tabSwipe(enabled: Boolean, onSwipe: (direction: Int) -> Unit): Modifier = composed {
+    val currentEnabled by rememberUpdatedState(enabled)
+    val currentSwipe by rememberUpdatedState(onSwipe)
+    val threshold = with(LocalDensity.current) { 72.dp.toPx() }
+    pointerInput(Unit) {
+        var total = 0f
+        detectHorizontalDragGestures(
+            onDragStart = { total = 0f },
+            onDragEnd = {
+                if (currentEnabled && abs(total) > threshold) currentSwipe(if (total < 0f) 1 else -1)
+                total = 0f
+            },
+            onDragCancel = { total = 0f },
+            onHorizontalDrag = { _, amount -> total += amount },
+        )
     }
 }
 

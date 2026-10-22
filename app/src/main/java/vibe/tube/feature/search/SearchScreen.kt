@@ -1,6 +1,21 @@
 package vibe.tube.feature.search
 
 import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import vibe.tube.ui.components.HeaderSurface
+import vibe.tube.ui.components.LocalMiniPlayerPadding
+import vibe.tube.ui.components.searchBounds
+import vibe.tube.ui.components.staggeredReveal
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,7 +68,12 @@ import vibe.tube.youtube.model.VideoItem
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen(onBack: () -> Unit, onLogin: () -> Unit, viewModel: SearchViewModel = hiltViewModel()) {
+fun SearchScreen(
+    onBack: () -> Unit,
+    onLogin: () -> Unit,
+    visibilityScope: AnimatedVisibilityScope? = null,
+    viewModel: SearchViewModel = hiltViewModel(),
+) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val results by viewModel.results.collectAsStateWithLifecycle()
     val suggestions by viewModel.suggestions.collectAsStateWithLifecycle()
@@ -63,34 +83,63 @@ fun SearchScreen(onBack: () -> Unit, onLogin: () -> Unit, viewModel: SearchViewM
     var sortMenu by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) { if (ui.submitted == null) focus.requestFocus() }
+    val gridState = rememberLazyGridState()
+    val listState = rememberLazyListState()
+    val showingResults = ui.submitted != null && results != null
+    val scrolled by remember(showingResults) {
+        derivedStateOf {
+            if (showingResults) gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 0
+            else listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+        }
+    }
 
+    // Open the keyboard only once the pill has finished expanding into the screen.
+    LaunchedEffect(Unit) {
+        if (ui.submitted == null) {
+            delay(380)
+            runCatching { focus.requestFocus() }
+        }
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxSize().searchBounds(visibilityScope),
+    ) {
     Scaffold(
+        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        contentWindowInsets = WindowInsets(0),
         topBar = {
-            Column {
+            HeaderSurface(scrolled) {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = Spacing.xs, vertical = Spacing.xs),
+                    Modifier.fillMaxWidth().padding(start = Spacing.xs, end = Spacing.lg, top = Spacing.xs, bottom = Spacing.xs).staggeredReveal(0),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TooltipIconButton(VIcon.ArrowBack, stringResource(R.string.action_back), onBack)
-                    SearchBarDefaults.InputField(
-                        query = ui.input,
-                        onQueryChange = viewModel::onInput,
-                        onSearch = viewModel::submit,
-                        expanded = false,
-                        onExpandedChange = {},
-                        placeholder = { Text(stringResource(R.string.search_placeholder)) },
-                        leadingIcon = { VIconImage(VIcon.Search, null) },
-                        trailingIcon = {
-                            if (ui.input.isNotEmpty()) {
-                                TooltipIconButton(VIcon.Close, stringResource(R.string.action_clear), { viewModel.onInput("") })
-                            }
-                        },
-                        modifier = Modifier.weight(1f).focusRequester(focus),
-                    )
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.weight(1f).height(52.dp),
+                    ) {
+                        SearchBarDefaults.InputField(
+                            query = ui.input,
+                            onQueryChange = viewModel::onInput,
+                            onSearch = viewModel::submit,
+                            expanded = false,
+                            onExpandedChange = {},
+                            placeholder = { Text(stringResource(R.string.search_placeholder)) },
+                            leadingIcon = { VIconImage(VIcon.Search, null) },
+                            trailingIcon = {
+                                if (ui.input.isNotEmpty()) {
+                                    TooltipIconButton(VIcon.Close, stringResource(R.string.action_clear), { viewModel.onInput("") })
+                                }
+                            },
+                            modifier = Modifier.focusRequester(focus),
+                        )
+                    }
                 }
                 if (ui.submitted != null) {
                     LazyRow(
+                        modifier = Modifier.padding(bottom = Spacing.sm),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.gutter),
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     ) {
@@ -144,19 +193,25 @@ fun SearchScreen(onBack: () -> Unit, onLogin: () -> Unit, viewModel: SearchViewM
                 onRefresh = viewModel::refresh,
                 onLoadMore = viewModel::loadMore,
                 onLogin = onLogin,
+                gridState = gridState,
                 contentPadding = inner,
                 singleColumn = true,
                 emptyTitle = stringResource(R.string.search_empty_title),
                 emptyBody = stringResource(R.string.search_empty_body),
             ) { item, queue ->
-                if (item is VideoItem) VideoRow(item, queue) else FeedItemContent(item, queue)
+                // One full-width card per result: large, highest-quality thumbnail.
+                FeedItemContent(item, queue)
             }
         } else {
-            LazyColumn(Modifier.fillMaxSize().padding(inner)) {
+            LazyColumn(
+                Modifier.fillMaxSize().padding(inner),
+                state = listState,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = LocalMiniPlayerPadding.current + Spacing.lg),
+            ) {
                 if (ui.input.trim().length >= 2 && suggestions.isNotEmpty()) {
-                    items(suggestions, key = { "s:$it" }) { suggestion ->
+                    itemsIndexed(suggestions, key = { _, it -> "s:$it" }) { index, suggestion ->
                         ListItem(
-                            modifier = Modifier.clickable(role = Role.Button) { viewModel.submit(suggestion) },
+                            modifier = Modifier.clickable(role = Role.Button) { viewModel.submit(suggestion) }.revealFirst(index + 1),
                             leadingContent = { VIconImage(VIcon.Search, null) },
                             headlineContent = { Text(suggestion) },
                         )
@@ -164,16 +219,16 @@ fun SearchScreen(onBack: () -> Unit, onLogin: () -> Unit, viewModel: SearchViewM
                 } else if (recent.isNotEmpty()) {
                     item {
                         Row(
-                            Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.xs),
+                            Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.xs).revealFirst(1),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(stringResource(R.string.search_recent), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                             TextButton(shapes = ButtonDefaults.shapes(), onClick = { confirmClear = true }) { Text(stringResource(R.string.action_clear)) }
                         }
                     }
-                    items(recent, key = { "r:$it" }) { query ->
+                    itemsIndexed(recent, key = { _, it -> "r:$it" }) { index, query ->
                         ListItem(
-                            modifier = Modifier.clickable(role = Role.Button) { viewModel.submit(query) },
+                            modifier = Modifier.clickable(role = Role.Button) { viewModel.submit(query) }.revealFirst(index + 2),
                             leadingContent = { VIconImage(VIcon.History, null) },
                             headlineContent = { Text(query) },
                             trailingContent = {
@@ -185,6 +240,7 @@ fun SearchScreen(onBack: () -> Unit, onLogin: () -> Unit, viewModel: SearchViewM
             }
         }
     }
+    }
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
@@ -195,6 +251,10 @@ fun SearchScreen(onBack: () -> Unit, onLogin: () -> Unit, viewModel: SearchViewM
         )
     }
 }
+
+/** Only the first screenful animates in; later rows (scrolled into view) appear normally. */
+@Composable
+private fun Modifier.revealFirst(index: Int): Modifier = if (index <= 12) staggeredReveal(index) else this
 
 private fun sortLabel(sort: SearchSort): Int = when (sort) {
     SearchSort.Relevance -> R.string.search_sort_relevance
