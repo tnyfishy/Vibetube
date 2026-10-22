@@ -76,6 +76,9 @@ fun <T> ConnectedChoiceGroup(
     }
 }
 
+/** Lets the wave travel while playing; UI tests switch it off so the frame clock can go idle. */
+val LocalWaveTravel = androidx.compose.runtime.compositionLocalOf { true }
+
 /** Horizontal inset (each side) of [WavyProgress], so round caps and the thumb stay inside the bounds. */
 val WavyInset = 4.dp
 
@@ -97,8 +100,9 @@ fun WavyProgress(
     thumb: androidx.compose.ui.unit.DpSize? = null,
 ) {
     val phase = androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
-    androidx.compose.runtime.LaunchedEffect(animate) {
-        if (!animate) return@LaunchedEffect
+    val travel = LocalWaveTravel.current
+    androidx.compose.runtime.LaunchedEffect(animate, travel) {
+        if (!animate || !travel) return@LaunchedEffect
         var last = 0L
         while (true) {
             androidx.compose.runtime.withFrameNanos { now ->

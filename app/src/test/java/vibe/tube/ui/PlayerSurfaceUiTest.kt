@@ -52,6 +52,7 @@ class PlayerSurfaceUiTest {
     private fun show(state: PlayerUiState, events: MutableList<String> = mutableListOf(), mode: ThemeMode = ThemeMode.Dark) {
         rule.setContent {
             VibetubeTheme(mode, false) {
+              androidx.compose.runtime.CompositionLocalProvider(vibe.tube.ui.components.LocalWaveTravel provides false) {
                 VideoSurface(
                     player = player, state = state, showControls = true,
                     onCollapse = { events += "collapse" }, onToggleFullscreen = { events += "fullscreen" },
@@ -61,6 +62,7 @@ class PlayerSurfaceUiTest {
                     onRetry = { events += "retry" }, onLogin = { events += "login" },
                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
                 )
+              }
             }
         }
         rule.waitForIdle()
