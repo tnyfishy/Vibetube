@@ -170,7 +170,6 @@ fun AddToPlaylistSheet(video: VideoItem, onDismiss: () -> Unit, onLogin: () -> U
                     }
                     OutlinedButton(
                        shapes = ButtonDefaults.shapes(),
-                        shapes = ButtonDefaults.shapes(),
                         onClick = { creating = true },
                         modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm),
                     ) {

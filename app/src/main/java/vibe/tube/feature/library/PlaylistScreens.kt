@@ -168,7 +168,6 @@ fun PlaylistScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                             Button(
                                shapes = ButtonDefaults.shapes(),
-                                shapes = ButtonDefaults.shapes(),
                                 onClick = { actions.playPlaylist(id, shuffle = false) },
                                 enabled = state.items.isNotEmpty(),
                             ) {
@@ -177,7 +176,6 @@ fun PlaylistScreen(
                             }
                             FilledTonalButton(
                                shapes = ButtonDefaults.shapes(),
-                                shapes = ButtonDefaults.shapes(),
                                 onClick = { actions.playPlaylist(id, shuffle = true) },
                                 enabled = state.items.isNotEmpty(),
                             ) {
