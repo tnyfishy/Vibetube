@@ -49,7 +49,7 @@ class YoutubeDataSource(private val upstream: DataSource) : DataSource {
             .setPosition(0)
             .setLength(C.LENGTH_UNSET.toLong())
             .setHttpMethod(DataSpec.HTTP_METHOD_POST)
-            .setHttpRequestBody(YoutubeRequests.body())
+            .setHttpBody(YoutubeRequests.body())
             .build()
         return upstream.open(rewritten)
     }

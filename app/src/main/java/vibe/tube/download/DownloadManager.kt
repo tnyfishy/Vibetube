@@ -93,10 +93,10 @@ class DownloadManager @Inject constructor(
         return DownloadPlanner.options(media, Build.VERSION.SDK_INT)
     }
 
-    private suspend fun resolveMedia(videoId: String): vibe.tube.youtube.player.ResolvedMedia {
+    private suspend fun resolveMedia(videoId: String, skip: Set<String> = emptySet()): vibe.tube.youtube.player.ResolvedMedia {
         val ctx = session.currentContext()
         val auth = ctx?.let { c -> session.authFor(c.accountId) }?.takeIf { session.authState.value is AuthState.Verified }
-        return when (val result = resolver.resolve(videoId, settings.latest.value.contentLocale(), auth)) {
+        return when (val result = resolver.resolve(videoId, settings.latest.value.contentLocale(), auth, skip)) {
             is ResolveResult.Playable -> result.media
             is ResolveResult.Blocked -> throw IOException("blocked:${result.failure}")
         }
