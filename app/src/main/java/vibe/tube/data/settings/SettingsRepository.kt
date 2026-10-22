@@ -6,15 +6,25 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 class SettingsRepository(
     private val store: DataStore<Preferences>,
+    scope: CoroutineScope,
     private val context: Context? = null,
 ) {
     val settings: Flow<AppSettings> = store.data.map { it.toSettings() }.distinctUntilChanged()
+
+    val latest: StateFlow<AppSettings> = settings.stateIn(scope, SharingStarted.Eagerly, AppSettings())
+
+    suspend fun prime(): AppSettings = settings.first().also { }
 
     suspend fun update(transform: (AppSettings) -> AppSettings) {
         store.edit { prefs ->

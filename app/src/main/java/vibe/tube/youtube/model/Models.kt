@@ -95,6 +95,7 @@ data class Comment(
     val isOwn: Boolean,
     val isLiked: Boolean,
     val repliesToken: String?,
+    val replyParams: String? = null,
 )
 
 data class CommentsPage(

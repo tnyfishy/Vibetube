@@ -59,7 +59,7 @@ object CommentsParser {
             it?.firstObject("continuationItemRenderer")?.let { c -> FeedParser.tokenOf("continuationItemRenderer", c) }
         }
         thread.at("commentViewModel")?.let { vm ->
-            return parseView(vm.at("commentViewModel") ?: vm, entities, thread, replyToken)
+            return parseView(vm.at("commentViewModel") ?: vm, entities, thread, replyToken)?.copy(replyParams = thread.firstString("createReplyParams"))
         }
         thread.at("comment")?.at("commentRenderer")?.let { return parseLegacy(it, replyToken) }
         return null

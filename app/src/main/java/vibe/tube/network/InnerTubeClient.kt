@@ -52,6 +52,15 @@ data class InnerTubeConfig(
     val backoffMillis: Long = 400,
 )
 
+data class ClientProfile(
+    val name: String,
+    val version: String,
+    val nameId: String,
+    val userAgent: String,
+    val extras: Map<String, JsonElement> = emptyMap(),
+    val platform: String? = null,
+)
+
 data class InnerTubeResponse(
     val root: JsonObject,
     val httpCode: Int,
@@ -79,14 +88,15 @@ class InnerTubeClient(
         locale: ContentLocale = ContentLocale.Default,
         auth: RequestAuth? = null,
         skipLoggedOutCheck: Boolean = false,
+        profile: ClientProfile? = null,
     ): InnerTubeResponse {
-        val payload = withContext(Dispatchers.Default) { buildBody(body, locale, auth) }
+        val payload = withContext(Dispatchers.Default) { buildBody(body, locale, auth, profile) }
         var attempt = 0
         var lastError: Throwable? = null
         while (attempt < config.maxAttempts) {
             attempt++
             try {
-                return execute(endpoint, payload, locale, auth, skipLoggedOutCheck)
+                return execute(endpoint, payload, locale, auth, skipLoggedOutCheck, profile)
             } catch (e: AppError.Network) {
                 lastError = e
                 val retriable = e.httpCode == null || e.httpCode == 429 || e.httpCode >= 500
@@ -110,17 +120,19 @@ class InnerTubeClient(
         }
     }
 
-    private fun buildBody(body: JsonObject, locale: ContentLocale, auth: RequestAuth?): String {
+    private fun buildBody(body: JsonObject, locale: ContentLocale, auth: RequestAuth?, profile: ClientProfile?): String {
         val visitor = auth?.visitorData ?: guestVisitorData
         val context = buildJsonObject {
             put("client", buildJsonObject {
-                put("clientName", config.clientName)
-                put("clientVersion", config.clientVersion)
+                put("clientName", profile?.name ?: config.clientName)
+                put("clientVersion", profile?.version ?: config.clientVersion)
                 put("hl", locale.language)
                 put("gl", locale.region)
-                put("userAgent", config.userAgent)
-                put("platform", "DESKTOP")
+                put("userAgent", profile?.userAgent ?: config.userAgent)
+                val platform = if (profile == null) "DESKTOP" else profile.platform
+                if (platform != null) put("platform", platform)
                 if (visitor != null) put("visitorData", visitor)
+                profile?.extras?.forEach { (k, v) -> put(k, v) }
             })
             put("user", buildJsonObject {
                 put("lockedSafetyMode", false)
@@ -141,6 +153,7 @@ class InnerTubeClient(
         locale: ContentLocale,
         auth: RequestAuth?,
         skipLoggedOutCheck: Boolean,
+        profile: ClientProfile?,
     ): InnerTubeResponse {
         val url = config.baseUrl.newBuilder()
             .addPathSegments("youtubei/v1/$endpoint")
@@ -148,12 +161,12 @@ class InnerTubeClient(
             .build()
         val builder = Request.Builder().url(url)
             .post(payload.toRequestBody(JSON_MEDIA))
-            .header("User-Agent", config.userAgent)
+            .header("User-Agent", profile?.userAgent ?: config.userAgent)
             .header("Accept-Language", locale.tag)
             .header("Origin", SapisidAuth.ORIGIN)
             .header("X-Origin", SapisidAuth.ORIGIN)
-            .header("X-YouTube-Client-Name", config.clientNameId)
-            .header("X-YouTube-Client-Version", config.clientVersion)
+            .header("X-YouTube-Client-Name", profile?.nameId ?: config.clientNameId)
+            .header("X-YouTube-Client-Version", profile?.version ?: config.clientVersion)
         val visitor = auth?.visitorData ?: guestVisitorData
         if (visitor != null) builder.header("X-Goog-Visitor-Id", visitor)
         val client: OkHttpClient
