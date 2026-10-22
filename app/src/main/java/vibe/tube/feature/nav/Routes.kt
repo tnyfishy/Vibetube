@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class ChannelRoute(val id: String)
 @Serializable data object YoutubeHistoryRoute
 @Serializable data object LocalHistoryRoute
+@Serializable data object DownloadsRoute
 @Serializable data object PlaylistsRoute
 @Serializable data object SettingsRoute
 @Serializable data object LoginRoute

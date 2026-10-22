@@ -37,6 +37,10 @@ import vibe.tube.ui.components.LocalSharedTransitionScope
 import vibe.tube.ui.theme.LocalReducedMotion
 import kotlin.math.abs
 import androidx.compose.foundation.layout.Box
+import kotlin.math.max
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -105,6 +109,7 @@ import vibe.tube.feature.nav.AccountRoute
 import vibe.tube.feature.nav.ChannelRoute
 import vibe.tube.feature.nav.DiagnosticsRoute
 import vibe.tube.feature.nav.GalleryRoute
+import vibe.tube.feature.nav.DownloadsRoute
 import vibe.tube.feature.nav.HomeRoute
 import vibe.tube.feature.nav.LibraryRoute
 import vibe.tube.feature.nav.LicensesRoute
@@ -236,6 +241,9 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     val barBody = 60.dp
     val navInset = WindowInsets.navigationBars.getBottom(density)
     val barFullPx = with(density) { barBody.roundToPx() } + navInset
+    val barFullDp = with(density) { barFullPx.toDp() }
+    val homeTab = currentTab == 0
+    var rootHeightPx by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     var hide by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     LaunchedEffect(currentTab, isBar) { hide = 0f }
     val barScroll = remember(barFullPx) {
@@ -252,9 +260,14 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
             }
         }
     }
-    val hideInsetDp = with(density) { (navInset - barFullPx * (1f - hide)).coerceAtLeast(0f).toDp() }
-    CompositionLocalProvider(LocalVideoActions provides actions, LocalMiniPlayerPadding provides miniPadding, vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds) {
-        Box(Modifier.fillMaxSize()) {
+    // On Home the content runs underneath the bar (the bar only slides, it never resizes the page), so scrolling
+    // never re-measures the feed. Other tabs reserve the bar's height.
+    val reservedBottom = if (isBar && !homeTab) barFullDp else 0.dp
+    val homeFeedPadding = if (isBar && homeTab) barFullDp else 0.dp
+    // Distance (px) the mini player / snackbar sit above the bottom edge on Home.
+    val homeLift: () -> Int = { max(barFullPx * (1f - hide), navInset.toFloat()).roundToInt() }
+    CompositionLocalProvider(LocalVideoActions provides actions, vibe.tube.feature.watch.LocalSeekSeconds provides settings.seekSeconds, LocalMiniPlayerPadding provides (miniPadding + homeFeedPadding), vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds) {
+        Box(Modifier.fillMaxSize().onSizeChanged { rootHeightPx = it.height }) {
             NavigationSuiteScaffold(
                 layoutType = if (isBar) NavigationSuiteType.None else suiteType,
                 navigationSuiteItems = {
@@ -269,87 +282,95 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                     }
                 },
             ) {
-                Column(Modifier.fillMaxSize()) {
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .onGloballyPositioned { contentBottomPx = (it.positionInRoot().y + it.size.height).roundToInt() }
-                        .then(if (isBar && currentTab == 0) Modifier.nestedScroll(barScroll) else Modifier)
-                        .tabSwipe(enabled = currentTab >= 0 && !(playerState.visible && playerState.expanded)) { direction ->
-                            tabs.getOrNull(currentTab + direction)?.let(goToTab)
-                        },
-                ) {
-                    AppNavHost(nav, appViewModel, avatarUrl, onTab = { route -> tabs.firstOrNull { it.route == route }?.let(goToTab) })
-                    MiniPlayer(
-                        controller,
-                        enabled = classicPlayer,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .then(if (!showNav) Modifier.windowInsetsPadding(WindowInsets.navigationBars) else if (isBar) Modifier.padding(bottom = hideInsetDp) else Modifier),
-                    )
-                    SnackbarHost(
-                        snackbar,
+                Box(Modifier.fillMaxSize()) {
+                    Box(
                         Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = miniPadding)
-                            .then(if (!showNav) Modifier.windowInsetsPadding(WindowInsets.navigationBars) else if (isBar) Modifier.padding(bottom = hideInsetDp) else Modifier),
-                    )
-                }
-                if (isBar) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainer,
-                        modifier = Modifier
-                            .layout { measurable, constraints ->
-                                val full = barFullPx
-                                val p = measurable.measure(constraints.copy(minHeight = full, maxHeight = full))
-                                val h = (full * (1f - hide)).roundToInt()
-                                layout(p.width, h) { p.place(0, 0) }
-                            }
-                            .clipToBounds(),
+                            .fillMaxSize()
+                            .padding(bottom = reservedBottom)
+                            .onGloballyPositioned { contentBottomPx = (it.positionInRoot().y + it.size.height).roundToInt() }
+                            .then(if (isBar && homeTab) Modifier.nestedScroll(barScroll) else Modifier)
+                            .tabSwipe(enabled = currentTab >= 0 && !(playerState.visible && playerState.expanded)) { direction ->
+                                tabs.getOrNull(currentTab + direction)?.let(goToTab)
+                            },
                     ) {
-                        Row(Modifier.fillMaxWidth().height(barBody)) {
-                            tabs.forEach { tab ->
-                                val selected = destination?.hasRoute(tab.route::class) == true
-                                Column(
-                                    Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight()
-                                        .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = androidx.compose.ui.semantics.Role.Tab) { goToTab(tab) },
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center,
-                                ) {
-                                    val pill by androidx.compose.animation.animateColorAsState(
-                                        if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent,
-                                        androidx.compose.animation.core.tween(200),
-                                        label = "navPill",
-                                    )
-                                    Box(
-                                        Modifier.size(width = 56.dp, height = 30.dp).background(pill, androidx.compose.foundation.shape.CircleShape),
-                                        contentAlignment = Alignment.Center,
-                                    ) { VIconImage(if (selected) tab.iconSelected else tab.icon, null, Modifier.size(22.dp)) }
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(
-                                        stringResource(tab.label),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        maxLines = 1,
-                                        color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                        AppNavHost(nav, appViewModel, avatarUrl, onTab = { route -> tabs.firstOrNull { it.route == route }?.let(goToTab) })
+                        val lift: Modifier = when {
+                            !showNav -> Modifier.windowInsetsPadding(WindowInsets.navigationBars)
+                            isBar && homeTab -> Modifier.offset { IntOffset(0, -homeLift()) }
+                            else -> Modifier
+                        }
+                        MiniPlayer(
+                            controller,
+                            enabled = classicPlayer,
+                            modifier = Modifier.align(Alignment.BottomCenter).then(lift),
+                        )
+                        SnackbarHost(
+                            snackbar,
+                            Modifier.align(Alignment.BottomCenter).padding(bottom = miniPadding).then(lift),
+                        )
+                    }
+                    if (isBar) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .height(barFullDp)
+                                .graphicsLayer { translationY = hide * barFullPx },
+                        ) {
+                            Row(Modifier.fillMaxWidth().height(barBody)) {
+                                tabs.forEach { tab ->
+                                    val selected = destination?.hasRoute(tab.route::class) == true
+                                    Column(
+                                        Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null, role = androidx.compose.ui.semantics.Role.Tab) { goToTab(tab) },
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center,
+                                    ) {
+                                        val pill by androidx.compose.animation.animateColorAsState(
+                                            if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+                                            androidx.compose.animation.core.tween(200),
+                                            label = "navPill",
+                                        )
+                                        Box(
+                                            Modifier.size(width = 56.dp, height = 30.dp).background(pill, androidx.compose.foundation.shape.CircleShape),
+                                            contentAlignment = Alignment.Center,
+                                        ) { VIconImage(if (selected) tab.iconSelected else tab.icon, null, Modifier.size(22.dp)) }
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(
+                                            stringResource(tab.label),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            maxLines = 1,
+                                            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                }
             }
-            PlayerOverlay(
+            PlayerOverlayHost(
                 player = appViewModel.engine.player,
                 controller = controller,
                 watch = watchViewModel,
                 onLogin = { controller.collapse(); nav.navigate(LoginRoute) },
                 onEnterPip = if (settings.pictureInPicture) onEnterPip else null,
-                contentBottomPx = contentBottomPx,
+                contentBottom = {
+                    if (isBar) (if (homeTab) rootHeightPx - homeLift() else rootHeightPx - barFullPx).coerceAtLeast(0) else contentBottomPx
+                },
             )
+            val welcomePrefs = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("app_state", android.content.Context.MODE_PRIVATE)
+            var welcomeSeen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(welcomePrefs.getBoolean("welcome_seen", false)) }
+            androidx.compose.animation.AnimatedVisibility(
+                visible = !welcomeSeen,
+                enter = androidx.compose.animation.EnterTransition.None,
+                exit = androidx.compose.animation.fadeOut(tween(260)),
+            ) {
+                vibe.tube.feature.welcome.WelcomeScreen(onDone = { welcomePrefs.edit().putBoolean("welcome_seen", true).apply(); welcomeSeen = true })
+            }
             if (playerState.expanded && playerState.visible) {
                 Box(Modifier.align(Alignment.BottomCenter)) {
                     SnackbarHost(snackbar, Modifier.windowInsetsPadding(WindowInsets.navigationBars))
@@ -396,7 +417,8 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
         val from = tabIndex(initial)
         val to = tabIndex(target)
         return when {
-            isSearch(initial) || isSearch(target) -> fadeIn(fadeInSpec)
+            isSearch(target) -> fadeIn(tween(180, easing = LinearOutSlowInEasing))
+            isSearch(initial) -> EnterTransition.None
             from >= 0 && to >= 0 -> {
                 val dir = if (to > from) 1 else -1
                 slideInHorizontally(enterSpec) { dir * it / 4 } + fadeIn(fadeInSpec)
@@ -411,7 +433,8 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
         val from = tabIndex(initial)
         val to = tabIndex(target)
         return when {
-            isSearch(initial) || isSearch(target) -> fadeOut(fadeOutSpec)
+            isSearch(initial) -> fadeOut(tween(180, easing = LinearEasing))
+            isSearch(target) -> ExitTransition.None
             from >= 0 && to >= 0 -> {
                 val dir = if (to > from) 1 else -1
                 slideOutHorizontally(exitSpec) { -dir * it / 4 } + fadeOut(fadeOutSpec)
@@ -457,6 +480,7 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
                     LibraryScreen(
                         onOpenHistory = { nav.navigate(YoutubeHistoryRoute) },
                         onOpenLocalHistory = { nav.navigate(LocalHistoryRoute) },
+                        onOpenDownloads = { nav.navigate(DownloadsRoute) },
                         onOpenLiked = { nav.navigate(PlaylistRoute("LL")) },
                         onOpenWatchLater = { nav.navigate(PlaylistRoute("WL")) },
                         onOpenPlaylists = { nav.navigate(PlaylistsRoute) },
@@ -482,6 +506,7 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
                         YoutubeHistoryScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) })
                     }
                 }
+                page<DownloadsRoute> { vibe.tube.feature.library.DownloadsScreen(onBack = { nav.popBackStack() }) }
                 page<LocalHistoryRoute> { LocalHistoryScreen(onBack = { nav.popBackStack() }) }
                 page<PlaylistsRoute> { PlaylistsScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) }) }
                 page<SettingsRoute> {
@@ -504,20 +529,24 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
  * clipped to the device's own corner radius; at rest it adds nothing.
  */
 @Composable
-private fun PageFrame(scope: AnimatedContentScope, content: @Composable () -> Unit) {
+private fun PageFrame(scope: AnimatedContentScope, clip: Boolean, content: @Composable () -> Unit) {
     val transition = scope.transition
     val moving = transition.currentState != EnterExitState.Visible || transition.targetState != EnterExitState.Visible
     val radius = rememberDeviceCornerRadius()
     val background = MaterialTheme.colorScheme.background
     Box(
-        if (moving) Modifier.clip(RoundedCornerShape(radius)).background(background) else Modifier,
+        if (moving && clip) Modifier.clip(RoundedCornerShape(radius)).background(background) else Modifier,
     ) { content() }
 }
 
 private inline fun <reified T : Any> NavGraphBuilder.page(
     noinline content: @Composable AnimatedContentScope.(NavBackStackEntry) -> Unit,
 ) {
-    composable<T> { entry -> PageFrame(this) { content(entry) } }
+    composable<T> { entry ->
+        val d = entry.destination
+        val flat = tabs.any { d.hasRoute(it.route::class) } || d.hasRoute(SearchRoute::class)
+        PageFrame(this, clip = !flat) { content(entry) }
+    }
 }
 
 /** Swipe horizontally on a top-level screen to move to the neighbouring tab (+1 = next, -1 = previous). */
@@ -546,4 +575,18 @@ private fun shareVideo(context: Context, video: VideoItem) {
         putExtra(Intent.EXTRA_TEXT, "https://www.youtube.com/watch?v=${video.id}")
     }
     context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+}
+
+
+@Composable
+private fun PlayerOverlayHost(
+    player: androidx.media3.common.Player,
+    controller: vibe.tube.player.PlayerController,
+    watch: vibe.tube.feature.watch.WatchViewModel,
+    onLogin: () -> Unit,
+    onEnterPip: (() -> Unit)?,
+    contentBottom: () -> Int,
+) {
+    // The lambda is read here, so only this host recomposes while the bottom bar slides.
+    PlayerOverlay(player = player, controller = controller, watch = watch, onLogin = onLogin, onEnterPip = onEnterPip, contentBottomPx = contentBottom())
 }

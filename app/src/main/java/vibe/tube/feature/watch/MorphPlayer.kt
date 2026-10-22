@@ -112,6 +112,11 @@ internal fun MorphPlayer(
     val progress = remember { Animatable(if (state.visible && state.expanded) 1f else 0f).apply { updateBounds(0f, 1f) } }
     val deviceCorner = with(density) { vibe.tube.ui.rememberDeviceCornerRadius().toPx() }
     val dismiss = remember { Animatable(0f) }
+    // Swipe-up-to-fullscreen: the video follows the finger and fades; negative while pulled up.
+    val fsOffset = remember { Animatable(0f) }
+    val fsRange = with(density) { 120.dp.toPx() }
+    val enterFade = remember { Animatable(if (System.currentTimeMillis() - fullscreenToggledAt < 900) 0f else 1f) }
+    LaunchedEffect(Unit) { if (enterFade.value < 1f) enterFade.animateTo(1f, tween(320)) }
     var pendingVelocity by remember { mutableFloatStateOf(0f) }
     // True while a finger is dragging the card: the node that owns the gesture must stay composed until it ends.
     var dragging by remember { mutableStateOf(false) }
@@ -171,8 +176,11 @@ internal fun MorphPlayer(
         }
 
         val dragState = rememberDraggableState { delta ->
-            scope.launch {
-                if (progress.value <= 0.002f && (delta > 0f || dismiss.value > 0f)) {
+            // UNDISPATCHED: apply the delta in this very frame instead of queueing a coroutine per touch event.
+            scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                if (progress.value >= 0.999f && !state.fullscreen && (delta < 0f || fsOffset.value < 0f)) {
+                    fsOffset.snapTo((fsOffset.value + delta).coerceIn(-fsRange, 0f))
+                } else if (progress.value <= 0.002f && (delta > 0f || dismiss.value > 0f)) {
                     dismiss.snapTo((dismiss.value + delta).coerceAtLeast(0f))
                 } else {
                     progress.snapTo((progress.value - delta / dragRange).coerceIn(0f, 1f))
@@ -194,9 +202,14 @@ internal fun MorphPlayer(
                             dismiss.animateTo(0f, tween(220, easing = vibe.tube.ui.components.EmphasizedDecelerate))
                         }
                     } else {
-                        if (state.expanded && progress.value > 0.9f && velocity < -900f && !state.fullscreen) {
-                            progress.animateTo(1f, MORPH_SPEC)
-                            controller.setFullscreen(true)
+                        if (fsOffset.value < 0f) {
+                            if (-fsOffset.value > fsRange * 0.45f || velocity < -900f) {
+                                fsOffset.animateTo(-fsRange, tween(160))
+                                fullscreenToggledAt = System.currentTimeMillis()
+                                controller.setFullscreen(true)
+                            } else {
+                                fsOffset.animateTo(0f, tween(220, easing = vibe.tube.ui.components.EmphasizedDecelerate))
+                            }
                             return@launch
                         }
                         val goExpanded = when {
@@ -232,7 +245,7 @@ internal fun MorphPlayer(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    alpha = (1f - dismiss.value / fadeRange).coerceIn(0f, 1f)
+                    alpha = (1f - dismiss.value / fadeRange).coerceIn(0f, 1f) * enterFade.value
                     translationY = dismiss.value * 0.5f
                 },
         ) {
@@ -273,6 +286,8 @@ internal fun MorphPlayer(
                     .graphicsLayer {
                         shape = RoundedCornerShape(CornerSize(lerpF(8.dp.toPx(), 0f, t())))
                         clip = true
+                        translationY = fsOffset.value
+                        alpha = (1f + fsOffset.value / fsRange).coerceIn(0f, 1f)
                     },
             ) {
                 VideoSurface(
@@ -303,13 +318,15 @@ internal fun MorphPlayer(
                         .graphicsLayer { alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f) },
                 ) {
                     val miniStroke = androidx.compose.ui.graphics.drawscope.Stroke(width = with(density) { 2.dp.toPx() }, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                    val miniAmp by androidx.compose.animation.core.animateFloatAsState(if (state.isPlaying) 0.6f else 0f, tween(260), label = "miniAmp")
+                    val miniAmpAnim = remember { Animatable(0f) }
+                    val miniFlat = !state.isPlaying || state.phase != vibe.tube.player.PlayerPhase.Ready
+                    LaunchedEffect(miniFlat) { miniAmpAnim.animateTo(if (miniFlat) 0f else 0.6f, if (miniFlat) tween(140) else tween(900)) }
                     LinearWavyProgressIndicator(
                         progress = { fraction },
                         wavelength = 9.dp,
                         stroke = miniStroke,
                         trackStroke = miniStroke,
-                        amplitude = { miniAmp },
+                        amplitude = { _ -> miniAmpAnim.value },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }

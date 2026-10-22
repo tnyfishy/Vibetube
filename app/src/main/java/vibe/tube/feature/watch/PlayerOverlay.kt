@@ -3,6 +3,8 @@ package vibe.tube.feature.watch
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -87,6 +89,9 @@ import kotlin.math.roundToInt
 fun usesClassicPlayer(state: PlayerUiState, widthDp: Int, heightDp: Int): Boolean =
     state.fullscreen || state.inPip || widthDp >= 840 || (heightDp < 480 && widthDp > heightDp)
 
+/** Wall-clock time of the last fullscreen toggle by swipe; the incoming layout fades in when it is recent. */
+internal var fullscreenToggledAt = 0L
+
 @Composable
 fun PlayerOverlay(
     player: Player,
@@ -146,15 +151,31 @@ private fun PlayerPage(
         },
     )
 
+    val fsPull = remember { Animatable(0f) }
+    val fsEnter = remember { Animatable(if (System.currentTimeMillis() - fullscreenToggledAt < 900) 0f else 1f) }
+    LaunchedEffect(Unit) { if (fsEnter.value < 1f) fsEnter.animateTo(1f, tween(320)) }
+    val fsRangePx = with(androidx.compose.ui.platform.LocalDensity.current) { 120.dp.toPx() }
     val exitFullscreenDrag = Modifier.draggable(
         orientation = Orientation.Vertical,
-        state = rememberDraggableState { },
-        onDragStopped = { velocity -> if (velocity > 900f) controller.setFullscreen(false) },
+        state = rememberDraggableState { delta -> scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { fsPull.snapTo((fsPull.value + delta).coerceIn(0f, fsRangePx)) } },
+        onDragStopped = { velocity ->
+            if (fsPull.value > fsRangePx * 0.45f || velocity > 900f) {
+                fsPull.animateTo(fsRangePx, tween(160))
+                fullscreenToggledAt = System.currentTimeMillis()
+                controller.setFullscreen(false)
+            } else {
+                fsPull.animateTo(0f, tween(220))
+            }
+        },
     )
 
     Surface(
         modifier = Modifier
             .fillMaxSize()
+            .graphicsLayer {
+                alpha = (1f - fsPull.value / fsRangePx).coerceIn(0f, 1f) * fsEnter.value
+                translationY = fsPull.value
+            }
             .offset { IntOffset(0, dragOffset.value.roundToInt()) },
         color = MaterialTheme.colorScheme.surface,
     ) {
@@ -436,7 +457,7 @@ private fun LazyListScope.upNext(ui: WatchUiState, state: PlayerUiState, control
     items(related.size, key = { "r:${related[it].id}:$it" }) { index ->
         when (val item = related[index]) {
             is VideoItem -> VideoRow(item, emptyList())
-            is PlaylistItem -> vibe.tube.ui.components.PlaylistCard(item)
+            is PlaylistItem -> vibe.tube.ui.components.PlaylistRow(item)
             else -> Unit
         }
     }

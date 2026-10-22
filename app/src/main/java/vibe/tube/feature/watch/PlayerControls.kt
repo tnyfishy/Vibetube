@@ -7,6 +7,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -117,6 +118,19 @@ fun VideoSurface(
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
     var interactions by remember { mutableFloatStateOf(0f) }
+    val seekSeconds = LocalSeekSeconds.current
+    var flashSide by remember { mutableStateOf(0) }
+    var flashTotal by remember { mutableStateOf(0) }
+    var flashKey by remember { mutableStateOf(0) }
+    var flashVisible by remember { mutableStateOf(false) }
+    var lastFlashAt by remember { mutableStateOf(0L) }
+    LaunchedEffect(flashKey) {
+        if (flashKey > 0) {
+            flashVisible = true
+            delay(700)
+            flashVisible = false
+        }
+    }
     LaunchedEffect(controlsVisible, state.isPlaying, interactions) {
         if (controlsVisible && state.isPlaying) {
             delay(3_000)
@@ -131,7 +145,13 @@ fun VideoSurface(
                 detectTapGestures(
                     onTap = { controlsVisible = !controlsVisible },
                     onDoubleTap = { offset ->
-                        if (offset.x < size.width / 2) onSeekBy(-10_000) else onSeekBy(10_000)
+                        val side = if (offset.x < size.width / 2) -1 else 1
+                        onSeekBy(side * seekSeconds * 1000L)
+                        val now = System.currentTimeMillis()
+                        flashTotal = if (side == flashSide && now - lastFlashAt < 900) flashTotal + seekSeconds else seekSeconds
+                        flashSide = side
+                        lastFlashAt = now
+                        flashKey += 1
                         controlsVisible = true
                         interactions += 1f
                     },
@@ -151,6 +171,21 @@ fun VideoSurface(
             onRelease = { view -> view.player = null },
             modifier = Modifier.fillMaxSize(),
         )
+        AnimatedVisibility(
+            visible = flashVisible,
+            enter = fadeIn(tween(80)),
+            exit = fadeOut(tween(260)),
+            modifier = Modifier.align(if (flashSide < 0) Alignment.CenterStart else Alignment.CenterEnd).padding(horizontal = Spacing.xxl),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                VIconImage(if (flashSide < 0) VIcon.FastRewind else VIcon.FastForward, null, Modifier.size(36.dp), tint = MediaOverlayColors.onScrim)
+                Text(
+                    stringResource(R.string.player_seek_flash, flashTotal),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MediaOverlayColors.onScrim,
+                )
+            }
+        }
         val busy = state.phase == PlayerPhase.Resolving || state.phase == PlayerPhase.Buffering
         if (busy && state.error == null && showControls) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { ContainedLoadingIndicator() }
@@ -199,6 +234,8 @@ fun VideoSurface(
         }
     }
 }
+
+val LocalSeekSeconds = androidx.compose.runtime.compositionLocalOf { 10 }
 
 @Composable
 private fun Controls(
@@ -272,7 +309,15 @@ private fun Controls(
             if (!state.isLive) {
                 val label = stringResource(R.string.player_seek_bar)
                 // Wavy (M3 Expressive) while playing, flattening to a straight line while the thumb is held.
-                val amplitude by androidx.compose.animation.core.animateFloatAsState(if (dragging || !state.isPlaying) 0f else 1f, androidx.compose.animation.core.tween(260, easing = vibe.tube.ui.components.EmphasizedDecelerate), label = "seekAmplitude")
+                val waveAmp = remember { androidx.compose.animation.core.Animatable(0f) }
+                val flat = dragging || !state.isPlaying || state.phase != PlayerPhase.Ready
+                LaunchedEffect(flat, dragging) {
+                    when {
+                        dragging -> waveAmp.snapTo(0f)
+                        flat -> waveAmp.animateTo(0f, tween(140))
+                        else -> waveAmp.animateTo(1f, tween(900, easing = androidx.compose.animation.core.LinearOutSlowInEasing))
+                    }
+                }
                 val strokePx = with(androidx.compose.ui.platform.LocalDensity.current) { 3.dp.toPx() }
                 val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = strokePx, cap = androidx.compose.ui.graphics.StrokeCap.Round)
                 var barWidth by remember { mutableFloatStateOf(1f) }
@@ -314,7 +359,7 @@ private fun Controls(
                         trackColor = MediaOverlayColors.onScrim.copy(alpha = 0.3f),
                         stroke = stroke,
                         trackStroke = stroke,
-                        amplitude = { _ -> amplitude },
+                        amplitude = { _ -> waveAmp.value },
                         wavelength = 20.dp,
                     )
                     Box(

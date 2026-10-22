@@ -123,6 +123,7 @@ fun FeedContent(
     val refreshing = state.phase == FeedPhase.Refreshing
     val blockingFailure = state.failure.takeIf { state.items.isEmpty() }
 
+    var guestDismissed by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     val ptrState = androidx.compose.material3.pulltorefresh.rememberPullToRefreshState()
     PullToRefreshBox(
         isRefreshing = refreshing,
@@ -152,13 +153,14 @@ fun FeedContent(
             modifier = Modifier.fillMaxSize(),
         ) {
             header?.invoke(this)
-            if (guestBanner) {
+            if (guestBanner && !guestDismissed) {
                 item(key = "guest-banner", span = { GridItemSpan(maxLineSpan) }) {
                     Banner(
                         text = stringResource(R.string.guest_banner),
                         icon = VIcon.Person,
                         actionLabel = stringResource(R.string.action_sign_in),
                         onAction = onLogin,
+                        onDismiss = { guestDismissed = true },
                     )
                 }
             }

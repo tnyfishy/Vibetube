@@ -4,6 +4,12 @@ import androidx.annotation.DrawableRes
 import vibe.tube.R
 
 object VIcon {
+    @DrawableRes val FastForward: Int = R.drawable.ic_fast_forward
+    @DrawableRes val FastRewind: Int = R.drawable.ic_fast_rewind
+    @DrawableRes val Bedtime: Int = R.drawable.ic_bedtime
+    @DrawableRes val Speed: Int = R.drawable.ic_speed
+    @DrawableRes val Check: Int = R.drawable.ic_check
+    @DrawableRes val GraphicEq: Int = R.drawable.ic_graphic_eq
     @DrawableRes val AccountCircle: Int = R.drawable.ic_account_circle
     @DrawableRes val AccountCircleFilled: Int = R.drawable.ic_account_circle_filled
     @DrawableRes val Add: Int = R.drawable.ic_add

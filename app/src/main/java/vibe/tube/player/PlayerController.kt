@@ -121,7 +121,7 @@ class PlayerController @Inject constructor(
         engine.player.addListener(listener)
         if (tuningPrefs.getBoolean("remember", false)) {
             engine.player.playbackParameters = PlaybackParameters(tuningPrefs.getFloat("speed", 1f), tuningPrefs.getFloat("pitch", 1f))
-            mutable.update { it.copy(tuningRemembered = true) }
+            mutable.update { it.copy(tuningRemembered = true, linkPitch = tuningPrefs.getBoolean("link", false)) }
         }
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
@@ -298,6 +298,20 @@ class PlayerController @Inject constructor(
 
     private fun handlePlayerError(error: PlaybackException) {
         val video = mutable.value.current ?: return
+        // A broken subtitle file (empty / unparsable response) must never end playback: drop the text track and resume.
+        val renderer = error as? androidx.media3.exoplayer.ExoPlaybackException
+        val textMime = renderer?.rendererFormat?.sampleMimeType.orEmpty().startsWith("text/") ||
+            renderer?.rendererFormat?.sampleMimeType == androidx.media3.common.MimeTypes.APPLICATION_SUBRIP ||
+            generateSequence(error.cause) { it.cause }.any { it.javaClass.name.contains("Subtitle", ignoreCase = true) || it.javaClass.name.contains("Cue", ignoreCase = true) }
+        if (textMime && mutable.value.selectedCaption != null) {
+            val p = engine.player
+            p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).setPreferredTextLanguage(null).build()
+            mutable.update { it.copy(selectedCaption = null) }
+            p.prepare()
+            p.play()
+            events.post(vibe.tube.R.string.player_caption_failed)
+            return
+        }
         val cause = error.cause
         val badStatus = cause is HttpDataSource.InvalidResponseCodeException &&
             (cause.responseCode == 403 || cause.responseCode == 410 || cause.responseCode == 404)
@@ -340,7 +354,33 @@ class PlayerController @Inject constructor(
     private fun onEnded() {
         persistProgress(completed = true)
         mutable.update { it.copy(phase = PlayerPhase.Ended, isPlaying = false) }
+        if (mutable.value.sleepAtEnd) {
+            mutable.update { it.copy(sleepAtEnd = false) }
+            return
+        }
         if (settings.latest.value.autoplay) next()
+    }
+
+    private var sleepJob: Job? = null
+
+    /** Pause playback after [minutes]; null cancels. */
+    fun setSleepTimer(minutes: Int?) {
+        sleepJob?.cancel()
+        mutable.update { it.copy(sleepAtEnd = false, sleepUntilMs = null) }
+        if (minutes == null) return
+        val until = System.currentTimeMillis() + minutes * 60_000L
+        mutable.update { it.copy(sleepUntilMs = until) }
+        sleepJob = scope.launch {
+            kotlinx.coroutines.delay(minutes * 60_000L)
+            engine.player.pause()
+            mutable.update { it.copy(sleepUntilMs = null) }
+        }
+    }
+
+    /** Stop once the current video finishes instead of moving to the next one. */
+    fun setSleepAtEnd(on: Boolean) {
+        sleepJob?.cancel()
+        mutable.update { it.copy(sleepAtEnd = on, sleepUntilMs = null) }
     }
 
     fun retry() {
@@ -373,7 +413,14 @@ class PlayerController @Inject constructor(
 
     fun setSpeed(speed: Float) {
         val p = engine.player
-        p.playbackParameters = PlaybackParameters(speed.coerceIn(0.25f, 3f), p.playbackParameters.pitch)
+        val v = speed.coerceIn(0.25f, 3f)
+        p.playbackParameters = PlaybackParameters(v, if (mutable.value.linkPitch) v.coerceIn(0.5f, 2f) else p.playbackParameters.pitch)
+    }
+
+    /** When linked, pitch follows speed (like a tape / vinyl), so both change together. */
+    fun setLinkPitch(on: Boolean) {
+        mutable.update { it.copy(linkPitch = on) }
+        if (on) setSpeed(engine.player.playbackParameters.speed)
     }
 
     fun setPitch(pitch: Float) {
@@ -388,7 +435,7 @@ class PlayerController @Inject constructor(
 
     private fun saveTuning() {
         val params = engine.player.playbackParameters
-        tuningPrefs.edit().putBoolean("remember", true).putFloat("speed", params.speed).putFloat("pitch", params.pitch).apply()
+        tuningPrefs.edit().putBoolean("remember", true).putFloat("speed", params.speed).putFloat("pitch", params.pitch).putBoolean("link", mutable.value.linkPitch).apply()
     }
 
     fun selectQuality(height: Int?) {

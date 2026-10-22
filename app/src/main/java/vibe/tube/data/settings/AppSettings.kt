@@ -63,6 +63,8 @@ data class AppSettings(
     val mobileQuality: QualityCap = QualityCap.P480,
     val autoplay: Boolean = true,
     val backgroundPlayback: Boolean = true,
+    /** Seconds skipped by a double tap on the video. */
+    val seekSeconds: Int = 10,
     val pictureInPicture: Boolean = true,
     val subtitlesEnabled: Boolean = false,
     val subtitleLanguage: String = SYSTEM,

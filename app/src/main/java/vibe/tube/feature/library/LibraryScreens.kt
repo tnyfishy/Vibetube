@@ -56,6 +56,7 @@ import vibe.tube.youtube.model.VideoItem
 fun LibraryScreen(
     onOpenHistory: () -> Unit,
     onOpenLocalHistory: () -> Unit,
+    onOpenDownloads: () -> Unit,
     onOpenLiked: () -> Unit,
     onOpenWatchLater: () -> Unit,
     onOpenPlaylists: () -> Unit,
@@ -95,6 +96,7 @@ fun LibraryScreen(
             item { LibraryCard(VIcon.ThumbUp, R.string.library_liked, onOpenLiked, enabled = !isGuest) }
             item { LibraryCard(VIcon.Schedule, R.string.library_watch_later, onOpenWatchLater, enabled = !isGuest) }
             item { LibraryCard(VIcon.History, R.string.library_youtube_history, onOpenHistory, enabled = !isGuest) }
+            item { LibraryCard(VIcon.Download, R.string.library_downloads, onOpenDownloads, enabled = true) }
             item { LibraryCard(VIcon.Storage, R.string.library_local_history, onOpenLocalHistory, enabled = true) }
             if (recent.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {

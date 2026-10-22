@@ -84,7 +84,7 @@ fun <T> ChoiceDialog(
 private val contentLanguages = listOf("en", "vi", "ja", "ko", "zh", "es", "fr", "de", "pt", "ru", "id", "th", "hi", "ar", "it", "tr")
 private val contentRegions = listOf("US", "VN", "GB", "JP", "KR", "DE", "FR", "ES", "BR", "IN", "ID", "TH", "RU", "AU", "CA", "SG", "TW", "PH", "MY")
 
-private enum class Dialog { Theme, Font, HiddenChannels, DownloadDir, UiLanguage, ContentLanguage, Region, WifiQuality, MobileQuality, ClearCache, ClearHistory, ClearSearch }
+private enum class Dialog { SeekSeconds, Theme, Font, HiddenChannels, DownloadDir, UiLanguage, ContentLanguage, Region, WifiQuality, MobileQuality, ClearCache, ClearHistory, ClearSearch }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -171,6 +171,7 @@ fun SettingsScreen(
             section(R.string.settings_section_playback)
             item { SettingRow(VIcon.HighQuality, R.string.settings_quality_wifi, qualityLabel(settings.wifiQuality)) { dialog = Dialog.WifiQuality } }
             item { SettingRow(VIcon.HighQuality, R.string.settings_quality_mobile, qualityLabel(settings.mobileQuality)) { dialog = Dialog.MobileQuality } }
+            item { SettingRow(VIcon.FastForward, R.string.settings_seek_seconds, stringResource(R.string.settings_seek_value, settings.seekSeconds)) { dialog = Dialog.SeekSeconds } }
             item {
                 SwitchRow(VIcon.SkipNext, R.string.settings_autoplay, R.string.settings_autoplay_desc, settings.autoplay) { v -> viewModel.update { it.copy(autoplay = v) } }
             }
@@ -307,6 +308,12 @@ fun SettingsScreen(
             settings.contentRegion,
             { dialog = null },
         ) { v -> viewModel.update { it.copy(contentRegion = v) }; dialog = null }
+        Dialog.SeekSeconds -> ChoiceDialog(
+            stringResource(R.string.settings_seek_seconds),
+            listOf(5, 10, 15, 20, 30, 45, 60).map { Choice(it, stringResource(R.string.settings_seek_value, it)) },
+            settings.seekSeconds,
+            { dialog = null },
+        ) { v -> viewModel.update { it.copy(seekSeconds = v) }; dialog = null }
         Dialog.WifiQuality -> ChoiceDialog(
             stringResource(R.string.settings_quality_wifi),
             QualityCap.entries.map { Choice(it, qualityLabel(it)) },

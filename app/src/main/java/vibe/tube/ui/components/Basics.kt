@@ -1,6 +1,7 @@
 package vibe.tube.ui.components
 
 import androidx.annotation.DrawableRes
+import vibe.tube.R
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -204,6 +205,7 @@ fun Banner(
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    onDismiss: (() -> Unit)? = null,
     container: Color = MaterialTheme.colorScheme.secondaryContainer,
     content: Color = MaterialTheme.colorScheme.onSecondaryContainer,
 ) {
@@ -224,6 +226,9 @@ fun Banner(
             Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             if (actionLabel != null && onAction != null) {
                 androidx.compose.material3.TextButton(shapes = ButtonDefaults.shapes(), onClick = onAction) { Text(actionLabel) }
+            }
+            if (onDismiss != null) {
+                TooltipIconButton(vibe.tube.ui.VIcon.Close, androidx.compose.ui.res.stringResource(R.string.action_close), onDismiss)
             }
         }
     }

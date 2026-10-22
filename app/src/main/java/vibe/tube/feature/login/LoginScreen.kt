@@ -94,7 +94,6 @@ fun LoginScreen(onClose: () -> Unit, viewModel: LoginViewModel = hiltViewModel()
                 title = { Text(stringResource(R.string.login_title)) },
                 navigationIcon = { TooltipIconButton(VIcon.Close, stringResource(R.string.action_close), onClose) },
                 actions = {
-                    TooltipIconButton(VIcon.Refresh, stringResource(R.string.action_reload), { webView?.reload() })
                 },
             )
         },

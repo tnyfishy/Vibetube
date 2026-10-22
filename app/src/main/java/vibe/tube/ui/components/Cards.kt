@@ -304,6 +304,47 @@ fun PlaylistCard(
     }
 }
 
+/** Compact playlist entry (same footprint as [VideoRow]); Mix playlists carry a "Mix" badge. */
+@Composable
+fun PlaylistRow(
+    playlist: PlaylistItem,
+    modifier: Modifier = Modifier,
+    actions: VideoActions = LocalVideoActions.current,
+) {
+    val description = metaLine(playlist.title, playlist.ownerName, playlist.videoCountText)
+    val badge = if (playlist.id.startsWith("RD")) "Mix" else playlist.videoCountText
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .bouncyClickable(VibeShape.card) { actions.openPlaylist(playlist.id, playlist.title) }
+            .semantics(mergeDescendants = true) { contentDescription = description }
+            .padding(vertical = Spacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            Modifier
+                .width(Sizing.listThumbnailWidth)
+                .aspectRatio(Sizing.THUMBNAIL_ASPECT)
+                .clip(VibeShape.thumbnail)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        ) {
+            RemoteImage(playlist.thumbnails.best(), null, Modifier.matchParentSize())
+            badge?.let { OverlayBadge(it, Modifier.align(Alignment.BottomEnd).padding(Spacing.sm)) }
+        }
+        Column(Modifier.weight(1f)) {
+            Text(playlist.title, style = MaterialTheme.typography.titleSmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Text(
+                metaLine(playlist.ownerName, playlist.updatedText),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
 @Composable
 fun ChannelRow(
     channel: ChannelItem,

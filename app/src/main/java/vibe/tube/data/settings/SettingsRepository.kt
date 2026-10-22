@@ -52,6 +52,7 @@ class SettingsRepository(
             mobileQuality = enumOr(this[MOBILE_Q], d.mobileQuality),
             autoplay = this[AUTOPLAY] ?: d.autoplay,
             backgroundPlayback = this[BACKGROUND] ?: d.backgroundPlayback,
+            seekSeconds = this[SEEK_SECONDS] ?: d.seekSeconds,
             pictureInPicture = this[PIP] ?: d.pictureInPicture,
             subtitlesEnabled = this[SUBS] ?: d.subtitlesEnabled,
             subtitleLanguage = this[SUB_LANG] ?: d.subtitleLanguage,
@@ -77,6 +78,7 @@ class SettingsRepository(
         this[MOBILE_Q] = s.mobileQuality.name
         this[AUTOPLAY] = s.autoplay
         this[BACKGROUND] = s.backgroundPlayback
+        this[SEEK_SECONDS] = s.seekSeconds
         this[PIP] = s.pictureInPicture
         this[SUBS] = s.subtitlesEnabled
         this[SUB_LANG] = s.subtitleLanguage
@@ -104,6 +106,7 @@ class SettingsRepository(
         private val MOBILE_Q = stringPreferencesKey("mobile_quality")
         private val AUTOPLAY = booleanPreferencesKey("autoplay")
         private val BACKGROUND = booleanPreferencesKey("background_playback")
+        private val SEEK_SECONDS = intPreferencesKey("seek_seconds")
         private val PIP = booleanPreferencesKey("pip")
         private val SUBS = booleanPreferencesKey("subtitles")
         private val SUB_LANG = stringPreferencesKey("subtitle_language")
