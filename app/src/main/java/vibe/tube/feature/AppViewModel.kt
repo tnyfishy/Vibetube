@@ -59,9 +59,12 @@ class AppViewModel @Inject constructor(
         }
     }
 
-    fun download(video: VideoItem, kind: vibe.tube.download.DownloadKind) {
-        downloads.enqueue(video, kind)
+    fun download(video: VideoItem, choice: vibe.tube.download.DownloadPlanner.Choice) {
+        downloads.enqueue(video, choice)
     }
+
+    suspend fun downloadOptions(videoId: String): Result<vibe.tube.download.DownloadPlanner.Options> =
+        runCatching { downloads.loadOptions(videoId) }
 
     fun watchLater(video: VideoItem) {
         viewModelScope.launch {

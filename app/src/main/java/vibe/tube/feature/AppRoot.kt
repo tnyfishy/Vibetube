@@ -275,7 +275,8 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                 vibe.tube.feature.watch.DownloadDialog(
                     video = video,
                     onDismiss = appViewModel.events::dismissDownload,
-                    onChoose = { kind -> appViewModel.events.dismissDownload(); appViewModel.download(video, kind) },
+                    loadOptions = { appViewModel.downloadOptions(video.id) },
+                    onChoose = { choice -> appViewModel.events.dismissDownload(); appViewModel.download(video, choice) },
                 )
             }
             saveTarget?.let { video ->

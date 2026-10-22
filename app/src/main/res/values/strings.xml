@@ -165,9 +165,10 @@
     <string name="settings_hidden_channels_count">%1$d channels</string>
     <string name="action_download">Download</string>
     <string name="download_title">Download</string>
-    <string name="download_video">Video, best quality</string>
-    <string name="download_audio">Music, audio only (best quality)</string>
-    <string name="download_note">Video is merged on this device from the highest-quality video and audio streams available.</string>
+    <string name="download_loading">Checking available quality…</string>
+    <string name="download_options_failed">Could not load the available qualities. Check your connection and try again.</string>
+    <string name="download_tab_video">Video</string>
+    <string name="download_tab_audio">Audio</string>
     <string name="download_notification_title">Downloading</string>
     <string name="download_channel_name">Downloads</string>
     <string name="msg_download_started">Downloading: %1$s</string>

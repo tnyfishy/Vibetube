@@ -59,6 +59,11 @@ data class ClientProfile(
     val userAgent: String,
     val extras: Map<String, JsonElement> = emptyMap(),
     val platform: String? = null,
+    /** Host to call instead of www.youtube.com (the visionOS client talks to youtubei.googleapis.com). */
+    val baseUrl: String? = null,
+    /** Mobile-app style request: no web Origin / X-YouTube-Client-* headers and no userAgent field in the context. */
+    val nativeApp: Boolean = false,
+    val extraHeaders: Map<String, String> = emptyMap(),
 )
 
 data class InnerTubeResponse(
@@ -89,14 +94,18 @@ class InnerTubeClient(
         auth: RequestAuth? = null,
         skipLoggedOutCheck: Boolean = false,
         profile: ClientProfile? = null,
+        query: Map<String, String> = emptyMap(),
+        visitorOverride: String? = null,
+        withoutVisitor: Boolean = false,
     ): InnerTubeResponse {
-        val payload = withContext(Dispatchers.Default) { buildBody(body, locale, auth, profile) }
+        val visitor = if (withoutVisitor) null else visitorOverride ?: auth?.visitorData ?: guestVisitorData
+        val payload = withContext(Dispatchers.Default) { buildBody(body, locale, auth, profile, visitor) }
         var attempt = 0
         var lastError: Throwable? = null
         while (attempt < config.maxAttempts) {
             attempt++
             try {
-                return execute(endpoint, payload, locale, auth, skipLoggedOutCheck, profile)
+                return execute(endpoint, payload, locale, auth, skipLoggedOutCheck, profile, query, visitor)
             } catch (e: AppError.Network) {
                 lastError = e
                 val retriable = e.httpCode == null || e.httpCode == 429 || e.httpCode >= 500
@@ -120,15 +129,14 @@ class InnerTubeClient(
         }
     }
 
-    private fun buildBody(body: JsonObject, locale: ContentLocale, auth: RequestAuth?, profile: ClientProfile?): String {
-        val visitor = auth?.visitorData ?: guestVisitorData
+    private fun buildBody(body: JsonObject, locale: ContentLocale, auth: RequestAuth?, profile: ClientProfile?, visitor: String?): String {
         val context = buildJsonObject {
             put("client", buildJsonObject {
                 put("clientName", profile?.name ?: config.clientName)
                 put("clientVersion", profile?.version ?: config.clientVersion)
                 put("hl", locale.language)
                 put("gl", locale.region)
-                put("userAgent", profile?.userAgent ?: config.userAgent)
+                if (profile?.nativeApp != true) put("userAgent", profile?.userAgent ?: config.userAgent)
                 val platform = if (profile == null) "DESKTOP" else profile.platform
                 if (platform != null) put("platform", platform)
                 if (visitor != null) put("visitorData", visitor)
@@ -154,21 +162,29 @@ class InnerTubeClient(
         auth: RequestAuth?,
         skipLoggedOutCheck: Boolean,
         profile: ClientProfile?,
+        query: Map<String, String>,
+        visitor: String?,
     ): InnerTubeResponse {
-        val url = config.baseUrl.newBuilder()
+        val url = (profile?.baseUrl?.toHttpUrl() ?: config.baseUrl).newBuilder()
             .addPathSegments("youtubei/v1/$endpoint")
             .addQueryParameter("prettyPrint", "false")
+            .apply { query.forEach { (k, v) -> addQueryParameter(k, v) } }
             .build()
         val builder = Request.Builder().url(url)
             .post(payload.toRequestBody(JSON_MEDIA))
             .header("User-Agent", profile?.userAgent ?: config.userAgent)
-            .header("Accept-Language", locale.tag)
-            .header("Origin", SapisidAuth.ORIGIN)
-            .header("X-Origin", SapisidAuth.ORIGIN)
-            .header("X-YouTube-Client-Name", profile?.nameId ?: config.clientNameId)
-            .header("X-YouTube-Client-Version", profile?.version ?: config.clientVersion)
-        val visitor = auth?.visitorData ?: guestVisitorData
-        if (visitor != null) builder.header("X-Goog-Visitor-Id", visitor)
+        if (profile?.nativeApp == true) {
+            profile.extraHeaders.forEach { (k, v) -> builder.header(k, v) }
+        } else {
+            builder
+                .header("Accept-Language", locale.tag)
+                .header("Origin", SapisidAuth.ORIGIN)
+                .header("X-Origin", SapisidAuth.ORIGIN)
+                .header("X-YouTube-Client-Name", profile?.nameId ?: config.clientNameId)
+                .header("X-YouTube-Client-Version", profile?.version ?: config.clientVersion)
+            profile?.extraHeaders?.forEach { (k, v) -> builder.header(k, v) }
+            if (visitor != null) builder.header("X-Goog-Visitor-Id", visitor)
+        }
         val client: OkHttpClient
         if (auth != null) {
             val header = SapisidAuth.authorization(auth.jar, clock.nowMillis() / 1000)

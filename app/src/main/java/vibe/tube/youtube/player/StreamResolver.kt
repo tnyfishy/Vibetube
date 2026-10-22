@@ -1,6 +1,7 @@
 package vibe.tube.youtube.player
 
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -73,24 +74,55 @@ class StreamResolver(
         throw lastError ?: AppError.Playback(PlaybackFailure.Unavailable)
     }
 
-    private suspend fun request(videoId: String, locale: ContentLocale, auth: RequestAuth?, profile: ClientProfile?): ResolveResult {
-        val body = buildJsonObject {
-            put("videoId", videoId)
-            put("contentCheckOk", true)
-            put("racyCheckOk", true)
-            put("playbackContext", buildJsonObject {
-                put("contentPlaybackContext", buildJsonObject {
-                    put("html5Preference", "HTML5_PREF_WANTS")
-                })
-            })
-        }
-        val response = client.post("player", body, locale, auth, skipLoggedOutCheck = true, profile = profile)
-        val name = profile?.name ?: client.clientConfig.clientName
-        val ua = profile?.userAgent ?: client.clientConfig.userAgent
-        return parse(response.root, videoId, name, ua)
+    @Volatile private var nativeVisitor: Pair<String, Long>? = null
+
+    /** Visitor id for the native (visionOS) client, fetched from its own `visitor_id` endpoint like NewPipe does. */
+    private suspend fun nativeVisitorData(profile: ClientProfile, locale: ContentLocale): String? {
+        val cached = nativeVisitor
+        if (cached != null && clock.nowMillis() - cached.second < VISITOR_TTL_MS) return cached.first
+        val fresh = runCatching {
+            client.post("visitor_id", JsonObject(emptyMap()), locale, null, skipLoggedOutCheck = true, profile = profile, withoutVisitor = true).visitorData
+        }.getOrNull()
+        if (fresh != null) nativeVisitor = fresh to clock.nowMillis()
+        return fresh
     }
 
-    fun parse(root: JsonElement, videoId: String, clientName: String, userAgent: String): ResolveResult {
+    private suspend fun request(videoId: String, locale: ContentLocale, auth: RequestAuth?, profile: ClientProfile?): ResolveResult {
+        val native = profile?.nativeApp == true
+        val cpn = if (native) randomToken(16) else null
+        val body = buildJsonObject {
+            put("videoId", videoId)
+            if (cpn != null) put("cpn", cpn)
+            put("contentCheckOk", true)
+            put("racyCheckOk", true)
+            if (!native) {
+                put("playbackContext", buildJsonObject {
+                    put("contentPlaybackContext", buildJsonObject {
+                        put("html5Preference", "HTML5_PREF_WANTS")
+                    })
+                })
+            }
+        }
+        val response = if (native && profile != null) {
+            val ua = nativeUserAgent(profile, locale)
+            val tuned = profile.copy(userAgent = ua)
+            client.post(
+                "player", body, locale, auth, skipLoggedOutCheck = true, profile = tuned,
+                query = mapOf("t" to randomToken(12), "id" to videoId),
+                visitorOverride = nativeVisitorData(tuned, locale),
+            )
+        } else {
+            client.post("player", body, locale, auth, skipLoggedOutCheck = true, profile = profile)
+        }
+        val name = profile?.name ?: client.clientConfig.clientName
+        val ua = if (native && profile != null) nativeUserAgent(profile, locale) else profile?.userAgent ?: client.clientConfig.userAgent
+        return parse(response.root, videoId, name, ua, cpn)
+    }
+
+    private fun nativeUserAgent(profile: ClientProfile, locale: ContentLocale): String =
+        profile.userAgent.replace("{region}", locale.region)
+
+    fun parse(root: JsonElement, videoId: String, clientName: String, userAgent: String, cpn: String? = null): ResolveResult {
         val status = root.path("playabilityStatus", "status").str
         val reason = root.path("playabilityStatus", "reason").str
             ?: root.firstObject("playerErrorMessageRenderer").at("reason").textOf()
@@ -106,7 +138,7 @@ class StreamResolver(
         }
         var skipped = 0
         fun parseFormats(key: String): List<StreamFormat> = streaming.at(key).list().mapNotNull { f ->
-            val url = f.at("url").str
+            val url = f.at("url").str?.let { if (cpn != null) "$it&cpn=$cpn" else it }
             if (url == null) {
                 if (f.at("signatureCipher") != null || f.at("cipher") != null) skipped++
                 return@mapNotNull null
@@ -171,6 +203,14 @@ class StreamResolver(
     }
 
     companion object {
+        private const val VISITOR_TTL_MS = 60L * 60 * 1000
+        private const val TOKEN_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+        private val random = java.security.SecureRandom()
+
+        private fun randomToken(length: Int): String =
+            buildString(length) { repeat(length) { append(TOKEN_ALPHABET[random.nextInt(TOKEN_ALPHABET.length)]) } }
+
         private val TERMINAL_FAILURES = setOf(
             PlaybackFailure.Private,
             PlaybackFailure.Removed,
@@ -193,6 +233,25 @@ class StreamResolver(
         }
 
         val DEFAULT_PROFILES: List<ClientProfile> = listOf(
+            // The client NewPipe currently streams with: no PO token, no signature cipher.
+            ClientProfile(
+                name = "VISIONOS",
+                version = "1.04",
+                nameId = "101",
+                userAgent = "com.google.visionos.youtube/1.04(RealityDevice17,1; U; CPU visionOS 26_6_0 like Mac OS X; {region})",
+                platform = "MOBILE",
+                baseUrl = "https://youtubei.googleapis.com/",
+                nativeApp = true,
+                extraHeaders = mapOf("X-Goog-Api-Format-Version" to "2"),
+                extras = mapOf(
+                    "clientScreen" to JsonPrimitive("WATCH"),
+                    "deviceMake" to JsonPrimitive("Apple"),
+                    "deviceModel" to JsonPrimitive("RealityDevice17,1"),
+                    "osName" to JsonPrimitive("visionOS"),
+                    "osVersion" to JsonPrimitive("26.6.0.23O770"),
+                    "utcOffsetMinutes" to JsonPrimitive(0),
+                ),
+            ),
             ClientProfile(
                 name = "ANDROID_VR",
                 version = "1.65.10",

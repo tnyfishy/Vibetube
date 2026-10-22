@@ -27,7 +27,7 @@ import vibe.tube.youtube.player.ResolvedMedia
 class MediaSourceBuilder(private val http: OkHttpClient) {
 
     fun build(plan: MediaPlan, media: ResolvedMedia, video: VideoItem, captions: List<CaptionTrack>): MediaSource {
-        val factory: DataSource.Factory = OkHttpDataSource.Factory(http).setUserAgent(media.userAgent)
+        val factory: DataSource.Factory = YoutubeDataSource.Factory(OkHttpDataSource.Factory(http).setUserAgent(media.userAgent))
         val metadata = MediaMetadata.Builder()
             .setTitle(media.title ?: video.title)
             .setArtist(media.author ?: video.channelName)

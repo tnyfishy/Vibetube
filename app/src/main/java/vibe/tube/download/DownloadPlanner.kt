@@ -12,7 +12,7 @@ sealed interface DownloadPlan {
 }
 
 /**
- * Picks the best streams for a download. "Best" means tallest resolution, then highest frame rate;
+ * Lists the qualities a video offers and picks the streams for the one the user chose (default: tallest resolution, then highest frame rate);
  * only codec/container pairs that [android.media.MediaMuxer] can write are considered (AVC in MP4,
  * VP9 in WebM, and AV1 in MP4 on Android 14+).
  */
@@ -31,20 +31,75 @@ object DownloadPlanner {
     private val videoOrder = compareBy<StreamFormat>({ it.height ?: 0 }, { it.fps ?: 0 }, { if (it.isAvc) 1 else 0 }, { it.bitrate })
     private val audioOrder = compareBy<StreamFormat>({ if (it.isDefaultAudio) 1 else 0 }, { it.bitrate }, { if (it.isAac) 1 else 0 })
 
-    fun planVideo(media: ResolvedMedia, sdk: Int): DownloadPlan? {
-        val bestVideo = media.videoOnly.filter { it.isVideo && muxable(it, sdk) }.maxWithOrNull(videoOrder)
+    /** One selectable video quality: a resolution/frame-rate pair and the container it will be saved in. */
+    data class VideoOption(val height: Int, val fps: Int, val container: String, val sizeBytes: Long?) {
+        val label: String get() = if (fps > 30) "${height}p$fps" else "${height}p"
+    }
+
+    /** One selectable audio stream (bitrate/codec), saved as M4A (AAC) or WebM (Opus). */
+    data class AudioOption(val itag: Int, val bitrateKbps: Int, val codec: String, val container: String, val sizeBytes: Long?, val trackName: String?)
+
+    data class Options(val videos: List<VideoOption>, val audios: List<AudioOption>)
+
+    /** What the user picked: a video quality ([height]/[fps]) or one audio stream ([audioItag]). */
+    data class Choice(val kind: DownloadKind, val height: Int? = null, val fps: Int? = null, val audioItag: Int? = null)
+
+    private fun audioFor(video: StreamFormat, media: ResolvedMedia): StreamFormat? = media.audioOnly
+        .filter { it.isAudio && if (video.isMp4Family) it.isAac && it.isMp4Family else it.isOpus }
+        .maxWithOrNull(audioOrder)
+
+    fun options(media: ResolvedMedia, sdk: Int): Options {
+        val adaptive = media.videoOnly.filter { it.isVideo && muxable(it, sdk) && it.height != null }
+            .groupBy { (it.height ?: 0) to (it.fps ?: 30) }
+            .map { (key, formats) ->
+                val best = formats.maxWithOrNull(compareBy<StreamFormat>({ if (it.isAvc) 1 else 0 }, { it.bitrate }))!!
+                val audio = audioFor(best, media)
+                VideoOption(key.first, key.second, if (best.isMp4Family) "MP4" else "WebM", best.contentLength?.let { it + (audio?.contentLength ?: 0L) })
+            }
+        val muxedOnly = media.muxed.filter { it.isVideo && it.height != null }
+            .filter { m -> adaptive.none { it.height == m.height } }
+            .map { VideoOption(it.height ?: 0, it.fps ?: 30, "MP4", it.contentLength) }
+        val videos = (adaptive + muxedOnly).sortedWith(compareByDescending<VideoOption> { it.height }.thenByDescending { it.fps })
+        val audios = media.audioOnly.filter { it.isAudio && (it.audioTrackId == null || it.isDefaultAudio) }
+            .groupBy { Triple(it.bitrate / 1000, it.isAac, it.isMp4Family) }
+            .map { (_, formats) -> formats.first() }
+            .sortedByDescending { it.bitrate }
+            .map {
+                AudioOption(
+                    itag = it.itag,
+                    bitrateKbps = it.bitrate / 1000,
+                    codec = if (it.isAac) "AAC" else if (it.isOpus) "Opus" else (it.codecs ?: "audio"),
+                    container = if (it.isMp4Family) "M4A" else "WebM",
+                    sizeBytes = it.contentLength,
+                    trackName = it.audioTrackName,
+                )
+            }
+        return Options(videos, audios)
+    }
+
+    /** Video plan for an exact [height] (and preferably [fps]); a missing quality falls back to the closest one below it. */
+    fun planVideo(media: ResolvedMedia, sdk: Int, height: Int? = null, fps: Int? = null): DownloadPlan? {
+        val candidates = media.videoOnly.filter { it.isVideo && muxable(it, sdk) }
+        val pool = if (height == null) candidates else {
+            val atOrBelow = candidates.filter { (it.height ?: 0) <= height }.ifEmpty { candidates }
+            val target = atOrBelow.maxOfOrNull { it.height ?: 0 }
+            atOrBelow.filter { it.height == target }
+        }
+        val withFps = if (fps == null) pool else pool.filter { (it.fps ?: 30) == fps }.ifEmpty { pool }
+        val bestVideo = withFps.maxWithOrNull(videoOrder)
         if (bestVideo != null) {
-            val audio = media.audioOnly
-                .filter { it.isAudio && if (bestVideo.isMp4Family) it.isAac && it.isMp4Family else it.isOpus }
-                .maxWithOrNull(audioOrder)
+            val audio = audioFor(bestVideo, media)
             if (audio != null) return DownloadPlan.Mux(bestVideo, audio)
         }
-        val muxed = media.muxed.filter { it.isVideo }.maxWithOrNull(compareBy({ it.height ?: 0 }, { it.bitrate }))
+        val muxedPool = media.muxed.filter { it.isVideo }
+        val muxed = (if (height == null) muxedPool else muxedPool.filter { (it.height ?: 0) <= height }.ifEmpty { muxedPool })
+            .maxWithOrNull(compareBy({ it.height ?: 0 }, { it.bitrate }))
         return muxed?.let(DownloadPlan::Single)
     }
 
-    fun planAudio(media: ResolvedMedia): DownloadPlan? {
-        val audio = media.audioOnly.filter { it.isAudio }.maxWithOrNull(audioOrder)
+    fun planAudio(media: ResolvedMedia, itag: Int? = null): DownloadPlan? {
+        val audios = media.audioOnly.filter { it.isAudio }
+        val audio = audios.firstOrNull { it.itag == itag } ?: audios.maxWithOrNull(audioOrder)
         if (audio != null) return DownloadPlan.Single(audio)
         return media.muxed.filter { it.isVideo }.minByOrNull { it.height ?: Int.MAX_VALUE }?.let(DownloadPlan::Single)
     }

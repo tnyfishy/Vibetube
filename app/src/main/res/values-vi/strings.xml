@@ -164,9 +164,10 @@
     <string name="settings_hidden_channels_count">%1$d kênh</string>
     <string name="action_download">Tải xuống</string>
     <string name="download_title">Tải xuống</string>
-    <string name="download_video">Video, chất lượng cao nhất</string>
-    <string name="download_audio">Nhạc, chỉ âm thanh (chất lượng cao nhất)</string>
-    <string name="download_note">Video được ghép ngay trên máy từ luồng hình và tiếng chất lượng cao nhất hiện có.</string>
+    <string name="download_loading">Đang kiểm tra chất lượng khả dụng…</string>
+    <string name="download_options_failed">Không tải được danh sách chất lượng. Kiểm tra kết nối rồi thử lại.</string>
+    <string name="download_tab_video">Video</string>
+    <string name="download_tab_audio">Âm thanh</string>
     <string name="download_notification_title">Đang tải xuống</string>
     <string name="download_channel_name">Tải xuống</string>
     <string name="msg_download_started">Đang tải: %1$s</string>

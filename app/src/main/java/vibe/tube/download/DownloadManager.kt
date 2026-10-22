@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import vibe.tube.player.YoutubeRequests
 import vibe.tube.R
 import vibe.tube.account.AuthState
 import vibe.tube.account.SessionManager
@@ -56,6 +58,7 @@ data class DownloadJob(
     val phase: DownloadPhase = DownloadPhase.Queued,
     val progress: Float = 0f,
     val quality: String? = null,
+    val choice: DownloadPlanner.Choice? = null,
 ) {
     val active: Boolean get() = phase != DownloadPhase.Done && phase != DownloadPhase.Failed
 }
@@ -83,8 +86,25 @@ class DownloadManager @Inject constructor(
         scope.launch { for (job in queue) process(job) }
     }
 
-    fun enqueue(video: VideoItem, kind: DownloadKind) {
-        val job = DownloadJob(nextId++, video.id, video.title, kind)
+    /** Resolves the streams of [videoId] and lists the qualities that can be downloaded. */
+    suspend fun loadOptions(videoId: String): DownloadPlanner.Options {
+        val media = resolveMedia(videoId)
+        if (media.isLive) throw IOException("live")
+        return DownloadPlanner.options(media, Build.VERSION.SDK_INT)
+    }
+
+    private suspend fun resolveMedia(videoId: String): vibe.tube.youtube.player.ResolvedMedia {
+        val ctx = session.currentContext()
+        val auth = ctx?.let { c -> session.authFor(c.accountId) }?.takeIf { session.authState.value is AuthState.Verified }
+        return when (val result = resolver.resolve(videoId, settings.latest.value.contentLocale(), auth)) {
+            is ResolveResult.Playable -> result.media
+            is ResolveResult.Blocked -> throw IOException("blocked:${result.failure}")
+        }
+    }
+
+    fun enqueue(video: VideoItem, choice: DownloadPlanner.Choice) {
+        val kind = choice.kind
+        val job = DownloadJob(nextId++, video.id, video.title, kind, choice = choice)
         jobsState.update { list -> list.filter { it.active } + job }
         queue.trySend(job)
         DownloadService.start(context)
@@ -99,43 +119,22 @@ class DownloadManager @Inject constructor(
         val temp = File(context.cacheDir, "downloads/${job.id}").apply { mkdirs() }
         try {
             update(job.id) { it.copy(phase = DownloadPhase.Resolving) }
-            val ctx = session.currentContext()
-            val auth = ctx?.let { c -> session.authFor(c.accountId) }?.takeIf { session.authState.value is AuthState.Verified }
-            val media = when (val result = resolver.resolve(job.videoId, settings.latest.value.contentLocale(), auth)) {
-                is ResolveResult.Playable -> result.media
-                is ResolveResult.Blocked -> throw IOException("blocked:${result.failure}")
-            }
-            if (media.isLive) throw IOException("live")
-            val plan = when (job.kind) {
-                DownloadKind.Video -> DownloadPlanner.planVideo(media, Build.VERSION.SDK_INT)
-                DownloadKind.Audio -> DownloadPlanner.planAudio(media)
-            } ?: throw IOException("no_stream")
-
-            val quality = DownloadPlanner.qualityLabel(plan).takeIf { job.kind == DownloadKind.Video }
-            update(job.id) { it.copy(phase = DownloadPhase.Downloading, quality = quality) }
-            val base = DownloadPlanner.safeFileName(media.title ?: job.title)
-
-            when (plan) {
-                is DownloadPlan.Single -> {
-                    val file = File(temp, "single")
-                    val total = plan.format.contentLength ?: 0L
-                    fetch(plan.format, media.userAgent, file) { done -> if (total > 0) update(job.id) { it.copy(progress = done.toFloat() / total) } }
-                    update(job.id) { it.copy(phase = DownloadPhase.Saving, progress = 1f) }
-                    val name = base + (quality?.let { " [$it]" } ?: "") + "." + DownloadPlanner.extension(plan.format)
-                    save(name, DownloadPlanner.mimeType(plan)) { fd -> FileOutputStream(fd).use { out -> file.inputStream().use { it.copyTo(out) } } }
-                }
-                is DownloadPlan.Mux -> {
-                    val videoFile = File(temp, "video")
-                    val audioFile = File(temp, "audio")
-                    val vTotal = plan.video.contentLength ?: 0L
-                    val aTotal = plan.audio.contentLength ?: 0L
-                    val all = (vTotal + aTotal).coerceAtLeast(1L)
-                    fetch(plan.video, media.userAgent, videoFile) { done -> update(job.id) { it.copy(progress = 0.9f * done / all) } }
-                    fetch(plan.audio, media.userAgent, audioFile) { done -> update(job.id) { it.copy(progress = 0.9f * (vTotal + done) / all) } }
-                    update(job.id) { it.copy(phase = DownloadPhase.Merging, progress = 0.92f) }
-                    val ext = if (plan.webm) "webm" else "mp4"
-                    val name = base + (quality?.let { " [$it]" } ?: "") + "." + ext
-                    save(name, DownloadPlanner.mimeType(plan)) { fd -> mux(videoFile, audioFile, fd, plan.webm) }
+            val skip = mutableSetOf<String>()
+            var attempt = 0
+            while (true) {
+                val media = resolveMedia(job.videoId, skip)
+                if (media.isLive) throw IOException("live")
+                try {
+                    runDownload(job, media, temp)
+                    break
+                } catch (e: IOException) {
+                    // Stream URL rejected: try the next InnerTube client, like playback does.
+                    if (e.message == "http_403" && attempt++ < 3) {
+                        skip += media.clientName
+                        update(job.id) { it.copy(phase = DownloadPhase.Resolving, progress = 0f) }
+                        continue
+                    }
+                    throw e
                 }
             }
             update(job.id) { it.copy(phase = DownloadPhase.Done, progress = 1f) }
@@ -150,28 +149,63 @@ class DownloadManager @Inject constructor(
         }
     }
 
-    /** Downloads [format] in range requests (googlevideo throttles unchunked reads); [onBytes] gets the running total. */
+    private suspend fun runDownload(job: DownloadJob, media: vibe.tube.youtube.player.ResolvedMedia, temp: File) {
+        val choice = job.choice
+        val plan = when (job.kind) {
+            DownloadKind.Video -> DownloadPlanner.planVideo(media, Build.VERSION.SDK_INT, choice?.height, choice?.fps)
+            DownloadKind.Audio -> DownloadPlanner.planAudio(media, choice?.audioItag)
+        } ?: throw IOException("no_stream")
+
+        val quality = DownloadPlanner.qualityLabel(plan).takeIf { job.kind == DownloadKind.Video }
+        update(job.id) { it.copy(phase = DownloadPhase.Downloading, quality = quality, progress = 0f) }
+        val base = DownloadPlanner.safeFileName(media.title ?: job.title)
+
+        when (plan) {
+            is DownloadPlan.Single -> {
+                val file = File(temp, "single")
+                val total = plan.format.contentLength ?: 0L
+                fetch(plan.format, media.userAgent, file) { done -> if (total > 0) update(job.id) { it.copy(progress = done.toFloat() / total) } }
+                update(job.id) { it.copy(phase = DownloadPhase.Saving, progress = 1f) }
+                val name = base + (quality?.let { " [$it]" } ?: "") + "." + DownloadPlanner.extension(plan.format)
+                save(name, DownloadPlanner.mimeType(plan)) { fd -> FileOutputStream(fd).use { out -> file.inputStream().use { it.copyTo(out) } } }
+            }
+            is DownloadPlan.Mux -> {
+                val videoFile = File(temp, "video")
+                val audioFile = File(temp, "audio")
+                val vTotal = plan.video.contentLength ?: 0L
+                val aTotal = plan.audio.contentLength ?: 0L
+                val all = (vTotal + aTotal).coerceAtLeast(1L)
+                fetch(plan.video, media.userAgent, videoFile) { done -> update(job.id) { it.copy(progress = 0.9f * done / all) } }
+                fetch(plan.audio, media.userAgent, audioFile) { done -> update(job.id) { it.copy(progress = 0.9f * (vTotal + done) / all) } }
+                update(job.id) { it.copy(phase = DownloadPhase.Merging, progress = 0.92f) }
+                val ext = if (plan.webm) "webm" else "mp4"
+                val name = base + (quality?.let { " [$it]" } ?: "") + "." + ext
+                save(name, DownloadPlanner.mimeType(plan)) { fd -> mux(videoFile, audioFile, fd, plan.webm) }
+            }
+        }
+    }
+
+    /**
+     * Downloads [format] in [CHUNK]-sized pieces the way NewPipe does: POST `x\0` with the range in a `&range=`
+     * query parameter (plain `Range` headers are rejected by googlevideo). [onBytes] gets the running total.
+     */
     private suspend fun fetch(format: StreamFormat, userAgent: String, target: File, onBytes: (Long) -> Unit) {
         var total = format.contentLength ?: -1L
         var position = 0L
         var failures = 0
+        var requestNumber = 0
         FileOutputStream(target).buffered().use { out ->
             while (total < 0 || position < total) {
                 currentCoroutineContext().ensureActive()
+                val end = if (total > 0) minOf(position + CHUNK, total) - 1 else -1L
                 val request = Request.Builder()
-                    .url(format.url)
+                    .url(YoutubeRequests.rangedUrl(format.url, position, end, requestNumber++))
                     .header("User-Agent", userAgent)
-                    .header("Range", "bytes=$position-${position + CHUNK - 1}")
+                    .post(YoutubeRequests.body().toRequestBody())
                     .build()
                 try {
                     http.newCall(request).execute().use { response ->
                         if (response.code != 206 && response.code != 200) throw IOException("http_${response.code}")
-                        if (total < 0) {
-                            total = response.header("Content-Range")?.substringAfter('/')?.toLongOrNull()
-                                ?: response.body.contentLength().takeIf { it > 0 } ?: -1L
-                        }
-                        val wholeBody = response.code == 200
-                        if (wholeBody && position > 0) throw IOException("range_ignored")
                         val buffer = ByteArray(64 * 1024)
                         val source = response.body.byteStream()
                         while (true) {
@@ -183,10 +217,10 @@ class DownloadManager @Inject constructor(
                             onBytes(position)
                             currentCoroutineContext().ensureActive()
                         }
-                        if (wholeBody) total = position
                     }
+                    if (total < 0) total = position
                 } catch (e: IOException) {
-                    if (++failures >= MAX_FAILURES) throw e
+                    if (e.message?.startsWith("http_4") == true || ++failures >= MAX_FAILURES) throw e
                     delay(800L * failures)
                 }
             }
