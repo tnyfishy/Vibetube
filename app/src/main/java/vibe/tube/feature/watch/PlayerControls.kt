@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
@@ -115,6 +117,8 @@ fun VideoSurface(
     onLogin: () -> Unit,
     modifier: Modifier = Modifier,
     dragModifier: Modifier = Modifier,
+    chapters: List<vibe.tube.player.Chapter> = emptyList(),
+    onChapters: () -> Unit = {},
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
     var interactions by remember { mutableFloatStateOf(0f) }
@@ -235,6 +239,8 @@ fun VideoSurface(
                 Controls(
                     state, onCollapse, onToggleFullscreen, onOptions, onPip, onTogglePlay, onNext, onPrevious, onSeek,
                     onInteract = { interactions += 1f },
+                    chapters = chapters,
+                    onChapters = onChapters,
                 )
             }
         }
@@ -255,6 +261,8 @@ private fun Controls(
     onPrevious: () -> Unit,
     onSeek: (Long) -> Unit,
     onInteract: () -> Unit,
+    chapters: List<vibe.tube.player.Chapter> = emptyList(),
+    onChapters: () -> Unit = {},
 ) {
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableFloatStateOf(0f) }
@@ -285,7 +293,7 @@ private fun Controls(
                 modifier = Modifier.size(64.dp),
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
             ) {
-                VIconImage(
+                vibe.tube.ui.components.SwappingIcon(
                     if (state.isPlaying) VIcon.Pause else VIcon.PlayArrowFilled,
                     stringResource(if (state.isPlaying) R.string.action_pause else R.string.action_play),
                     Modifier.size(36.dp),
@@ -298,11 +306,36 @@ private fun Controls(
                 if (state.isLive) {
                     Text(stringResource(R.string.badge_live), color = MediaOverlayColors.onScrim, style = MaterialTheme.typography.labelLarge)
                 } else {
+                    val shownMs = if (dragging) (dragValue * duration).toLong() else state.positionMs
                     Text(
-                        "${formatTime(if (dragging) (dragValue * duration).toLong() else state.positionMs)} / ${formatTime(state.durationMs)}",
+                        "${formatTime(shownMs)} / ${formatTime(state.durationMs)}",
                         color = MediaOverlayColors.onScrim,
                         style = MaterialTheme.typography.labelMedium,
                     )
+                    val chapterIndex = vibe.tube.player.Chapters.currentIndex(chapters, shownMs)
+                    if (chapterIndex >= 0) {
+                        Row(
+                            Modifier
+                                .weight(1f, fill = false)
+                                .padding(start = Spacing.sm)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                                .clickable(role = androidx.compose.ui.semantics.Role.Button) { onInteract(); onChapters() }
+                                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("\u2022", color = MediaOverlayColors.onScrim, style = MaterialTheme.typography.labelMedium)
+                            Spacer(Modifier.width(Spacing.xs))
+                            Text(
+                                chapters[chapterIndex].title,
+                                color = MediaOverlayColors.onScrim,
+                                style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            VIconImage(VIcon.ArrowForward, null, Modifier.size(14.dp), tint = MediaOverlayColors.onScrim)
+                        }
+                    }
                 }
                 Spacer(Modifier.weight(1f))
                 TooltipIconButton(
@@ -361,6 +394,22 @@ private fun Controls(
                         trackColor = MediaOverlayColors.onScrim.copy(alpha = 0.3f),
                         thumb = androidx.compose.ui.unit.DpSize(4.dp, 20.dp),
                     )
+                    if (chapters.size > 1) {
+                        // Chapter starts are marked as thin notches across the bar.
+                        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                            val usable = size.width - 2 * insetPx
+                            val notch = 2.5.dp.toPx()
+                            chapters.drop(1).forEach { chapter ->
+                                val x = insetPx + usable * (chapter.startMs.toFloat() / duration).coerceIn(0f, 1f)
+                                drawRoundRect(
+                                    color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f),
+                                    topLeft = androidx.compose.ui.geometry.Offset(x - notch / 2f, size.height / 2f - 7.dp.toPx()),
+                                    size = androidx.compose.ui.geometry.Size(notch, 14.dp.toPx()),
+                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(notch / 2f),
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

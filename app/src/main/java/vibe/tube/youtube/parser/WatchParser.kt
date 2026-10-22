@@ -34,6 +34,7 @@ object WatchParser {
                 avatar = ItemParsers.thumbs(it.at("thumbnail")).lastOrNull()?.url,
                 subscriberText = it.at("subscriberCountText").textOf(),
                 subscribed = subscribeButton.at("subscribed").bool ?: subscribedEntity,
+                badge = ItemParsers.badgeOf(it.at("badges")),
             )
         }
 
@@ -122,6 +123,7 @@ object WatchParser {
             viewCountText = null,
             publishedText = null,
             playlistIndex = node.path("navigationEndpoint", "watchEndpoint", "index").int,
+            channelBadge = ItemParsers.badgeOf(node.at("longBylineText")),
         )
     }
 }

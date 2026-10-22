@@ -9,14 +9,32 @@ enum class ThemeMode { System, Light, Dark, Amoled }
  * Selectable UI fonts. [resId] is null for the system font. All bundled fonts are variable and cover
  * Vietnamese; [minWeight]..[maxWeight] is the `wght` axis range of each file. Enum names are persisted.
  */
-enum class AppFont(val resId: Int?, val label: String?, val minWeight: Int = 1, val maxWeight: Int = 1000) {
+/**
+ * Bundled fonts. All are variable, cover Vietnamese, and expose weight and width axes (ranges below are the real
+ * axis ranges of the files). Only Google Sans Flex has a roundness (`ROND`) axis. Enum names are persisted.
+ */
+enum class AppFont(
+    val resId: Int?,
+    val label: String?,
+    val minWeight: Int = 1,
+    val maxWeight: Int = 1000,
+    val minWidth: Float = 100f,
+    val maxWidth: Float = 100f,
+    val hasRoundness: Boolean = false,
+) {
     System(null, null),
-    GoogleSansFlex(vibe.tube.R.font.google_sans_flex, "Google Sans Flex", 1, 1000),
-    Inter(vibe.tube.R.font.inter, "Inter", 100, 900),
-    NotoSans(vibe.tube.R.font.noto_sans, "Noto Sans", 100, 900),
-    OpenSans(vibe.tube.R.font.open_sans, "Open Sans", 300, 800),
-    Nunito(vibe.tube.R.font.nunito, "Nunito", 200, 1000),
-    Lexend(vibe.tube.R.font.lexend, "Lexend", 100, 900),
+    GoogleSansFlex(vibe.tube.R.font.google_sans_flex, "Google Sans Flex", 1, 1000, 25f, 151f, hasRoundness = true),
+    Roboto(vibe.tube.R.font.roboto, "Roboto", 100, 900, 75f, 100f),
+    NotoSans(vibe.tube.R.font.noto_sans, "Noto Sans", 100, 900, 62.5f, 100f),
+    OpenSans(vibe.tube.R.font.open_sans, "Open Sans", 300, 800, 75f, 100f),
+    Archivo(vibe.tube.R.font.archivo, "Archivo", 100, 900, 62f, 125f),
+    MonaSans(vibe.tube.R.font.mona_sans, "Mona Sans", 200, 900, 75f, 125f),
+    EncodeSans(vibe.tube.R.font.encode_sans, "Encode Sans", 100, 900, 75f, 125f),
+    NunitoSans(vibe.tube.R.font.nunito_sans, "Nunito Sans", 200, 1000, 75f, 125f),
+    ZalandoSans(vibe.tube.R.font.zalando_sans, "Zalando Sans", 200, 900, 75f, 125f),
+    TikTokSans(vibe.tube.R.font.tiktok_sans, "TikTok Sans", 300, 900, 75f, 150f),
+    Bricolage(vibe.tube.R.font.bricolage_grotesque, "Bricolage Grotesque", 200, 800, 75f, 100f),
+    Georama(vibe.tube.R.font.georama, "Georama", 100, 900, 62.5f, 150f),
 }
 
 /**
@@ -63,6 +81,8 @@ data class AppSettings(
     val wifiQuality: QualityCap = QualityCap.Auto,
     val mobileQuality: QualityCap = QualityCap.P480,
     val autoplay: Boolean = true,
+    /** Resume a paused video when headphones (wired or Bluetooth) connect. */
+    val autoplayOnHeadphones: Boolean = false,
     val backgroundPlayback: Boolean = true,
     /** Seconds skipped by a double tap on the video. */
     val seekSeconds: Int = 10,

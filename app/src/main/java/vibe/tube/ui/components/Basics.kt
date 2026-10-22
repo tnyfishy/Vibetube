@@ -2,6 +2,7 @@ package vibe.tube.ui.components
 
 import androidx.annotation.DrawableRes
 import vibe.tube.R
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -70,6 +74,7 @@ fun TooltipIconButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     tint: Color = Color.Unspecified,
+    animateIcon: Boolean = false,
 ) {
     TooltipBox(
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
@@ -82,9 +87,29 @@ fun TooltipIconButton(
             modifier = modifier.size(Sizing.minTouchTarget),
             enabled = enabled,
         ) {
-            VIconImage(icon, label, tint = tint)
+            if (animateIcon) SwappingIcon(icon, label, tint = tint) else VIconImage(icon, label, tint = tint)
         }
     }
+}
+
+/** Icon that swaps with a short scale + fade, e.g. play/pause. */
+@Composable
+fun SwappingIcon(
+    @DrawableRes icon: Int,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    tint: Color = Color.Unspecified,
+) {
+    androidx.compose.animation.AnimatedContent(
+        targetState = icon,
+        transitionSpec = {
+            (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180, delayMillis = 60)) +
+                androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(220, delayMillis = 40), initialScale = 0.55f)) togetherWith
+                (androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(90)) +
+                    androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(120), targetScale = 0.55f))
+        },
+        label = "swappingIcon",
+    ) { current -> VIconImage(current, contentDescription, modifier, tint = tint) }
 }
 
 @Composable
@@ -237,4 +262,56 @@ fun Banner(
 @Composable
 fun ChipLabel(text: String, modifier: Modifier = Modifier) {
     Text(text, modifier = modifier, style = MaterialTheme.typography.labelLarge)
+}
+
+/**
+ * "Channel ✓ · views · date": the check mark rides inline right after the channel name, so wrapping and ellipsis
+ * behave exactly like plain text.
+ */
+@Composable
+fun ChannelMetaText(
+    channel: String?,
+    badge: vibe.tube.youtube.model.ChannelBadge,
+    rest: List<String?>,
+    modifier: Modifier = Modifier,
+    style: androidx.compose.ui.text.TextStyle = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+    color: Color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+    maxLines: Int = 2,
+) {
+    val hasBadge = badge != vibe.tube.youtube.model.ChannelBadge.None && !channel.isNullOrBlank()
+    val tail = rest.filterNotNull().filter { it.isNotBlank() }
+    val text = androidx.compose.ui.text.buildAnnotatedString {
+        var first = true
+        if (!channel.isNullOrBlank()) {
+            append(channel)
+            if (hasBadge) {
+                append(" ")
+                appendInlineContent("channelBadge", "✓")
+            }
+            first = false
+        }
+        tail.forEach {
+            if (!first) append(" · ")
+            append(it)
+            first = false
+        }
+    }
+    val size = style.fontSize.takeIf { it.isSpecified } ?: 12.sp
+    val inline = if (hasBadge) {
+        mapOf(
+            "channelBadge" to androidx.compose.foundation.text.InlineTextContent(
+                androidx.compose.ui.text.Placeholder(size * 1.15f, size * 1.15f, androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter),
+            ) {
+                VIconImage(
+                    if (badge == vibe.tube.youtube.model.ChannelBadge.Artist) vibe.tube.ui.VIcon.ArtistBadge else vibe.tube.ui.VIcon.VerifiedFilled,
+                    null,
+                    Modifier.fillMaxSize(),
+                    tint = color,
+                )
+            },
+        )
+    } else {
+        emptyMap()
+    }
+    Text(text, modifier = modifier, style = style, color = color, maxLines = maxLines, overflow = TextOverflow.Ellipsis, inlineContent = inline)
 }

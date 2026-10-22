@@ -71,12 +71,12 @@ private fun thumbnailCandidates(video: VideoItem): List<String> {
 }
 
 @Composable
-fun VideoThumbnail(video: VideoItem, modifier: Modifier = Modifier) {
+fun VideoThumbnail(video: VideoItem, modifier: Modifier = Modifier, shape: androidx.compose.ui.graphics.Shape? = null) {
     val aspect = if (video.isShort) 9f / 16f else Sizing.THUMBNAIL_ASPECT
     Box(
         modifier = modifier
             .aspectRatio(Sizing.THUMBNAIL_ASPECT)
-            .clip(VibeShape.thumbnail)
+            .clip(shape ?: VibeShape.thumbnail)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
     ) {
         // Note: `Modifier.align(..).then(matchParentSize())` lets `align` win and the image then
@@ -135,8 +135,9 @@ fun VideoMenu(
     actions: VideoActions,
     extra: List<MenuEntry>,
     modifier: Modifier = Modifier,
+    menuState: androidx.compose.runtime.MutableState<Boolean> = remember { mutableStateOf(false) },
 ) {
-    var open by remember { mutableStateOf(false) }
+    var open by menuState
     Box(modifier) {
         TooltipIconButton(VIcon.MoreVert, stringResource(R.string.action_more), { open = true })
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
@@ -196,10 +197,18 @@ fun VideoCard(
 ) {
     val queueMode = LocalQueueMode.current
     val description = metaLine(video.title, video.channelName, video.viewCountText, video.publishedText, video.durationText)
+    val menuOpen = remember { mutableStateOf(false) }
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .bouncyClickable(VibeShape.card) { actions.play(video, if (queueMode) queue else listOf(video)) }
+            .bouncyClickable(
+                VibeShape.card,
+                onLongClick = {
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    menuOpen.value = true
+                },
+            ) { actions.play(video, if (queueMode) queue else listOf(video)) }
             .semantics(mergeDescendants = true) { contentDescription = description },
     ) {
         VideoThumbnail(video, Modifier.fillMaxWidth())
@@ -216,15 +225,9 @@ fun VideoCard(
             )
             Column(Modifier.weight(1f)) {
                 Text(video.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(
-                    metaLine(video.channelName, video.viewCountText, video.publishedText),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                ChannelMetaText(video.channelName, video.channelBadge, listOf(video.viewCountText, video.publishedText))
             }
-            VideoMenu(video, actions, extraMenu)
+            VideoMenu(video, actions, extraMenu, menuState = menuOpen)
         }
     }
 }
@@ -237,21 +240,31 @@ fun VideoRow(
     actions: VideoActions = LocalVideoActions.current,
     extraMenu: List<MenuEntry> = emptyList(),
     leading: @Composable (() -> Unit)? = null,
+    thumbnailShape: androidx.compose.ui.graphics.Shape? = null,
 ) {
     val queueMode = LocalQueueMode.current
     val unavailable = video.availability != VideoAvailability.Available
     val description = metaLine(video.title, video.channelName, video.viewCountText, video.publishedText, video.durationText)
+    val menuOpen = remember { mutableStateOf(false) }
+    val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .bouncyClickable(VibeShape.card, enabled = !unavailable) { actions.play(video, if (queueMode) queue else listOf(video)) }
+            .bouncyClickable(
+                VibeShape.card,
+                enabled = !unavailable,
+                onLongClick = {
+                    haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    menuOpen.value = true
+                },
+            ) { actions.play(video, if (queueMode) queue else listOf(video)) }
             .semantics(mergeDescendants = true) { contentDescription = description }
             .padding(vertical = Spacing.xs),
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalAlignment = Alignment.Top,
     ) {
         leading?.invoke()
-        VideoThumbnail(video, Modifier.width(Sizing.listThumbnailWidth))
+        VideoThumbnail(video, Modifier.width(Sizing.listThumbnailWidth), thumbnailShape)
         Column(Modifier.weight(1f)) {
             Text(
                 video.title,
@@ -260,15 +273,9 @@ fun VideoRow(
                 overflow = TextOverflow.Ellipsis,
                 color = if (unavailable) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             )
-            Text(
-                metaLine(video.channelName, video.viewCountText, video.publishedText),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            ChannelMetaText(video.channelName, video.channelBadge, listOf(video.viewCountText, video.publishedText))
         }
-        VideoMenu(video, actions, extraMenu)
+        VideoMenu(video, actions, extraMenu, menuState = menuOpen)
     }
 }
 
@@ -285,16 +292,17 @@ fun PlaylistCard(
             .bouncyClickable(VibeShape.card) { actions.openPlaylist(playlist.id, playlist.title) }
             .semantics(mergeDescendants = true) { contentDescription = description },
     ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(Sizing.THUMBNAIL_ASPECT)
-                .clip(VibeShape.thumbnail)
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-        ) {
-            RemoteImage(playlist.thumbnails.best(), null, Modifier.matchParentSize())
-            playlist.videoCountText?.let {
-                OverlayBadge(it, Modifier.align(Alignment.BottomEnd).padding(Spacing.sm))
+        StackedFrame(peek = 6.dp, inset = 14.dp, Modifier.fillMaxWidth()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(Sizing.THUMBNAIL_ASPECT)
+                    .clip(VibeShape.thumbnail)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            ) {
+                RemoteImage(playlist.thumbnails.best(), null, Modifier.matchParentSize())
+                val badge = if (playlist.id.startsWith("RD")) "Mix" else playlist.videoCountText
+                badge?.let { OverlayBadge(it, Modifier.align(Alignment.BottomEnd).padding(Spacing.sm)) }
             }
         }
         Column(Modifier.padding(horizontal = Spacing.xs, vertical = Spacing.sm)) {
@@ -328,17 +336,19 @@ fun PlaylistRow(
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalAlignment = Alignment.Top,
     ) {
-        Box(
-            Modifier
-                .width(Sizing.listThumbnailWidth)
-                .aspectRatio(Sizing.THUMBNAIL_ASPECT)
-                .clip(VibeShape.thumbnail)
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-        ) {
-            RemoteImage(playlist.thumbnails.best(), null, Modifier.matchParentSize())
-            badge?.let { OverlayBadge(it, Modifier.align(Alignment.BottomEnd).padding(Spacing.sm)) }
+        StackedFrame(peek = 4.dp, inset = 9.dp, Modifier.width(Sizing.listThumbnailWidth)) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(Sizing.THUMBNAIL_ASPECT)
+                    .clip(VibeShape.thumbnail)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            ) {
+                RemoteImage(playlist.thumbnails.best(), null, Modifier.matchParentSize())
+                badge?.let { OverlayBadge(it, Modifier.align(Alignment.BottomEnd).padding(Spacing.sm)) }
+            }
         }
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f).padding(top = 8.dp)) {
             Text(playlist.title, style = MaterialTheme.typography.titleSmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
             Text(
                 metaLine(playlist.ownerName, playlist.updatedText),
@@ -370,7 +380,10 @@ fun ChannelRow(
     ) {
         Avatar(channel.avatars.bestFor(96), Sizing.avatarLarge + 8.dp)
         Column(Modifier.weight(1f)) {
-            Text(channel.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            ChannelMetaText(
+                channel.name, channel.badge, emptyList(),
+                style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
+            )
             Text(
                 metaLine(channel.handle, channel.subscriberText),
                 style = MaterialTheme.typography.bodySmall,
@@ -380,5 +393,40 @@ fun ChannelRow(
             )
         }
         trailing?.invoke()
+    }
+}
+
+/**
+ * Draws two shallow "cards" peeking out above [content], the usual way of saying "this is a playlist / mix, not a
+ * single video". [peek] is the visible height of each layer, [inset] how much narrower the first one is per side.
+ */
+@Composable
+private fun StackedFrame(peek: androidx.compose.ui.unit.Dp, inset: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val back = MaterialTheme.colorScheme.secondaryContainer
+    val backFar = MaterialTheme.colorScheme.surfaceContainerHighest
+    val gap = MaterialTheme.colorScheme.surface
+    Box(modifier) {
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .padding(horizontal = inset * 2)
+                .fillMaxWidth()
+                .height(peek * 3)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                .background(backFar),
+        )
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = peek, start = inset, end = inset)
+                .fillMaxWidth()
+                .height(peek * 3)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                .background(gap)
+                .padding(top = 1.5.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
+                .background(back),
+        )
+        Box(Modifier.padding(top = peek * 2)) { content() }
     }
 }

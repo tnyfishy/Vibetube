@@ -54,11 +54,8 @@ private val weightStops = listOf(100, 200, 300, 400, 500, 600, 700, 800, 900)
 
 private fun variationFor(font: AppFont, weight: Int, opsz: Float, s: FontStyleSettings): FontVariation.Settings {
     val w = weight.coerceIn(font.minWeight, font.maxWeight)
-    return when (font) {
-        AppFont.GoogleSansFlex -> GoogleSansFlex.settings(w, opsz, s.width.toFloat(), s.roundness.toFloat())
-        AppFont.Inter -> FontVariation.Settings(FontVariation.weight(w), FontVariation.Setting("opsz", opsz.coerceIn(14f, 32f)))
-        else -> FontVariation.Settings(FontVariation.weight(w))
-    }
+    if (font == AppFont.GoogleSansFlex) return GoogleSansFlex.settings(w, opsz, s.width.toFloat(), s.roundness.toFloat())
+    return FontVariation.Settings(FontVariation.weight(w), FontVariation.width(s.width.toFloat().coerceIn(font.minWidth, font.maxWidth)))
 }
 
 /**
@@ -68,8 +65,8 @@ private fun variationFor(font: AppFont, weight: Int, opsz: Float, s: FontStyleSe
  */
 fun fontFamilyFor(s: FontStyleSettings, opsz: Float): FontFamily {
     val res = s.font.resId ?: return FontFamily.Default
-    val axisKey = if (s.font == AppFont.GoogleSansFlex) "${s.width}/${s.roundness}" else ""
-    val opszKey = if (s.font == AppFont.GoogleSansFlex || s.font == AppFont.Inter) opsz.toInt() else 0
+    val axisKey = if (s.font == AppFont.GoogleSansFlex) "${s.width}/${s.roundness}" else "${s.width}"
+    val opszKey = if (s.font == AppFont.GoogleSansFlex) opsz.toInt() else 0
     val key = "${s.font.name}|${s.weightOffset}|$axisKey|$opszKey"
     return synchronized(familyCache) {
         familyCache.getOrPut(key) {

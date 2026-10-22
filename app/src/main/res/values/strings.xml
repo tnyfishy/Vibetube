@@ -136,7 +136,7 @@
     <string name="dialog_sign_out_all_title">Sign out of all accounts?</string>
     <string name="dialog_sign_out_all_body">Removes every session and all cached account data from Vibetube.</string>
     <string name="login_title">Sign in to Google</string>
-    <string name="login_hint">You are on the official Google sign-in page. Vibetube never sees your password; it only keeps the Vibetube session after Vibetube confirms it.</string>
+    <string name="login_hint">You are on the official Google sign-in page. Vibetube never sees your password; it only keeps the session after confirming it.</string>
     <string name="login_verifying">Asking Vibetube to confirm your session…</string>
     <string name="login_blocked_title">Google blocked sign-in inside this embedded browser</string>
     <string name="login_blocked_body">Google may refuse sign-in inside app web views (%1$s). Vibetube does not bypass this. Browser sessions in Chrome or other apps cannot be transferred to Vibetube. You can keep using guest mode for search and playback.</string>
@@ -229,8 +229,8 @@
     <string name="msg_unsupported">This isn\'t supported yet.</string>
     <string name="msg_parse_error">Couldn\'t read Vibetube\'s response.</string>
     <string name="msg_generic_error">Something went wrong.</string>
-    <string name="msg_liked">Liked on Vibetube.</string>
-    <string name="msg_unliked">Like removed on Vibetube.</string>
+    <string name="msg_liked">Liked video</string>
+    <string name="msg_unliked">Unliked video</string>
     <string name="msg_subscribed">Subscribed on Vibetube.</string>
     <string name="msg_unsubscribed">Unsubscribed on Vibetube.</string>
     <string name="msg_action_not_reflected">Vibetube did not reflect that change. Showing the current state.</string>
@@ -347,4 +347,7 @@
     <string name="palette_ocean">Ocean</string>
     <string name="palette_rose">Rose</string>
     <string name="palette_violet">Violet</string>
+    <string name="settings_autoplay_headphones">Play when headphones connect</string>
+    <string name="settings_autoplay_headphones_desc">Resume the paused video as soon as wired or Bluetooth headphones are connected</string>
+    <string name="player_chapters">Chapters</string>
 </resources>

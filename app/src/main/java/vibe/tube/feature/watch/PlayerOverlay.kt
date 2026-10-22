@@ -15,6 +15,9 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -141,6 +144,11 @@ private fun PlayerPage(
     val ui by watch.state.collectAsStateWithLifecycle()
     val auth by watch.authState.collectAsStateWithLifecycle()
     var options by remember { mutableStateOf(false) }
+    var chaptersOpen by remember { mutableStateOf(false) }
+    val chapters = remember(ui.info?.videoId, ui.info?.description) {
+        ui.info?.let { vibe.tube.player.Chapters.parse(it.description) } ?: emptyList()
+    }
+    val activeChapters = if (ui.info?.videoId != null && ui.info?.videoId == state.current?.id) chapters else emptyList()
     val scope = rememberCoroutineScope()
     val dragOffset = remember { Animatable(0f) }
     val spring = VibeMotion.spatial<Float>()
@@ -210,6 +218,8 @@ private fun PlayerPage(
                     onLogin = onLogin,
                     modifier = m,
                     dragModifier = if (state.fullscreen) exitFullscreenDrag else if (fullscreen) Modifier else dragModifier,
+                    chapters = activeChapters,
+                    onChapters = { chaptersOpen = true },
                 )
             }
 
@@ -230,6 +240,9 @@ private fun PlayerPage(
         }
     }
     if (options) PlayerOptionsSheet(state, controller) { options = false }
+    if (chaptersOpen && activeChapters.isNotEmpty()) {
+        ChaptersSheet(activeChapters, state.positionMs, controller::seekTo) { chaptersOpen = false }
+    }
 }
 
 @Composable
@@ -384,7 +397,10 @@ private fun LazyListScope.detailsHeader(ui: WatchUiState, state: PlayerUiState, 
                 ) {
                     Avatar(channel.avatar, Sizing.avatarLarge)
                     Column {
-                        Text(channel.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        vibe.tube.ui.components.ChannelMetaText(
+                            channel.name, channel.badge, emptyList(),
+                            style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
+                        )
                         channel.subscriberText?.let {
                             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
@@ -444,17 +460,23 @@ private fun LazyListScope.upNext(ui: WatchUiState, state: PlayerUiState, control
         items(state.queue.size, key = { "q:${state.queue[it].id}:$it" }) { index ->
             val video = state.queue[index]
             val current = index == state.queueIndex
+            // The highlight reaches 8dp beyond the row on every side, so the thumbnail sits inside it with
+            // concentric corners (outer 16dp, inner 8dp) instead of poking out of the rounded frame.
             Surface(
-                color = if (current) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+                color = if (current) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
                 shape = MaterialTheme.shapes.large,
+                modifier = Modifier.bleedHorizontally(8.dp),
             ) {
-                VideoRow(
-                    video = video,
-                    queue = emptyList(),
-                    actions = object : vibe.tube.ui.components.VideoActions by LocalVideoActionsDelegate.current {
-                        override fun play(video: VideoItem, queue: List<VideoItem>) = controller.playQueueIndex(index)
-                    },
-                )
+                Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+                    VideoRow(
+                        video = video,
+                        queue = emptyList(),
+                        thumbnailShape = RoundedCornerShape(8.dp),
+                        actions = object : vibe.tube.ui.components.VideoActions by LocalVideoActionsDelegate.current {
+                            override fun play(video: VideoItem, queue: List<VideoItem>) = controller.playQueueIndex(index)
+                        },
+                    )
+                }
             }
         }
         item(key = "related-title") { Text(stringResource(R.string.player_related), style = MaterialTheme.typography.titleSmall) }
@@ -495,4 +517,12 @@ private fun LazyListScope.commentsList(ui: WatchUiState, auth: AuthState, watch:
     }
     if (c.loadingMore) item(key = "comments-more") { Box(Modifier.fillMaxWidth().padding(Spacing.md), contentAlignment = Alignment.Center) { androidx.compose.material3.ContainedLoadingIndicator() } }
     if (c.loadMoreError) item(key = "comments-more-error") { TextButton(shapes = ButtonDefaults.shapes(), onClick = watch::loadMoreComments) { Text(stringResource(R.string.feed_load_more_failed)) } }
+}
+
+/** Lets a child extend [by] beyond the parent's horizontal padding (the content is not clipped, so it just overflows). */
+private fun Modifier.bleedHorizontally(by: androidx.compose.ui.unit.Dp): Modifier = layout { measurable, constraints ->
+    val px = by.roundToPx()
+    val width = constraints.maxWidth + 2 * px
+    val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+    layout(constraints.maxWidth, placeable.height) { placeable.place(-px, 0) }
 }

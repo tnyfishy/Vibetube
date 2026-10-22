@@ -37,6 +37,7 @@ import vibe.tube.R
 import vibe.tube.account.AuthState
 import vibe.tube.ui.VIcon
 import vibe.tube.ui.components.Avatar
+import vibe.tube.ui.components.VIconImage
 import vibe.tube.ui.components.ChannelRow
 import vibe.tube.ui.components.FeedContent
 import vibe.tube.ui.components.PlaylistCard
@@ -74,12 +75,24 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.xs, bottom = Spacing.sm),
                     visibilityScope = visibilityScope,
                 ) {
-                    val guest = auth is AuthState.Guest
-                    TooltipIconButton(
-                        VIcon.Person,
-                        stringResource(if (guest) R.string.action_sign_in else R.string.nav_account),
-                        if (guest) onLogin else onAccount,
-                    )
+                    if (auth is AuthState.Guest) {
+                        TooltipIconButton(VIcon.Person, stringResource(R.string.action_sign_in), onLogin)
+                    } else {
+                        // Signed in: the account photo takes the place of the person icon.
+                        androidx.compose.foundation.layout.Box(
+                            Modifier
+                                .size(48.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = stringResource(R.string.nav_account), onClick = onAccount),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (avatarUrl != null) {
+                                Avatar(avatarUrl, 36.dp, description = stringResource(R.string.nav_account))
+                            } else {
+                                VIconImage(VIcon.Person, stringResource(R.string.nav_account))
+                            }
+                        }
+                    }
                 }
             }
         },

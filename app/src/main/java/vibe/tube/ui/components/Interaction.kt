@@ -14,6 +14,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -90,13 +91,21 @@ fun Modifier.bouncyClickable(
     enabled: Boolean = true,
     role: Role? = Role.Button,
     pressedScale: Float = 0.97f,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ): Modifier {
     val source = remember { MutableInteractionSource() }
     return this
         .pressScale(source, pressedScale)
         .clip(shape)
-        .clickable(interactionSource = source, indication = LocalIndication.current, enabled = enabled, role = role, onClick = onClick)
+        .combinedClickable(
+            interactionSource = source,
+            indication = LocalIndication.current,
+            enabled = enabled,
+            role = role,
+            onLongClick = onLongClick,
+            onClick = onClick,
+        )
 }
 
 /** Fades an element in from slightly above, one step later per [index] (top to bottom). */

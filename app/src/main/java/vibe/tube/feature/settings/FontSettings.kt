@@ -28,6 +28,13 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import vibe.tube.ui.theme.fontFamilyFor
+import kotlinx.coroutines.delay
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -98,9 +105,29 @@ fun FontSheet(settings: AppSettings, onChange: (AppSettings.() -> AppSettings) -
                 }
             }
 
+            // Rows switch to their own typeface one after another once the sheet has settled: loading eleven font files
+            // while the sheet is still sliding in is what made opening it stutter.
+            var ready by remember { mutableIntStateOf(0) }
+            LaunchedEffect(Unit) {
+                delay(380)
+                for (i in 1..AppFont.entries.size) {
+                    ready = i
+                    delay(32)
+                }
+            }
             Column(Modifier.selectableGroup()) {
-                AppFont.entries.forEach { option ->
-                    val style = remember(option, applied.weightOffset) { buildTypography(FontStyleSettings(option, applied.weightOffset, applied.width, applied.roundness)).titleMedium }
+                AppFont.entries.forEachIndexed { index, option ->
+                    val style = if (index < ready) {
+                        remember(option, applied.weightOffset, applied.width) {
+                            TextStyle(
+                                fontFamily = fontFamilyFor(FontStyleSettings(option, applied.weightOffset, applied.width, applied.roundness), 16f),
+                                fontWeight = FontWeight(if (option.resId == null) 400 + applied.weightOffset else 400),
+                                fontSize = 16.sp,
+                            )
+                        }
+                    } else {
+                        MaterialTheme.typography.titleMedium
+                    }
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -122,23 +149,29 @@ fun FontSheet(settings: AppSettings, onChange: (AppSettings.() -> AppSettings) -
                 onChange = { weight = (it / 10f).roundToInt() * 10f },
                 onFinished = ::commit,
             )
-            if (font == AppFont.GoogleSansFlex) {
-                SliderRow(
-                    label = stringResource(R.string.settings_font_width),
-                    valueText = width.roundToInt().toString(),
-                    value = width,
-                    range = GoogleSansFlex.WIDTH_MIN..GoogleSansFlex.WIDTH_MAX,
-                    onChange = { width = it.roundToInt().toFloat() },
-                    onFinished = ::commit,
-                )
-                SliderRow(
-                    label = stringResource(R.string.settings_font_roundness),
-                    valueText = roundness.roundToInt().toString(),
-                    value = roundness,
-                    range = 0f..100f,
-                    onChange = { roundness = it.roundToInt().toFloat() },
-                    onFinished = ::commit,
-                )
+            if (font.resId != null) {
+                val minW = font.minWidth
+                val maxW = font.maxWidth
+                if (maxW > minW) {
+                    SliderRow(
+                        label = stringResource(R.string.settings_font_width),
+                        valueText = width.coerceIn(minW, maxW).roundToInt().toString(),
+                        value = width.coerceIn(minW, maxW),
+                        range = minW..maxW,
+                        onChange = { width = it.roundToInt().toFloat() },
+                        onFinished = ::commit,
+                    )
+                }
+                if (font.hasRoundness) {
+                    SliderRow(
+                        label = stringResource(R.string.settings_font_roundness),
+                        valueText = roundness.roundToInt().toString(),
+                        value = roundness,
+                        range = 0f..100f,
+                        onChange = { roundness = it.roundToInt().toFloat() },
+                        onFinished = ::commit,
+                    )
+                }
             }
             OutlinedButton(
                 shapes = ButtonDefaults.shapes(),

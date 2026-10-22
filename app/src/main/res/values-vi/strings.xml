@@ -135,7 +135,7 @@
     <string name="dialog_sign_out_all_title">Đăng xuất tất cả tài khoản?</string>
     <string name="dialog_sign_out_all_body">Xóa mọi phiên và toàn bộ dữ liệu tài khoản đã lưu khỏi Vibetube.</string>
     <string name="login_title">Đăng nhập Google</string>
-    <string name="login_hint">Bạn đang ở trang đăng nhập chính thức của Google. Vibetube không thấy mật khẩu của bạn; chỉ giữ phiên Vibetube sau khi Vibetube xác nhận.</string>
+    <string name="login_hint">Bạn đang ở trang đăng nhập chính thức của Google. Vibetube không thấy mật khẩu của bạn; chỉ giữ phiên đăng nhập sau khi xác nhận.</string>
     <string name="login_verifying">Đang nhờ Vibetube xác nhận phiên của bạn…</string>
     <string name="login_blocked_title">Google đã chặn đăng nhập trong trình duyệt nhúng này</string>
     <string name="login_blocked_body">Google có thể từ chối đăng nhập trong WebView của ứng dụng (%1$s). Vibetube không vượt qua hạn chế này. Phiên trong Chrome hoặc ứng dụng khác không thể chuyển sang Vibetube. Bạn vẫn có thể dùng chế độ khách để tìm kiếm và xem video.</string>
@@ -228,8 +228,8 @@
     <string name="msg_unsupported">Chưa hỗ trợ thao tác này.</string>
     <string name="msg_parse_error">Không đọc được phản hồi của Vibetube.</string>
     <string name="msg_generic_error">Đã xảy ra lỗi.</string>
-    <string name="msg_liked">Đã thích trên Vibetube.</string>
-    <string name="msg_unliked">Đã bỏ thích trên Vibetube.</string>
+    <string name="msg_liked">Đã thích video</string>
+    <string name="msg_unliked">Đã bỏ thích video</string>
     <string name="msg_subscribed">Đã đăng ký kênh trên Vibetube.</string>
     <string name="msg_unsubscribed">Đã hủy đăng ký kênh trên Vibetube.</string>
     <string name="msg_action_not_reflected">Vibetube chưa phản ánh thay đổi này. Đang hiển thị trạng thái hiện tại.</string>
@@ -344,4 +344,7 @@
     <string name="palette_ocean">Đại dương</string>
     <string name="palette_rose">Hồng</string>
     <string name="palette_violet">Tím</string>
+    <string name="settings_autoplay_headphones">Tự phát khi cắm tai nghe</string>
+    <string name="settings_autoplay_headphones_desc">Tiếp tục phát video đang tạm dừng ngay khi kết nối tai nghe có dây hoặc Bluetooth</string>
+    <string name="player_chapters">Các chương</string>
 </resources>

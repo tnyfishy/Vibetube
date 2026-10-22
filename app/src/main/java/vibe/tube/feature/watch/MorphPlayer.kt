@@ -80,12 +80,6 @@ private fun Modifier.placedRect(x: () -> Float, y: () -> Float, w: () -> Float, 
             layout(width, height) { placeable.place(0, 0) }
         }
 
-/** Lays the child out at a fixed size regardless of the (animating) parent size. */
-private fun Modifier.fixedTopStart(width: Int, height: Int): Modifier = layout { measurable, constraints ->
-    val placeable = measurable.measure(Constraints.fixed(width, height))
-    layout(constraints.maxWidth.coerceAtMost(width), constraints.maxHeight.coerceAtMost(height)) { placeable.place(0, 0) }
-}
-
 /**
  * The player as one card that morphs between a full-screen page (progress 1) and the mini player
  * (progress 0). The finger drives `progress` directly while dragging; releasing springs it to the
@@ -112,8 +106,16 @@ internal fun MorphPlayer(
     val expanded by remember { derivedStateOf { stateHolder.value.expanded } }
     val isPlaying by remember { derivedStateOf { stateHolder.value.isPlaying } }
     val current by remember { derivedStateOf { stateHolder.value.current } }
+    val videoAspect by remember { derivedStateOf { stateHolder.value.videoAspect.coerceIn(1.2f, 2.4f) } }
     val detailState by remember { derivedStateOf { stateHolder.value.copy(positionMs = 0, bufferedMs = 0) } }
     var options by remember { mutableStateOf(false) }
+    var chaptersOpen by remember { mutableStateOf(false) }
+    val chapters = remember(ui.info?.videoId, ui.info?.description) {
+        val info = ui.info
+        if (info != null) vibe.tube.player.Chapters.parse(info.description) else emptyList()
+    }
+    // Only trust the chapters while they belong to the video that is actually playing.
+    val activeChapters = if (ui.info?.videoId != null && ui.info?.videoId == current?.id) chapters else emptyList()
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
 
@@ -163,11 +165,16 @@ internal fun MorphPlayer(
         val miniHPx = with(density) { Sizing.miniPlayerHeight.toPx() }
         val gapPx = with(density) { 6.dp.toPx() }
         val miniTop = hPx - bottomInsetPx - miniHPx - gapPx
-        val thumbW = with(density) { 104.dp.toPx() }
-        val thumbH = thumbW * 9f / 16f
-        val thumbX = sidePx * 2f
+        // The video box follows the real aspect ratio of the video (clamped), and so does the minimized thumbnail:
+        // it fits a 104x58.5dp slot, so a 4:3 clip gets a narrower thumbnail instead of letterboxing.
+        val aspect = videoAspect
+        val slotW = with(density) { 104.dp.toPx() }
+        val slotH = slotW * 9f / 16f
+        val thumbW = minOf(slotW, slotH * aspect)
+        val thumbH = thumbW / aspect
+        val thumbX = sidePx * 2f + (slotW - thumbW) / 2f
         val thumbY = miniTop + (miniHPx - thumbH) / 2f
-        val videoH = wPx * 9f / 16f
+        val videoH = wPx / aspect
         val dragRange = max(miniTop, 1f)
         val fadeRange = with(density) { 140.dp.toPx() }
 
@@ -179,6 +186,7 @@ internal fun MorphPlayer(
         LaunchedEffect(opened, visible) { pageComposed = opened || (pageComposed && visible) }
         val showPage = pageComposed
         val miniish by remember { derivedStateOf { progress.value < 0.35f } }
+        val pageVisible by remember { derivedStateOf { progress.value > 0.1f } }
         val controlsOn by remember { derivedStateOf { progress.value > 0.92f } }
 
         suspend fun fadeOutAndDismiss() {
@@ -247,10 +255,8 @@ internal fun MorphPlayer(
 
         val cardColor = MaterialTheme.colorScheme.surfaceContainerHigh
         val pageColor = MaterialTheme.colorScheme.surface
-        val containerX = { lerpF(sidePx, 0f, p()) }
-        val containerY = { lerpF(miniTop, 0f, p()) }
-        val containerW = { lerpF(wPx - 2f * sidePx, wPx, p()) }
-        val containerH = { lerpF(miniHPx, hPx, p()) }
+        val cardRadius = with(density) { 16.dp.toPx() }
+        val infoX = sidePx * 2f + slotW + with(density) { 12.dp.toPx() }
 
         Box(
             Modifier
@@ -260,23 +266,34 @@ internal fun MorphPlayer(
                     translationY = dismiss.value * 0.5f
                 },
         ) {
-            // 1. Card / page background. Its content (details, comments) is laid out at full size and clipped.
+            // Nothing below changes size while the card morphs: the page and the mini card only fade (and the page
+            // drifts down), the video is one fixed-size layer that is scaled and moved. Layout never re-runs per frame.
+
+            // 1. Page: background + details. It fades out as the player is pulled down and is not placed (so it neither
+            //    draws nor takes touches) while minimized; it stays composed so expanding again is instant.
             Box(
                 Modifier
-                    .placedRect(containerX, containerY, containerW, containerH)
-                    .graphicsLayer {
-                        val tt = t()
-                        shape = RoundedCornerShape(CornerSize(lerpF(16.dp.toPx(), deviceCorner, tt)))
-                        clip = true
+                    .fillMaxSize()
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        layout(placeable.width, placeable.height) { if (pageVisible) placeable.place(0, 0) }
                     }
-                    .drawBehind { drawRect(lerp(cardColor, pageColor, t())) }
+                    .graphicsLayer {
+                        alpha = ((p() - 0.12f) / 0.55f).coerceIn(0f, 1f)
+                        translationY = (1f - p()) * hPx * 0.16f
+                        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                    }
+                    .background(pageColor)
                     .pointerInput(Unit) {},
             ) {
                 if (showPage) {
                     Column(
                         Modifier
-                            .fixedTopStart(wPx.roundToInt(), hPx.roundToInt())
-                            .graphicsLayer { alpha = ((p() - 0.55f) / 0.45f).coerceIn(0f, 1f); compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha },
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = ((p() - 0.5f) / 0.45f).coerceIn(0f, 1f)
+                                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                            },
                     ) {
                         Spacer(Modifier.height(with(density) { (topInsetPx + videoH).toDp() }))
                         Details(ui, detailState, controller, watch, auth, onLogin, includeTabs = true, modifier = Modifier.weight(1f))
@@ -284,8 +301,19 @@ internal fun MorphPlayer(
                 }
             }
 
-            // 2. The video is always laid out at its full size and only scaled/moved by the graphics layer, so the
-            //    TextureView never re-lays out or resizes while the card morphs (that is what made it stutter).
+            // 2. Mini card background: fixed rectangle at the bottom, fades in as the page leaves.
+            Box(
+                Modifier
+                    .placedRect({ sidePx }, { miniTop }, { wPx - 2f * sidePx }, { miniHPx })
+                    .graphicsLayer {
+                        alpha = (1f - p() / 0.45f).coerceIn(0f, 1f)
+                        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                    }
+                    .drawBehind { drawRoundRect(cardColor, cornerRadius = androidx.compose.ui.geometry.CornerRadius(cardRadius)) },
+            )
+
+            // 3. The video is always laid out at its full size and only scaled/moved by the graphics layer, so the
+            //    TextureView never re-lays out or resizes while the card morphs.
             Box(
                 Modifier
                     .layout { measurable, _ ->
@@ -323,6 +351,8 @@ internal fun MorphPlayer(
                     onLogin = onLogin,
                     modifier = Modifier.fillMaxSize(),
                     dragModifier = if (controlsOn || !miniish || dragging) dragModifier else Modifier,
+                    chapters = activeChapters,
+                    onChapters = { chaptersOpen = true },
                 )
             }
             // Playback progress rides along the bottom of the thumbnail while minimized.
@@ -338,7 +368,10 @@ internal fun MorphPlayer(
                             w = { lerpF(thumbW, wPx, p()) },
                             h = { lerpF(thumbH, videoH, p()) },
                         )
-                        .graphicsLayer { alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f); compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha },
+                        .graphicsLayer {
+                            alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f)
+                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                        },
                 ) {
                     vibe.tube.ui.components.WavyProgress(
                         progress = { stateHolder.value.let { if (it.durationMs > 0) (it.positionMs.toFloat() / it.durationMs).coerceIn(0f, 1f) else 0f } },
@@ -354,11 +387,11 @@ internal fun MorphPlayer(
                 }
             }
 
-            // 3. Minimized card: tap to expand, drag up to expand, drag down to dismiss.
+            // 4. Minimized card: tap to expand, drag up to expand, drag down to dismiss.
             if (miniish || dragging) {
                 Box(
                     Modifier
-                        .placedRect(containerX, containerY, containerW, containerH)
+                        .placedRect({ sidePx }, { miniTop }, { wPx - 2f * sidePx }, { miniHPx })
                         .then(dragModifier)
                         .clickable(role = Role.Button, onClickLabel = stringResource(R.string.action_expand_player)) { controller.expand() },
                 )
@@ -366,12 +399,15 @@ internal fun MorphPlayer(
                 Row(
                     Modifier
                         .placedRect(
-                            x = { containerX() + sidePx + thumbW + with(density) { 12.dp.toPx() } + sidePx },
-                            y = containerY,
-                            w = { wPx - 2f * sidePx - (sidePx + thumbW + with(density) { 12.dp.toPx() } + sidePx) },
+                            x = { infoX },
+                            y = { miniTop },
+                            w = { wPx - sidePx - infoX },
                             h = { miniHPx },
                         )
-                        .graphicsLayer { alpha = ((0.3f - t()) / 0.3f).coerceIn(0f, 1f); compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha },
+                        .graphicsLayer {
+                            alpha = ((0.3f - t()) / 0.3f).coerceIn(0f, 1f)
+                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                        },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -384,16 +420,27 @@ internal fun MorphPlayer(
                         if (isPlaying) VIcon.Pause else VIcon.PlayArrowFilled,
                         stringResource(if (isPlaying) R.string.action_pause else R.string.action_play),
                         controller::togglePlay,
+                        animateIcon = true,
                     )
                     TooltipIconButton(VIcon.Close, stringResource(R.string.action_close_player), { scope.launch { fadeOutAndDismiss() } })
                 }
             }
         }
         if (options) OptionsHost(stateHolder, controller) { options = false }
+        if (chaptersOpen && activeChapters.isNotEmpty()) {
+            ChaptersHost(stateHolder, activeChapters, controller::seekTo) { chaptersOpen = false }
+        }
     }
 }
 
 @Composable
 private fun OptionsHost(state: androidx.compose.runtime.State<PlayerUiState>, controller: PlayerController, onDismiss: () -> Unit) {
     PlayerOptionsSheet(state.value, controller, onDismiss)
+}
+
+@Composable
+private fun ChaptersHost(state: androidx.compose.runtime.State<PlayerUiState>, chapters: List<vibe.tube.player.Chapter>, onSeek: (Long) -> Unit, onDismiss: () -> Unit) {
+    // The position is read once, when the sheet opens, to scroll to the current chapter.
+    val position = remember { state.value.positionMs }
+    ChaptersSheet(chapters, position, onSeek, onDismiss)
 }

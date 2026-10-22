@@ -464,7 +464,12 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
                 // The back-gesture preview: the leaving page just follows the finger to the right (clipped to the
                 // device's corner radius) while the page below is already in place. No default 0.9 scale-down.
                 predictivePopEnterTransition = { EnterTransition.None },
-                predictivePopExitTransition = { _ -> slideOutHorizontally(tween(300, easing = LinearEasing)) { it } },
+                // Search never slides away (its body just fades, the header hands over to the home pill); sliding a half-faded
+                // page across the screen is what left a ghost streak on the back gesture.
+                predictivePopExitTransition = { _ ->
+                    if (isSearch(initialState.destination)) ExitTransition.None
+                    else slideOutHorizontally(tween(300, easing = LinearEasing)) { it }
+                },
             ) {
                 page<HomeRoute> {
                     HomeScreen(

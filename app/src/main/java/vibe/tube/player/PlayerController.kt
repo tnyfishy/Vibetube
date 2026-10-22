@@ -123,6 +123,7 @@ class PlayerController @Inject constructor(
             engine.player.playbackParameters = PlaybackParameters(tuningPrefs.getFloat("speed", 1f), tuningPrefs.getFloat("pitch", 1f))
             mutable.update { it.copy(tuningRemembered = true, linkPitch = tuningPrefs.getBoolean("link", false)) }
         }
+        registerHeadphoneAutoplay()
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
                 val s = mutable.value
@@ -131,6 +132,27 @@ class PlayerController @Inject constructor(
                 }
             }
         })
+    }
+
+    /** Resumes a paused, loaded video when headphones connect (if the user turned that on). */
+    private fun registerHeadphoneAutoplay() {
+        val audio = context.getSystemService(android.media.AudioManager::class.java) ?: return
+        val registeredAt = android.os.SystemClock.elapsedRealtime()
+        audio.registerAudioDeviceCallback(
+            object : android.media.AudioDeviceCallback() {
+                override fun onAudioDevicesAdded(addedDevices: Array<out android.media.AudioDeviceInfo>) {
+                    // Registering reports the devices that are already connected; only react to new ones.
+                    if (android.os.SystemClock.elapsedRealtime() - registeredAt < 1500) return
+                    if (!settings.latest.value.autoplayOnHeadphones) return
+                    if (addedDevices.none { it.isSink && it.type in HEADPHONE_TYPES }) return
+                    val s = mutable.value
+                    if (s.visible && s.current != null && s.error == null && s.phase == PlayerPhase.Ready && !engine.player.isPlaying) {
+                        engine.player.play()
+                    }
+                }
+            },
+            android.os.Handler(android.os.Looper.getMainLooper()),
+        )
     }
 
     private fun durationOf(): Long = engine.player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
@@ -559,6 +581,13 @@ class PlayerController @Inject constructor(
 
     companion object {
         private const val TICK_MS = 500L
+        private val HEADPHONE_TYPES = setOf(
+            android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET,
+            android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+            android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+            android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
+            android.media.AudioDeviceInfo.TYPE_HEARING_AID,
+        ) + if (android.os.Build.VERSION.SDK_INT >= 31) setOf(android.media.AudioDeviceInfo.TYPE_BLE_HEADSET) else emptySet()
         private const val PERSIST_INTERVAL_MS = 15_000L
         private const val RESTART_THRESHOLD_MS = 3_000L
         private const val MAX_QUEUE_PAGES = 5

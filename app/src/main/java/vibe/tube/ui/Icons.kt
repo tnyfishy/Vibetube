@@ -67,6 +67,7 @@ object VIcon {
     @DrawableRes val ThumbUpFilled: Int = R.drawable.ic_thumb_up_filled
     @DrawableRes val Tune: Int = R.drawable.ic_tune
     @DrawableRes val VerifiedFilled: Int = R.drawable.ic_verified_filled
+    @DrawableRes val ArtistBadge: Int = R.drawable.ic_artist_badge
     @DrawableRes val VideoLibrary: Int = R.drawable.ic_video_library
     @DrawableRes val VideoLibraryFilled: Int = R.drawable.ic_video_library_filled
     @DrawableRes val VisibilityOff: Int = R.drawable.ic_visibility_off

@@ -18,6 +18,10 @@ fun List<Thumb>.bestFor(minWidth: Int): String? {
     return (sorted.firstOrNull { it.width >= minWidth } ?: sorted.last()).url
 }
 
+/** Check mark next to a channel name: a verified channel or an official artist channel. */
+@Serializable
+enum class ChannelBadge { None, Verified, Artist }
+
 @Serializable
 enum class VideoAvailability { Available, Private, Deleted, Unplayable }
 
@@ -44,6 +48,7 @@ data class VideoItem(
     val setVideoId: String? = null,
     val availability: VideoAvailability = VideoAvailability.Available,
     val playlistIndex: Int? = null,
+    val channelBadge: ChannelBadge = ChannelBadge.None,
 ) : FeedItem
 
 @Serializable
@@ -67,6 +72,7 @@ data class ChannelItem(
     val subscriberText: String?,
     val description: String?,
     val subscribed: Boolean? = null,
+    val badge: ChannelBadge = ChannelBadge.None,
 ) : FeedItem
 
 data class Page<T>(
@@ -120,6 +126,7 @@ data class ChannelRef(
     val avatar: String?,
     val subscriberText: String?,
     val subscribed: Boolean?,
+    val badge: ChannelBadge = ChannelBadge.None,
 )
 
 enum class LikeStatus { Like, Indifferent, Dislike }

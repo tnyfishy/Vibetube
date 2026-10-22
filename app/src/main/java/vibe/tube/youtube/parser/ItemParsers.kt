@@ -2,6 +2,7 @@ package vibe.tube.youtube.parser
 
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import vibe.tube.youtube.model.ChannelBadge
 import vibe.tube.youtube.model.ChannelItem
 import vibe.tube.youtube.model.FeedItem
 import vibe.tube.youtube.model.PlaylistItem
@@ -10,6 +11,16 @@ import vibe.tube.youtube.model.VideoAvailability
 import vibe.tube.youtube.model.VideoItem
 
 object ItemParsers {
+    /** Reads the verified / official-artist marker out of the badge-carrying part of a renderer. */
+    fun badgeOf(node: JsonElement?): ChannelBadge {
+        val s = node?.toString() ?: return ChannelBadge.None
+        return when {
+            "BADGE_STYLE_TYPE_VERIFIED_ARTIST" in s || "OFFICIAL_ARTIST_BADGE" in s || "AUDIO_BADGE" in s -> ChannelBadge.Artist
+            "BADGE_STYLE_TYPE_VERIFIED" in s || "CHECK_CIRCLE_THICK" in s || "CHECK_CIRCLE_FILLED" in s -> ChannelBadge.Verified
+            else -> ChannelBadge.None
+        }
+    }
+
 
     val itemKeys = setOf(
         "videoRenderer",
@@ -131,6 +142,7 @@ object ItemParsers {
             setVideoId = node.at("setVideoId").str,
             availability = availability,
             playlistIndex = node.at("index").textOf()?.toIntOrNull(),
+            channelBadge = badgeOf(node.at("ownerBadges")),
         )
     }
 
@@ -180,6 +192,7 @@ object ItemParsers {
                     isLive = live,
                     watchedPercent = progress,
                     setVideoId = node.firstString("setVideoId"),
+                    channelBadge = badgeOf(rows.getOrNull(0)),
                 )
             }
             type.endsWith("_PLAYLIST") || type.endsWith("_PODCAST") || type.endsWith("_MIX") -> {
@@ -257,6 +270,7 @@ object ItemParsers {
             subscriberText = subscribers,
             description = node.at("descriptionSnippet").textOf(),
             subscribed = node.at("subscriptionButton").at("subscribed").bool,
+            badge = badgeOf(node.at("ownerBadges")),
         )
     }
 

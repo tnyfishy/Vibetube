@@ -105,6 +105,7 @@ fun MiniPlayer(controller: PlayerController, modifier: Modifier = Modifier, enab
                         if (state.isPlaying) VIcon.Pause else VIcon.PlayArrowFilled,
                         stringResource(if (state.isPlaying) R.string.action_pause else R.string.action_play),
                         controller::togglePlay,
+                        animateIcon = true,
                     )
                     TooltipIconButton(VIcon.Close, stringResource(R.string.action_close_player), controller::dismiss)
                 }
