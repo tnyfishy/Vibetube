@@ -133,7 +133,7 @@ fun VideoSurface(
     ) {
         AndroidView(
             factory = { ctx ->
-                PlayerView(ctx).apply {
+                (android.view.LayoutInflater.from(ctx).inflate(R.layout.vibe_player_view, null) as PlayerView).apply {
                     useController = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -145,11 +145,11 @@ fun VideoSurface(
             modifier = Modifier.fillMaxSize(),
         )
         val busy = state.phase == PlayerPhase.Resolving || state.phase == PlayerPhase.Buffering
-        if (busy && state.error == null) {
+        if (busy && state.error == null && showControls) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator() }
         }
         val error = state.error
-        if (state.phase == PlayerPhase.Error && error != null) {
+        if (state.phase == PlayerPhase.Error && error != null && showControls) {
             val (title, body) = failureText(error.failure)
             Column(
                 Modifier
@@ -177,7 +177,7 @@ fun VideoSurface(
                 }
             }
         }
-        if (!state.inPip) {
+        if (!state.inPip && showControls) {
             AnimatedVisibility(
                 visible = controlsVisible && state.phase != PlayerPhase.Error,
                 enter = fadeIn(VibeMotion.fastEffects()),

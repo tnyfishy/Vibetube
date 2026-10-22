@@ -49,9 +49,9 @@ import vibe.tube.ui.theme.VibeShape
 import vibe.tube.youtube.model.bestFor
 
 @Composable
-fun MiniPlayer(controller: PlayerController, modifier: Modifier = Modifier) {
+fun MiniPlayer(controller: PlayerController, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val state by controller.state.collectAsStateWithLifecycle()
-    val show = state.visible && !state.expanded && state.current != null && !state.inPip
+    val show = enabled && state.visible && !state.expanded && state.current != null && !state.inPip
     var drag by remember { mutableFloatStateOf(0f) }
     AnimatedVisibility(
         visible = show,

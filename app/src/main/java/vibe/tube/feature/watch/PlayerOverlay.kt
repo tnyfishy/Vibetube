@@ -1,5 +1,6 @@
 package vibe.tube.feature.watch
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.fadeIn
@@ -82,6 +83,10 @@ import vibe.tube.youtube.model.PlaylistItem
 import vibe.tube.youtube.model.VideoItem
 import kotlin.math.roundToInt
 
+/** Wide windows, landscape phones, fullscreen and picture-in-picture keep the classic page + mini bar. */
+fun usesClassicPlayer(state: PlayerUiState, widthDp: Int, heightDp: Int): Boolean =
+    state.fullscreen || state.inPip || widthDp >= 840 || (heightDp < 480 && widthDp > heightDp)
+
 @Composable
 fun PlayerOverlay(
     player: Player,
@@ -89,10 +94,19 @@ fun PlayerOverlay(
     watch: WatchViewModel,
     onLogin: () -> Unit,
     onEnterPip: (() -> Unit)?,
+    contentBottomPx: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
+    val config = LocalConfiguration.current
     val expanded = state.visible && state.expanded
+    if (!usesClassicPlayer(state, config.screenWidthDp, config.screenHeightDp)) {
+        MorphPlayer(player, controller, watch, state, onLogin, onEnterPip, contentBottomPx, modifier)
+        return
+    }
+    BackHandler(enabled = expanded) {
+        if (state.fullscreen) controller.setFullscreen(false) else controller.collapse()
+    }
     AnimatedVisibility(
         visible = expanded,
         enter = slideInVertically(VibeMotion.spatial()) { it } + fadeIn(VibeMotion.effects()),
@@ -224,7 +238,7 @@ private fun ActionRow(
 }
 
 @Composable
-private fun Details(
+internal fun Details(
     ui: WatchUiState,
     state: PlayerUiState,
     controller: PlayerController,

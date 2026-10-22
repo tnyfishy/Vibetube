@@ -14,6 +14,9 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.composed
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import kotlin.math.roundToInt
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -180,6 +183,9 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
         adaptive.windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXTRA_LARGE_LOWER_BOUND) -> NavigationSuiteType.NavigationDrawer
         else -> NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptive)
     }
+    val windowConfig = androidx.compose.ui.platform.LocalConfiguration.current
+    val classicPlayer = vibe.tube.feature.watch.usesClassicPlayer(playerState, windowConfig.screenWidthDp, windowConfig.screenHeightDp)
+    var contentBottomPx by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val miniVisible = playerState.visible && !playerState.expanded && !playerState.inPip
     val miniPadding = if (miniVisible) Sizing.miniPlayerHeight + 16.dp else 0.dp
 
@@ -202,6 +208,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                 Box(
                     Modifier
                         .fillMaxSize()
+                        .onGloballyPositioned { contentBottomPx = (it.positionInRoot().y + it.size.height).roundToInt() }
                         .tabSwipe(enabled = currentTab >= 0 && !(playerState.visible && playerState.expanded)) { direction ->
                             tabs.getOrNull(currentTab + direction)?.let(goToTab)
                         },
@@ -209,7 +216,8 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                     AppNavHost(nav, appViewModel, avatarUrl)
                     MiniPlayer(
                         controller,
-                        Modifier
+                        enabled = classicPlayer,
+                        modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .then(if (showNav) Modifier else Modifier.windowInsetsPadding(WindowInsets.navigationBars)),
                     )
@@ -228,6 +236,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                 watch = watchViewModel,
                 onLogin = { controller.collapse(); nav.navigate(LoginRoute) },
                 onEnterPip = if (settings.pictureInPicture) onEnterPip else null,
+                contentBottomPx = contentBottomPx,
             )
             if (playerState.expanded && playerState.visible) {
                 Box(Modifier.align(Alignment.BottomCenter)) {
