@@ -33,7 +33,7 @@ val LocalVideoActions = staticCompositionLocalOf<VideoActions> { NoOpVideoAction
 
 data class MenuEntry(val label: String, val icon: Int, val onClick: () -> Unit)
 
-val LocalMiniPlayerPadding = staticCompositionLocalOf { androidx.compose.ui.unit.Dp.Hairline }
+val LocalMiniPlayerPadding = androidx.compose.runtime.compositionLocalOf { androidx.compose.ui.unit.Dp.Hairline }
 
 val LocalQueueMode = staticCompositionLocalOf { false }
 

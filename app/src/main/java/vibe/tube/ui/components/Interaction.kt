@@ -18,6 +18,7 @@ import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -44,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -158,6 +160,7 @@ fun SearchPill(
     visibilityScope: AnimatedVisibilityScope? = null,
     expansion: Animatable<Float, AnimationVector1D>? = null,
     expandDistance: () -> Float = { 0f },
+    expandEndDistance: () -> Float = { 0f },
 ) {
     val source = remember { MutableInteractionSource() }
     val reduced = LocalReducedMotion.current
@@ -166,13 +169,16 @@ fun SearchPill(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = modifier
+            .zIndex(1f)
             .layout { measurable, constraints ->
-                val extra = ((expansion?.value ?: 0f) * expandDistance()).roundToInt().coerceAtLeast(0)
-                val width = constraints.maxWidth + extra
+                val t = expansion?.value ?: 0f
+                val extra = (t * expandDistance()).roundToInt().coerceAtLeast(0)
+                val extraEnd = (t * expandEndDistance()).roundToInt().coerceAtLeast(0)
+                val width = constraints.maxWidth + extra + extraEnd
                 val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
                 layout(constraints.maxWidth, placeable.height) { placeable.place(-extra, 0) }
             }
-            .height(48.dp)
+            .height(56.dp)
             .clip(CircleShape)
             .clickable(interactionSource = source, indication = null) {
                 scope.launch {
@@ -210,10 +216,22 @@ fun SearchHeaderRow(
     visibilityScope: AnimatedVisibilityScope? = null,
     trailing: @Composable () -> Unit = {},
 ) {
-    val expansion = remember { Animatable(0f) }
+    // True while the search screen is open above this page; on the way back the pill collapses and the heading fades in.
+    var returning by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val expansion = remember { Animatable(if (returning) 1f else 0f) }
+    LaunchedEffect(Unit) {
+        if (returning) {
+            returning = false
+            expansion.animateTo(0f, tween(340, easing = EmphasizedDecelerate))
+        }
+    }
     var titleWidth by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-    val gap = with(androidx.compose.ui.platform.LocalDensity.current) { Spacing.md.toPx() }
-    val fade = with(androidx.compose.ui.platform.LocalDensity.current) { 36.dp.toPx() }
+    var trailingWidth by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val gap = with(density) { Spacing.md.toPx() }
+    val fade = with(density) { 36.dp.toPx() }
+    // The search screen's back button occupies the first 52dp of its header, so the pill stops there.
+    val searchFieldStart = with(density) { (Spacing.xs + 48.dp - Spacing.lg).toPx() }
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
         Text(
             title,
@@ -221,10 +239,13 @@ fun SearchHeaderRow(
             maxLines = 1,
             modifier = Modifier
                 .onSizeChanged { titleWidth = it.width }
-                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .graphicsLayer {
+                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                    alpha = 1f - expansion.value
+                }
                 .drawWithContent {
                     drawContent()
-                    val edge = titleWidth + gap - expansion.value * (titleWidth + gap)
+                    val edge = titleWidth + gap - expansion.value * (titleWidth + gap - searchFieldStart)
                     if (expansion.value > 0f) {
                         drawRect(
                             brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
@@ -238,13 +259,18 @@ fun SearchHeaderRow(
                 },
         )
         SearchPill(
-            onClick = onSearch,
+            onClick = { returning = true; onSearch() },
             modifier = Modifier.weight(1f),
             visibilityScope = visibilityScope,
             expansion = expansion,
-            expandDistance = { titleWidth + gap },
+            expandDistance = { titleWidth + gap - searchFieldStart },
+            expandEndDistance = { trailingWidth + gap },
         )
-        trailing()
+        Box(
+            Modifier
+                .onSizeChanged { trailingWidth = it.width }
+                .graphicsLayer { alpha = 1f - expansion.value },
+        ) { trailing() }
     }
 }
 

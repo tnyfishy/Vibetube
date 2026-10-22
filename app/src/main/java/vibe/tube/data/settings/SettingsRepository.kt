@@ -41,6 +41,7 @@ class SettingsRepository(
         return AppSettings(
             themeMode = enumOr(this[THEME], d.themeMode),
             dynamicColor = this[DYNAMIC] ?: d.dynamicColor,
+            palette = enumOr(this[PALETTE], d.palette),
             font = enumOr(this[FONT], d.font),
             fontWeightOffset = this[FONT_WEIGHT] ?: d.fontWeightOffset,
             fontWidth = this[FONT_WIDTH] ?: d.fontWidth,
@@ -67,6 +68,7 @@ class SettingsRepository(
     private fun androidx.datastore.preferences.core.MutablePreferences.write(s: AppSettings) {
         this[THEME] = s.themeMode.name
         this[DYNAMIC] = s.dynamicColor
+        this[PALETTE] = s.palette.name
         this[FONT] = s.font.name
         this[FONT_WEIGHT] = s.fontWeightOffset
         this[FONT_WIDTH] = s.fontWidth
@@ -95,6 +97,7 @@ class SettingsRepository(
     companion object {
         private val THEME = stringPreferencesKey("theme_mode")
         private val DYNAMIC = booleanPreferencesKey("dynamic_color")
+        private val PALETTE = stringPreferencesKey("palette")
         private val FONT = stringPreferencesKey("font_family")
         private val FONT_WEIGHT = intPreferencesKey("font_weight_offset")
         private val FONT_WIDTH = intPreferencesKey("font_width")

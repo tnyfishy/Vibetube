@@ -74,19 +74,12 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.xs, bottom = Spacing.sm),
                     visibilityScope = visibilityScope,
                 ) {
-                    if (auth is AuthState.Guest) {
-                        TooltipIconButton(VIcon.Login, stringResource(R.string.action_sign_in), onLogin)
-                    } else {
-                        androidx.compose.foundation.layout.Box(
-                            Modifier
-                                .size(44.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = stringResource(R.string.nav_account), onClick = onAccount),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Avatar(avatarUrl, 36.dp, description = stringResource(R.string.nav_account))
-                        }
-                    }
+                    val guest = auth is AuthState.Guest
+                    TooltipIconButton(
+                        VIcon.Person,
+                        stringResource(if (guest) R.string.action_sign_in else R.string.nav_account),
+                        if (guest) onLogin else onAccount,
+                    )
                 }
             }
         },

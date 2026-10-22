@@ -97,7 +97,6 @@ internal fun MorphPlayer(
     player: Player,
     controller: PlayerController,
     watch: WatchViewModel,
-    state: PlayerUiState,
     onLogin: () -> Unit,
     onEnterPip: (() -> Unit)?,
     contentBottomPx: Int,
@@ -105,11 +104,20 @@ internal fun MorphPlayer(
 ) {
     val ui by watch.state.collectAsStateWithLifecycle()
     val auth by watch.authState.collectAsStateWithLifecycle()
+    // The full state ticks with the playback position several times a second. Nothing structural may read it directly,
+    // otherwise the whole card (and the lists in it) would recompose while it morphs; each piece below reads a derived
+    // value that only changes when that piece actually has something new to show.
+    val stateHolder = controller.state.collectAsStateWithLifecycle()
+    val visible by remember { derivedStateOf { stateHolder.value.visible } }
+    val expanded by remember { derivedStateOf { stateHolder.value.expanded } }
+    val isPlaying by remember { derivedStateOf { stateHolder.value.isPlaying } }
+    val current by remember { derivedStateOf { stateHolder.value.current } }
+    val detailState by remember { derivedStateOf { stateHolder.value.copy(positionMs = 0, bufferedMs = 0) } }
     var options by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
 
-    val progress = remember { Animatable(if (state.visible && state.expanded) 1f else 0f).apply { updateBounds(0f, 1f) } }
+    val progress = remember { Animatable(if (visible && expanded) 1f else 0f).apply { updateBounds(0f, 1f) } }
     val deviceCorner = with(density) { vibe.tube.ui.rememberDeviceCornerRadius().toPx() }
     val dismiss = remember { Animatable(0f) }
     // Swipe-up-to-fullscreen: the video follows the finger and fades; negative while pulled up.
@@ -121,20 +129,20 @@ internal fun MorphPlayer(
     // True while a finger is dragging the card: the node that owns the gesture must stay composed until it ends.
     var dragging by remember { mutableStateOf(false) }
 
-    val target = if (state.visible && state.expanded) 1f else 0f
+    val target = if (visible && expanded) 1f else 0f
     LaunchedEffect(target) {
         val velocity = pendingVelocity
         pendingVelocity = 0f
         progress.animateTo(target, MORPH_SPEC, initialVelocity = velocity)
     }
-    LaunchedEffect(state.visible) {
-        if (!state.visible) {
+    LaunchedEffect(visible) {
+        if (!visible) {
             progress.snapTo(0f)
             dismiss.snapTo(0f)
         }
     }
 
-    PredictiveBackHandler(enabled = state.visible && state.expanded) { events ->
+    PredictiveBackHandler(enabled = visible && expanded) { events ->
         try {
             events.collect { event -> progress.snapTo(1f - event.progress * 0.9f) }
             controller.collapse()
@@ -168,7 +176,7 @@ internal fun MorphPlayer(
 
         var pageComposed by remember { mutableStateOf(false) }
         val opened by remember { derivedStateOf { progress.value > 0.05f } }
-        LaunchedEffect(opened, state.visible) { pageComposed = opened || (pageComposed && state.visible) }
+        LaunchedEffect(opened, visible) { pageComposed = opened || (pageComposed && visible) }
         val showPage = pageComposed
         val miniish by remember { derivedStateOf { progress.value < 0.35f } }
         val controlsOn by remember { derivedStateOf { progress.value > 0.92f } }
@@ -181,7 +189,7 @@ internal fun MorphPlayer(
         val dragState = rememberDraggableState { delta ->
             // UNDISPATCHED: apply the delta in this very frame instead of queueing a coroutine per touch event.
             scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
-                if (progress.value >= 0.999f && !state.fullscreen && (delta < 0f || fsOffset.value < 0f)) {
+                if (progress.value >= 0.999f && !stateHolder.value.fullscreen && (delta < 0f || fsOffset.value < 0f)) {
                     fsOffset.snapTo((fsOffset.value + delta).coerceIn(-fsRange, 0f))
                 } else if (progress.value <= 0.002f && (delta > 0f || dismiss.value > 0f)) {
                     dismiss.snapTo((dismiss.value + delta).coerceAtLeast(0f))
@@ -221,7 +229,7 @@ internal fun MorphPlayer(
                             else -> progress.value > 0.5f
                         }
                         val v = -velocity / dragRange
-                        if (goExpanded == state.expanded) {
+                        if (goExpanded == stateHolder.value.expanded) {
                             progress.animateTo(if (goExpanded) 1f else 0f, MORPH_SPEC, initialVelocity = v)
                         } else {
                             pendingVelocity = v
@@ -235,7 +243,7 @@ internal fun MorphPlayer(
             },
         )
 
-        if (!state.visible) return@BoxWithConstraints
+        if (!visible) return@BoxWithConstraints
 
         val cardColor = MaterialTheme.colorScheme.surfaceContainerHigh
         val pageColor = MaterialTheme.colorScheme.surface
@@ -268,10 +276,10 @@ internal fun MorphPlayer(
                     Column(
                         Modifier
                             .fixedTopStart(wPx.roundToInt(), hPx.roundToInt())
-                            .graphicsLayer { alpha = ((p() - 0.55f) / 0.45f).coerceIn(0f, 1f) },
+                            .graphicsLayer { alpha = ((p() - 0.55f) / 0.45f).coerceIn(0f, 1f); compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha },
                     ) {
                         Spacer(Modifier.height(with(density) { (topInsetPx + videoH).toDp() }))
-                        Details(ui, state, controller, watch, auth, onLogin, includeTabs = true, modifier = Modifier.weight(1f))
+                        Details(ui, detailState, controller, watch, auth, onLogin, includeTabs = true, modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -296,12 +304,14 @@ internal fun MorphPlayer(
                         alpha = (1f + fsOffset.value / fsRange).coerceIn(0f, 1f)
                     },
             ) {
+                // Position only matters to the controls; while they are hidden the surface sees a state that does not tick.
+                val surfaceState by remember { derivedStateOf { if (controlsOn) stateHolder.value else detailState } }
                 VideoSurface(
                     player = player,
-                    state = state,
+                    state = surfaceState,
                     showControls = controlsOn,
                     onCollapse = controller::collapse,
-                    onToggleFullscreen = { controller.setFullscreen(!state.fullscreen) },
+                    onToggleFullscreen = { controller.setFullscreen(!stateHolder.value.fullscreen) },
                     onOptions = { options = true },
                     onPip = onEnterPip,
                     onTogglePlay = controller::togglePlay,
@@ -317,9 +327,8 @@ internal fun MorphPlayer(
             }
             // Playback progress rides along the bottom of the thumbnail while minimized.
             if (miniish) {
-                val fraction = if (state.durationMs > 0) (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f
                 val miniAmpAnim = remember { Animatable(0f) }
-                val miniFlat = !state.isPlaying || state.phase != vibe.tube.player.PlayerPhase.Ready
+                val miniFlat by remember { derivedStateOf { !stateHolder.value.isPlaying || stateHolder.value.phase != vibe.tube.player.PlayerPhase.Ready } }
                 LaunchedEffect(miniFlat) { if (miniFlat) miniAmpAnim.snapTo(0f) else miniAmpAnim.animateTo(1f, tween(900)) }
                 Box(
                     Modifier
@@ -329,12 +338,12 @@ internal fun MorphPlayer(
                             w = { lerpF(thumbW, wPx, p()) },
                             h = { lerpF(thumbH, videoH, p()) },
                         )
-                        .graphicsLayer { alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f) },
+                        .graphicsLayer { alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f); compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha },
                 ) {
                     vibe.tube.ui.components.WavyProgress(
-                        progress = { fraction },
+                        progress = { stateHolder.value.let { if (it.durationMs > 0) (it.positionMs.toFloat() / it.durationMs).coerceIn(0f, 1f) else 0f } },
                         amplitude = { miniAmpAnim.value },
-                        animate = state.isPlaying,
+                        animate = isPlaying,
                         modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(10.dp),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.35f),
@@ -353,7 +362,7 @@ internal fun MorphPlayer(
                         .then(dragModifier)
                         .clickable(role = Role.Button, onClickLabel = stringResource(R.string.action_expand_player)) { controller.expand() },
                 )
-                val video = state.current
+                val video = current
                 Row(
                     Modifier
                         .placedRect(
@@ -362,7 +371,7 @@ internal fun MorphPlayer(
                             w = { wPx - 2f * sidePx - (sidePx + thumbW + with(density) { 12.dp.toPx() } + sidePx) },
                             h = { miniHPx },
                         )
-                        .graphicsLayer { alpha = ((0.3f - t()) / 0.3f).coerceIn(0f, 1f) },
+                        .graphicsLayer { alpha = ((0.3f - t()) / 0.3f).coerceIn(0f, 1f); compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -372,14 +381,19 @@ internal fun MorphPlayer(
                         }
                     }
                     TooltipIconButton(
-                        if (state.isPlaying) VIcon.Pause else VIcon.PlayArrowFilled,
-                        stringResource(if (state.isPlaying) R.string.action_pause else R.string.action_play),
+                        if (isPlaying) VIcon.Pause else VIcon.PlayArrowFilled,
+                        stringResource(if (isPlaying) R.string.action_pause else R.string.action_play),
                         controller::togglePlay,
                     )
                     TooltipIconButton(VIcon.Close, stringResource(R.string.action_close_player), { scope.launch { fadeOutAndDismiss() } })
                 }
             }
         }
-        if (options) PlayerOptionsSheet(state, controller) { options = false }
+        if (options) OptionsHost(stateHolder, controller) { options = false }
     }
+}
+
+@Composable
+private fun OptionsHost(state: androidx.compose.runtime.State<PlayerUiState>, controller: PlayerController, onDismiss: () -> Unit) {
+    PlayerOptionsSheet(state.value, controller, onDismiss)
 }

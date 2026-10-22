@@ -78,6 +78,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -90,6 +91,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.window.core.layout.WindowSizeClass
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import vibe.tube.BuildConfig
 import vibe.tube.R
@@ -151,7 +154,10 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     val nav = rememberNavController()
     val context = LocalContext.current
     val controller = appViewModel.playerController
-    val playerState by controller.state.collectAsStateWithLifecycle()
+    // Only these flags matter here. The raw state also changes with every playback-position tick, which would
+    // recompose this whole screen several times a second (and hitch the player card while it morphs).
+    val playerState by remember { controller.state.map { PlayerFlags(it.visible, it.expanded, it.fullscreen, it.inPip) }.distinctUntilChanged() }
+        .collectAsStateWithLifecycle(initialValue = PlayerFlags())
     val settings by appViewModel.settings.collectAsStateWithLifecycle()
     val avatarUrl by appViewModel.avatarUrl.collectAsStateWithLifecycle()
     val saveTarget by appViewModel.events.saveTarget.collectAsStateWithLifecycle()
@@ -230,9 +236,11 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
         else -> NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(adaptive)
     }
     val windowConfig = androidx.compose.ui.platform.LocalConfiguration.current
-    val classicPlayer = vibe.tube.feature.watch.usesClassicPlayer(playerState, windowConfig.screenWidthDp, windowConfig.screenHeightDp)
+    val classicPlayer = vibe.tube.feature.watch.usesClassicPlayer(playerState.fullscreen, playerState.inPip, windowConfig.screenWidthDp, windowConfig.screenHeightDp)
     var contentBottomPx by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
-    val miniVisible = playerState.visible && !playerState.expanded && !playerState.inPip
+    // Reserved for as long as the player exists (expanded or not), so expanding/collapsing never changes the padding of
+    // every list underneath in the middle of the morph animation.
+    val miniVisible = playerState.visible && !playerState.inPip
     val miniPadding = if (miniVisible) Sizing.miniPlayerHeight + 16.dp else 0.dp
 
     val hiddenIds = remember(settings.hiddenChannels)  { settings.hiddenChannelIds }
@@ -329,13 +337,15 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center,
                                     ) {
-                                        val pill by androidx.compose.animation.animateColorAsState(
-                                            if (selected) MaterialTheme.colorScheme.secondaryContainer else androidx.compose.ui.graphics.Color.Transparent,
+                                        val pillAlpha by androidx.compose.animation.core.animateFloatAsState(
+                                            if (selected) 1f else 0f,
                                             androidx.compose.animation.core.tween(200),
                                             label = "navPill",
                                         )
+                                        val pillColor = MaterialTheme.colorScheme.secondaryContainer
                                         Box(
-                                            Modifier.size(width = 56.dp, height = 30.dp).background(pill, androidx.compose.foundation.shape.CircleShape),
+                                            Modifier.size(width = 56.dp, height = 30.dp)
+                                                .drawBehind { drawRoundRect(pillColor.copy(alpha = pillColor.alpha * pillAlpha), cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)) },
                                             contentAlignment = Alignment.Center,
                                         ) { VIconImage(if (selected) tab.iconSelected else tab.icon, null, Modifier.size(22.dp)) }
                                         Spacer(Modifier.height(2.dp))
@@ -417,8 +427,7 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
         val from = tabIndex(initial)
         val to = tabIndex(target)
         return when {
-            isSearch(target) -> fadeIn(tween(180, easing = LinearOutSlowInEasing))
-            isSearch(initial) -> EnterTransition.None
+            isSearch(target) || isSearch(initial) -> EnterTransition.None
             from >= 0 && to >= 0 -> {
                 val dir = if (to > from) 1 else -1
                 slideInHorizontally(enterSpec) { dir * it / 4 } + fadeIn(fadeInSpec)
@@ -433,8 +442,7 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
         val from = tabIndex(initial)
         val to = tabIndex(target)
         return when {
-            isSearch(initial) -> fadeOut(tween(180, easing = LinearEasing))
-            isSearch(target) -> ExitTransition.None
+            isSearch(initial) || isSearch(target) -> ExitTransition.None
             from >= 0 && to >= 0 -> {
                 val dir = if (to > from) 1 else -1
                 slideOutHorizontally(exitSpec) { -dir * it / 4 } + fadeOut(fadeOutSpec)
@@ -590,3 +598,11 @@ private fun PlayerOverlayHost(
     // The lambda is read here, so only this host recomposes while the bottom bar slides.
     PlayerOverlay(player = player, controller = controller, watch = watch, onLogin = onLogin, onEnterPip = onEnterPip, contentBottomPx = contentBottom())
 }
+
+/** The few player facts the app shell reacts to; unlike the full state it does not change while playing. */
+private data class PlayerFlags(
+    val visible: Boolean = false,
+    val expanded: Boolean = false,
+    val fullscreen: Boolean = false,
+    val inPip: Boolean = false,
+)

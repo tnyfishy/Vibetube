@@ -43,14 +43,13 @@ fun resolveDark(mode: ThemeMode, systemDark: Boolean): Boolean = when (mode) {
 }
 
 @Composable
-fun vibeColorScheme(mode: ThemeMode, dynamicColor: Boolean, systemDark: Boolean): ColorScheme {
+fun vibeColorScheme(mode: ThemeMode, dynamicColor: Boolean, systemDark: Boolean, palette: AppPalette = AppPalette.Vibe): ColorScheme {
     val dark = resolveDark(mode, systemDark)
     val context = LocalContext.current
     val base = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
             if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        dark -> VibeDarkColorScheme
-        else -> VibeLightColorScheme
+        else -> paletteScheme(palette, dark)
     }
     return if (mode == ThemeMode.Amoled) base.toAmoled() else base
 }
@@ -59,13 +58,14 @@ fun vibeColorScheme(mode: ThemeMode, dynamicColor: Boolean, systemDark: Boolean)
 fun VibetubeTheme(
     themeMode: ThemeMode,
     dynamicColor: Boolean,
+    palette: AppPalette = AppPalette.Vibe,
     fontStyle: FontStyleSettings = FontStyleSettings(),
     content: @Composable () -> Unit,
 ) {
     val typography = remember(fontStyle) { buildTypography(fontStyle) }
     val systemDark = isSystemInDarkTheme()
     val dark = resolveDark(themeMode, systemDark)
-    val scheme = vibeColorScheme(themeMode, dynamicColor, systemDark)
+    val scheme = vibeColorScheme(themeMode, dynamicColor, systemDark, palette)
     val context = LocalContext.current
     val reduced = remember { isReducedMotion(context) }
     val view = LocalView.current

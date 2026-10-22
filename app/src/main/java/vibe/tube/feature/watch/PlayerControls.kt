@@ -25,7 +25,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -187,8 +187,14 @@ fun VideoSurface(
             }
         }
         val busy = state.phase == PlayerPhase.Resolving || state.phase == PlayerPhase.Buffering
-        if (busy && state.error == null && showControls) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { ContainedLoadingIndicator() }
+        if (busy && state.error == null) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularWavyProgressIndicator(
+                    modifier = Modifier.size(52.dp),
+                    color = androidx.compose.ui.graphics.Color.White,
+                    trackColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.25f),
+                )
+            }
         }
         val error = state.error
         if (state.phase == PlayerPhase.Error && error != null && showControls) {

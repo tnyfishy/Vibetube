@@ -2,6 +2,12 @@ package vibe.tube.feature.search
 
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.State
+import androidx.compose.foundation.background
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.EnterExitState
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -106,29 +112,37 @@ fun SearchScreen(
     // Open the keyboard only once the pill has finished expanding into the screen.
     LaunchedEffect(Unit) {
         if (ui.submitted == null) {
-            delay(380)
+            delay(160)
             runCatching { focus.requestFocus() }
         }
     }
 
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier.fillMaxSize().searchBounds(visibilityScope),
-    ) {
+    // The header (pill / field) stays solid for the whole transition, so it never blinks. Only the body fades:
+    // in when opening, out when leaving. On the way out the header is dropped at once so the home pill underneath
+    // (already expanded) can collapse back; a predictive-back drag keeps it so the page moves as one piece.
+    val transition = visibilityScope?.transition
+    val bodyAlpha: State<Float> = if (transition != null) {
+        transition.animateFloat(transitionSpec = { tween(220) }, label = "searchBody") { if (it == EnterExitState.Visible) 1f else 0f }
+    } else {
+        remember { mutableStateOf(1f) }
+    }
+    val leaving = transition != null && transition.targetState == EnterExitState.PostExit && !transition.isSeeking
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
         contentWindowInsets = WindowInsets(0),
         topBar = {
+            Box(Modifier.graphicsLayer { alpha = if (leaving) 0f else 1f }) {
             HeaderSurface(scrolled) {
                 Row(
-                    Modifier.fillMaxWidth().padding(start = Spacing.xs, end = Spacing.lg, top = Spacing.xs, bottom = Spacing.xs).staggeredReveal(0),
+                    Modifier.fillMaxWidth().padding(start = Spacing.xs, end = Spacing.sm, top = Spacing.xs, bottom = Spacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TooltipIconButton(VIcon.ArrowBack, stringResource(R.string.action_back), onBack)
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        modifier = Modifier.weight(1f).height(52.dp),
+                        modifier = Modifier.weight(1f).height(56.dp),
                     ) {
                         SearchBarDefaults.InputField(
                             query = ui.input,
@@ -193,9 +207,11 @@ fun SearchScreen(
                     }
                 }
             }
+            }
         },
     ) { inner ->
         val state = results
+        Box(Modifier.fillMaxSize().graphicsLayer { alpha = bodyAlpha.value }.background(MaterialTheme.colorScheme.surface)) {
         if (ui.submitted != null && state != null) {
             FeedContent(
                 state = state,
@@ -248,6 +264,7 @@ fun SearchScreen(
                     }
                 }
             }
+        }
         }
     }
     }

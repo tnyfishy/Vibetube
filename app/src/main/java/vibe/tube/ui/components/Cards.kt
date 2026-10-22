@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -106,17 +107,22 @@ fun VideoThumbnail(video: VideoItem, modifier: Modifier = Modifier) {
         }
         val watched = video.watchedPercent
         if (watched != null && watched > 0) {
-            androidx.compose.material3.LinearWavyProgressIndicator(
-                progress = { watched / 100f },
-                modifier = Modifier
+            Box(
+                Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 3.dp),
-                trackColor = MediaOverlayColors.scrim,
-                stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
-                trackStroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round),
-                wavelength = 12.dp,
-            )
+                    .padding(horizontal = 6.dp, vertical = 6.dp)
+                    .height(5.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(androidx.compose.ui.graphics.Color.White.copy(alpha = 0.45f)),
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth((watched / 100f).coerceIn(0.02f, 1f))
+                        .background(MaterialTheme.colorScheme.error),
+                )
+            }
         }
     }
 }

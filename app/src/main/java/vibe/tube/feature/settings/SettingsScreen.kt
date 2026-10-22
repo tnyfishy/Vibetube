@@ -130,10 +130,7 @@ fun SettingsScreen(
                 ) { dialog = Dialog.Theme }
             }
             item {
-                SwitchRow(
-                    VIcon.LightMode, R.string.settings_dynamic_color, R.string.settings_dynamic_color_desc,
-                    settings.dynamicColor,
-                ) { v -> viewModel.update { it.copy(dynamicColor = v) } }
+                PalettePicker(settings, onPick = { dyn, pal -> viewModel.update { it.copy(dynamicColor = dyn, palette = pal) } })
             }
             item {
                 SettingRow(

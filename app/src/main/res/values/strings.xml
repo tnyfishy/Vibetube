@@ -338,4 +338,13 @@
         <item quantity="one">%d video</item>
         <item quantity="other">%d videos</item>
     </plurals>
+    <string name="settings_palette">Color scheme</string>
+    <string name="settings_palette_desc">Pick a palette for the whole app</string>
+    <string name="palette_dynamic">Wallpaper</string>
+    <string name="palette_vibe">Vibe</string>
+    <string name="palette_indigo">Indigo</string>
+    <string name="palette_coral">Coral</string>
+    <string name="palette_ocean">Ocean</string>
+    <string name="palette_rose">Rose</string>
+    <string name="palette_violet">Violet</string>
 </resources>

@@ -1,5 +1,11 @@
 package vibe.tube.feature.settings
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -61,12 +67,17 @@ fun FontSheet(settings: AppSettings, onChange: (AppSettings.() -> AppSettings) -
     fun commitSettings() = onChange {
         copy(font = font, fontWeightOffset = weight.roundToInt(), fontWidth = width.roundToInt(), fontRoundness = roundness.roundToInt())
     }
+    // Only the sheet's own preview changes while it is open; the app-wide theme (which recomposes every screen) is
+    // updated once, when the sheet is closed.
     fun commit() {
         applied = FontStyleSettings(font, weight.roundToInt(), width.roundToInt(), roundness.roundToInt())
+    }
+    fun finish() {
         commitSettings()
+        onDismiss()
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    ModalBottomSheet(onDismissRequest = ::finish, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
             Modifier.verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -74,9 +85,16 @@ fun FontSheet(settings: AppSettings, onChange: (AppSettings.() -> AppSettings) -
             Text(stringResource(R.string.settings_font), style = MaterialTheme.typography.titleLarge)
 
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-                Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                    Text(stringResource(R.string.settings_font_preview_title), style = preview.headlineSmall)
-                    Text(stringResource(R.string.settings_font_preview_label), style = preview.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Cross-fade between previews so a change glides instead of snapping.
+                AnimatedContent(
+                    targetState = preview,
+                    transitionSpec = { fadeIn(tween(240)) togetherWith fadeOut(tween(160)) using SizeTransform(clip = false) { _, _ -> tween(240) } },
+                    label = "fontPreview",
+                ) { typography ->
+                    Column(Modifier.padding(Spacing.lg).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        Text(stringResource(R.string.settings_font_preview_title), style = typography.headlineSmall)
+                        Text(stringResource(R.string.settings_font_preview_label), style = typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
 

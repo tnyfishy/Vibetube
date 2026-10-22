@@ -335,4 +335,13 @@
     <plurals name="video_count">
         <item quantity="other">%d video</item>
     </plurals>
+    <string name="settings_palette">Phối màu</string>
+    <string name="settings_palette_desc">Chọn bảng màu cho toàn bộ ứng dụng</string>
+    <string name="palette_dynamic">Hình nền</string>
+    <string name="palette_vibe">Vibe</string>
+    <string name="palette_indigo">Chàm</string>
+    <string name="palette_coral">San hô</string>
+    <string name="palette_ocean">Đại dương</string>
+    <string name="palette_rose">Hồng</string>
+    <string name="palette_violet">Tím</string>
 </resources>

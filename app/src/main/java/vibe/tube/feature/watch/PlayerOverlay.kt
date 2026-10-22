@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import vibe.tube.R
 import vibe.tube.account.AuthState
@@ -87,7 +88,10 @@ import kotlin.math.roundToInt
 
 /** Wide windows, landscape phones, fullscreen and picture-in-picture keep the classic page + mini bar. */
 fun usesClassicPlayer(state: PlayerUiState, widthDp: Int, heightDp: Int): Boolean =
-    state.fullscreen || state.inPip || widthDp >= 840 || (heightDp < 480 && widthDp > heightDp)
+    usesClassicPlayer(state.fullscreen, state.inPip, widthDp, heightDp)
+
+fun usesClassicPlayer(fullscreen: Boolean, inPip: Boolean, widthDp: Int, heightDp: Int): Boolean =
+    fullscreen || inPip || widthDp >= 840 || (heightDp < 480 && widthDp > heightDp)
 
 /** Wall-clock time of the last fullscreen toggle by swipe; the incoming layout fades in when it is recent. */
 internal var fullscreenToggledAt = 0L
@@ -102,13 +106,16 @@ fun PlayerOverlay(
     contentBottomPx: Int = 0,
     modifier: Modifier = Modifier,
 ) {
-    val state by controller.state.collectAsStateWithLifecycle()
     val config = LocalConfiguration.current
-    val expanded = state.visible && state.expanded
-    if (!usesClassicPlayer(state, config.screenWidthDp, config.screenHeightDp)) {
-        MorphPlayer(player, controller, watch, state, onLogin, onEnterPip, contentBottomPx, modifier)
+    // Which layout is used only depends on these two flags; keep this scope from recomposing on every position tick.
+    val layoutFlags by remember { controller.state.map { it.fullscreen to it.inPip }.distinctUntilChanged() }
+        .collectAsStateWithLifecycle(initialValue = false to false)
+    if (!usesClassicPlayer(layoutFlags.first, layoutFlags.second, config.screenWidthDp, config.screenHeightDp)) {
+        MorphPlayer(player, controller, watch, onLogin, onEnterPip, contentBottomPx, modifier)
         return
     }
+    val state by controller.state.collectAsStateWithLifecycle()
+    val expanded = state.visible && state.expanded
     BackHandler(enabled = expanded) {
         if (state.fullscreen) controller.setFullscreen(false) else controller.collapse()
     }

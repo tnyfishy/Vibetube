@@ -74,33 +74,19 @@ class MainActivity : AppCompatActivity() {
         setContent {
             val appViewModel: AppViewModel = hiltViewModel()
             val settings by appViewModel.settings.collectAsStateWithLifecycle()
-            val playerState by controller.state.collectAsStateWithLifecycle()
+            val playerVisible by remember { controller.state.map { it.visible }.distinctUntilChanged() }.collectAsStateWithLifecycle(false)
             val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-            LaunchedEffect(playerState.visible) {
-                if (playerState.visible && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            LaunchedEffect(playerVisible) {
+                if (playerVisible && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                     checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
                 ) {
                     notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
-            LaunchedEffect(playerState.isPlaying) {
-                // Ask once to be exempt from battery optimisation so background playback is not killed.
-                val prefs = getSharedPreferences("app_state", MODE_PRIVATE)
-                val power = getSystemService(android.os.PowerManager::class.java)
-                if (playerState.isPlaying && !prefs.getBoolean("battery_asked", false) && !power.isIgnoringBatteryOptimizations(packageName)) {
-                    prefs.edit().putBoolean("battery_asked", true).apply()
-                    runCatching {
-                        startActivity(
-                            android.content.Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                                .setData(android.net.Uri.parse("package:$packageName")),
-                        )
-                    }
-                }
-            }
             val fontStyle = remember(settings.font, settings.fontWeightOffset, settings.fontWidth, settings.fontRoundness) {
                 FontStyleSettings(settings.font, settings.fontWeightOffset, settings.fontWidth, settings.fontRoundness)
             }
-            VibetubeTheme(themeMode = settings.themeMode, dynamicColor = settings.dynamicColor, fontStyle = fontStyle) {
+            VibetubeTheme(themeMode = settings.themeMode, dynamicColor = settings.dynamicColor, palette = settings.palette, fontStyle = fontStyle) {
                 AppRoot(onEnterPip = if (supportsPip()) ::enterPip else null)
             }
         }
