@@ -228,7 +228,13 @@ class InnerTubeProviderTest {
 
     @Test
     fun verifyRejectsGuestMenuEvenWithCookiesPresent() = runBlocking {
-        enqueueJson(Fixtures.text("account_menu_guest.json"))
+        val guestJson = Fixtures.text("account_menu_guest.json")
+        server.dispatcher = object : mockwebserver3.Dispatcher() {
+            override fun dispatch(request: mockwebserver3.RecordedRequest): MockResponse {
+                val body = if (request.url.encodedPath.endsWith("account_menu")) guestJson else "{}"
+                return MockResponse.Builder().code(200).addHeader("Content-Type", "application/json").body(body).build()
+            }
+        }
         val session = AccountSession("s1", "Looks Legit", "@legit", "https://x/y.jpg", cookies = jar().snapshot(), createdAt = 0)
         assertEquals(VerifyResult.LoggedOut, provider.verify(session, locale))
     }
