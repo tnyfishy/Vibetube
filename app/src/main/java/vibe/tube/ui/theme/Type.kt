@@ -26,8 +26,6 @@ object GoogleSansFlex {
         val w = weight.coerceIn(MIN_WEIGHT, MAX_WEIGHT)
         val opsz = opticalSize.coerceIn(MIN_OPSZ, MAX_OPSZ)
         return FontVariation.Settings(
-            FontWeight(w),
-            FontStyle.Normal,
             FontVariation.weight(w),
             FontVariation.width(WIDTH_DEFAULT),
             FontVariation.Setting("opsz", opsz),

@@ -99,6 +99,11 @@ kotlin {
     }
 }
 
+tasks.withType<Test>().configureEach {
+    System.getenv("ROBOLECTRIC_DEPENDENCY_REPO_URL")?.let { systemProperty("robolectric.dependency.repo.url", it) }
+    maxHeapSize = "2g"
+}
+
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
     arg("room.generateKotlin", "true")
