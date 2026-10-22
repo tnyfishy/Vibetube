@@ -106,7 +106,7 @@ fun HomeScreen(
             onLogin = onLogin,
             gridState = gridState,
             contentPadding = PaddingValues(top = inner.calculateTopPadding(), bottom = contentPadding.calculateBottomPadding()),
-            guestBanner = state.guest,
+            guestBanner = false,
         ) { item, queue -> FeedItemContent(item, queue) }
     }
 }

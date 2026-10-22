@@ -39,6 +39,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalFontFamilyResolver
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,20 +74,42 @@ fun FontSheet(settings: AppSettings, onChange: (AppSettings.() -> AppSettings) -
     var applied by remember { mutableStateOf(FontStyleSettings(settings.font, settings.fontWeightOffset, settings.fontWidth, settings.fontRoundness)) }
     val preview = remember(applied) { buildTypography(applied) }
 
+    val scope = rememberCoroutineScope()
+    val resolver = LocalFontFamilyResolver.current
+    // Loading a typeface is blocking work; do it on the resolver's background loader first so the UI thread only ever
+    // swaps in fonts that are already in memory.
+    suspend fun warm(style: FontStyleSettings) {
+        val t = buildTypography(style)
+        listOf(t.displayLarge, t.headlineSmall, t.titleMedium, t.bodyLarge, t.bodySmall, t.labelLarge, t.labelSmall)
+            .mapNotNull { it.fontFamily }
+            .distinct()
+            .forEach { runCatching { resolver.preload(it) } }
+    }
+
     fun commitSettings() = onChange {
         copy(font = font, fontWeightOffset = weight.roundToInt(), fontWidth = width.roundToInt(), fontRoundness = roundness.roundToInt())
     }
     // Only the sheet's own preview changes while it is open; the app-wide theme (which recomposes every screen) is
     // updated once, when the sheet is closed.
+    var pending by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     fun commit() {
-        applied = FontStyleSettings(font, weight.roundToInt(), width.roundToInt(), roundness.roundToInt())
+        val next = FontStyleSettings(font, weight.roundToInt(), width.roundToInt(), roundness.roundToInt())
+        pending?.cancel()
+        pending = scope.launch {
+            warm(next)
+            applied = next
+        }
     }
     fun finish() {
-        commitSettings()
-        onDismiss()
+        scope.launch {
+            // The app-wide typography is warmed before it is applied, so closing the sheet never stalls a frame.
+            warm(FontStyleSettings(font, weight.roundToInt(), width.roundToInt(), roundness.roundToInt()))
+            commitSettings()
+            onDismiss()
+        }
     }
 
-    ModalBottomSheet(onDismissRequest = ::finish, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    ModalBottomSheet(onDismissRequest = ::finish) {
         Column(
             Modifier.verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = Spacing.lg),
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -121,7 +146,7 @@ fun FontSheet(settings: AppSettings, onChange: (AppSettings.() -> AppSettings) -
                         remember(option, applied.weightOffset, applied.width) {
                             TextStyle(
                                 fontFamily = fontFamilyFor(FontStyleSettings(option, applied.weightOffset, applied.width, applied.roundness), 16f),
-                                fontWeight = FontWeight(if (option.resId == null) 400 + applied.weightOffset else 400),
+                                fontWeight = FontWeight(if (option.isSystem) 400 + applied.weightOffset else 400),
                                 fontSize = 16.sp,
                             )
                         }
@@ -149,29 +174,30 @@ fun FontSheet(settings: AppSettings, onChange: (AppSettings.() -> AppSettings) -
                 onChange = { weight = (it / 10f).roundToInt() * 10f },
                 onFinished = ::commit,
             )
-            if (font.resId != null) {
+            val showWidth = font.isBundled && font.maxWidth > font.minWidth
+            val grow = androidx.compose.animation.fadeIn(tween(220)) + androidx.compose.animation.expandVertically(tween(280))
+            val shrink = androidx.compose.animation.fadeOut(tween(120)) + androidx.compose.animation.shrinkVertically(tween(220))
+            androidx.compose.animation.AnimatedVisibility(visible = showWidth, enter = grow, exit = shrink) {
                 val minW = font.minWidth
-                val maxW = font.maxWidth
-                if (maxW > minW) {
-                    SliderRow(
-                        label = stringResource(R.string.settings_font_width),
-                        valueText = width.coerceIn(minW, maxW).roundToInt().toString(),
-                        value = width.coerceIn(minW, maxW),
-                        range = minW..maxW,
-                        onChange = { width = it.roundToInt().toFloat() },
-                        onFinished = ::commit,
-                    )
-                }
-                if (font.hasRoundness) {
-                    SliderRow(
-                        label = stringResource(R.string.settings_font_roundness),
-                        valueText = roundness.roundToInt().toString(),
-                        value = roundness,
-                        range = 0f..100f,
-                        onChange = { roundness = it.roundToInt().toFloat() },
-                        onFinished = ::commit,
-                    )
-                }
+                val maxW = font.maxWidth.coerceAtLeast(minW + 1f)
+                SliderRow(
+                    label = stringResource(R.string.settings_font_width),
+                    valueText = width.coerceIn(minW, maxW).roundToInt().toString(),
+                    value = width.coerceIn(minW, maxW),
+                    range = minW..maxW,
+                    onChange = { width = it.roundToInt().toFloat() },
+                    onFinished = ::commit,
+                )
+            }
+            androidx.compose.animation.AnimatedVisibility(visible = font.hasRoundness, enter = grow, exit = shrink) {
+                SliderRow(
+                    label = stringResource(R.string.settings_font_roundness),
+                    valueText = roundness.roundToInt().toString(),
+                    value = roundness,
+                    range = 0f..100f,
+                    onChange = { roundness = it.roundToInt().toFloat() },
+                    onFinished = ::commit,
+                )
             }
             OutlinedButton(
                 shapes = ButtonDefaults.shapes(),

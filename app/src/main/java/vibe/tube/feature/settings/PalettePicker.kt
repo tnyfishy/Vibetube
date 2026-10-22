@@ -59,7 +59,12 @@ fun PalettePicker(settings: AppSettings, onPick: (dynamic: Boolean, palette: App
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             if (dynamicAvailable) {
-                val colors = MaterialTheme.colorScheme
+                // The wallpaper scheme itself, not the active theme: otherwise the tile would repaint in whichever palette is selected.
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val isDarkNow = androidx.compose.foundation.isSystemInDarkTheme()
+                val colors = remember(isDarkNow) {
+                    if (isDarkNow) androidx.compose.material3.dynamicDarkColorScheme(context) else androidx.compose.material3.dynamicLightColorScheme(context)
+                }
                 PaletteTile(
                     label = stringResource(R.string.palette_dynamic),
                     selected = settings.dynamicColor,

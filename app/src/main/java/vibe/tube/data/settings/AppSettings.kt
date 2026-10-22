@@ -21,20 +21,32 @@ enum class AppFont(
     val minWidth: Float = 100f,
     val maxWidth: Float = 100f,
     val hasRoundness: Boolean = false,
+    /** Static fonts only: (weight, resource) pairs. */
+    val statics: List<Pair<Int, Int>> = emptyList(),
 ) {
+    val isSystem: Boolean get() = resId == null && statics.isEmpty()
+    val isStatic: Boolean get() = statics.isNotEmpty()
+    /** Anything but the system font can be previewed/loaded from bundled files. */
+    val isBundled: Boolean get() = !isSystem
+
     System(null, null),
     GoogleSansFlex(vibe.tube.R.font.google_sans_flex, "Google Sans Flex", 1, 1000, 25f, 151f, hasRoundness = true),
-    Roboto(vibe.tube.R.font.roboto, "Roboto", 100, 900, 75f, 100f),
-    NotoSans(vibe.tube.R.font.noto_sans, "Noto Sans", 100, 900, 62.5f, 100f),
-    OpenSans(vibe.tube.R.font.open_sans, "Open Sans", 300, 800, 75f, 100f),
-    Archivo(vibe.tube.R.font.archivo, "Archivo", 100, 900, 62f, 125f),
-    MonaSans(vibe.tube.R.font.mona_sans, "Mona Sans", 200, 900, 75f, 125f),
-    EncodeSans(vibe.tube.R.font.encode_sans, "Encode Sans", 100, 900, 75f, 125f),
-    NunitoSans(vibe.tube.R.font.nunito_sans, "Nunito Sans", 200, 1000, 75f, 125f),
-    ZalandoSans(vibe.tube.R.font.zalando_sans, "Zalando Sans", 200, 900, 75f, 125f),
     TikTokSans(vibe.tube.R.font.tiktok_sans, "TikTok Sans", 300, 900, 75f, 150f),
-    Bricolage(vibe.tube.R.font.bricolage_grotesque, "Bricolage Grotesque", 200, 800, 75f, 100f),
-    Georama(vibe.tube.R.font.georama, "Georama", 100, 900, 62.5f, 150f),
+    // Be Vietnam Pro ships as nine static weights (no variable build exists): weight steps in hundreds, no width axis.
+    BeVietnamPro(
+        null, "Be Vietnam Pro", 100, 900,
+        statics = listOf(
+            100 to vibe.tube.R.font.be_vietnam_pro_thin,
+            200 to vibe.tube.R.font.be_vietnam_pro_extralight,
+            300 to vibe.tube.R.font.be_vietnam_pro_light,
+            400 to vibe.tube.R.font.be_vietnam_pro_regular,
+            500 to vibe.tube.R.font.be_vietnam_pro_medium,
+            600 to vibe.tube.R.font.be_vietnam_pro_semibold,
+            700 to vibe.tube.R.font.be_vietnam_pro_bold,
+            800 to vibe.tube.R.font.be_vietnam_pro_extrabold,
+            900 to vibe.tube.R.font.be_vietnam_pro_black,
+        ),
+    ),
 }
 
 /**

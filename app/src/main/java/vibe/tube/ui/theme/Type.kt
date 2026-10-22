@@ -64,12 +64,23 @@ private fun variationFor(font: AppFont, weight: Int, opsz: Float, s: FontStyleSe
  * on the right instance instead of being synthesized.
  */
 fun fontFamilyFor(s: FontStyleSettings, opsz: Float): FontFamily {
-    val res = s.font.resId ?: return FontFamily.Default
+    if (s.font.isSystem) return FontFamily.Default
     val axisKey = if (s.font == AppFont.GoogleSansFlex) "${s.width}/${s.roundness}" else "${s.width}"
     val opszKey = if (s.font == AppFont.GoogleSansFlex) opsz.toInt() else 0
     val key = "${s.font.name}|${s.weightOffset}|$axisKey|$opszKey"
     return synchronized(familyCache) {
         familyCache.getOrPut(key) {
+            if (s.font.isStatic) {
+                val files = s.font.statics
+                return@getOrPut FontFamily(
+                    weightStops.map { stop ->
+                        val target = (stop + s.weightOffset).coerceIn(files.first().first, files.last().first)
+                        val file = files.minBy { kotlin.math.abs(it.first - target) }
+                        Font(resId = file.second, weight = FontWeight(stop), style = FontStyle.Normal)
+                    },
+                )
+            }
+            val res = s.font.resId!!
             FontFamily(
                 weightStops.map { stop ->
                     Font(
@@ -93,7 +104,7 @@ private fun role(
 ): TextStyle = TextStyle(
     fontFamily = fontFamilyFor(s, sizeSp),
     // System font is not variable: apply the offset directly to the requested weight.
-    fontWeight = FontWeight((if (s.font.resId == null) weight + s.weightOffset else weight).coerceIn(1, 1000)),
+    fontWeight = FontWeight((if (s.font.isSystem) weight + s.weightOffset else weight).coerceIn(1, 1000)),
     fontSize = sizeSp.sp,
     lineHeight = lineHeightSp.sp,
     letterSpacing = letterSpacing,

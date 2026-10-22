@@ -72,7 +72,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /** Share of the screen width the minimized player takes (keep in sync with the list padding in AppRoot). */
-internal const val MINI_WIDTH_FRACTION = 0.46f
+internal const val MINI_WIDTH_FRACTION = 0.53f
 
 /** Critically damped: glides to the end without overshooting or bouncing. */
 private val MORPH_SPEC = spring<Float>(dampingRatio = 1f, stiffness = 380f)
@@ -192,7 +192,7 @@ internal fun MorphPlayer(
 
         val sidePx = with(density) { 8.dp.toPx() }
         val gapPx = with(density) { 8.dp.toPx() }
-        // Minimized, the player is just the video: a small floating card (46% of the width at 16:9, narrower for
+        // Minimized, the player is just the video: a small floating card (53% of the width at 16:9, narrower for
         // taller videos) that can be dragged around and always rests against an edge of the screen.
         val aspect = videoAspect
         val maxMiniW = wPx * MINI_WIDTH_FRACTION
