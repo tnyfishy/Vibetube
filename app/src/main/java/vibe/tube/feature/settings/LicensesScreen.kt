@@ -25,6 +25,7 @@ private data class Entry(val name: String, val license: String)
 
 private val entries = listOf(
     Entry("Google Sans Flex (font)", "SIL Open Font License 1.1"),
+    Entry("Inter, Nunito, Lexend, Noto Sans, Open Sans (fonts)", "SIL Open Font License 1.1"),
     Entry("Material Symbols Rounded (icons)", "Apache License 2.0"),
     Entry("AndroidX: Core, AppCompat, Activity, Lifecycle, Navigation, Room, DataStore, Media3", "Apache License 2.0"),
     Entry("Jetpack Compose and Material 3", "Apache License 2.0"),

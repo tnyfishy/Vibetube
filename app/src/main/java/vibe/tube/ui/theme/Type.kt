@@ -8,89 +8,130 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import vibe.tube.R
+import vibe.tube.data.settings.AppFont
 
 object GoogleSansFlex {
     const val ROUNDNESS = 100f
     const val WIDTH_DEFAULT = 100f
+    const val WIDTH_MIN = 25f
+    const val WIDTH_MAX = 151f
     const val MIN_OPSZ = 1f
     const val MAX_OPSZ = 144f
     const val MIN_WEIGHT = 1
     const val MAX_WEIGHT = 1000
 
-    private val cache = HashMap<Pair<Int, Int>, FontFamily>()
-
-    fun settings(weight: Int, opticalSize: Float): FontVariation.Settings {
+    fun settings(
+        weight: Int,
+        opticalSize: Float,
+        width: Float = WIDTH_DEFAULT,
+        roundness: Float = ROUNDNESS,
+    ): FontVariation.Settings {
         val w = weight.coerceIn(MIN_WEIGHT, MAX_WEIGHT)
         val opsz = opticalSize.coerceIn(MIN_OPSZ, MAX_OPSZ)
         return FontVariation.Settings(
             FontVariation.weight(w),
-            FontVariation.width(WIDTH_DEFAULT),
+            FontVariation.width(width.coerceIn(WIDTH_MIN, WIDTH_MAX)),
             FontVariation.Setting("opsz", opsz),
-            FontVariation.Setting("ROND", ROUNDNESS),
+            FontVariation.Setting("ROND", roundness.coerceIn(0f, 100f)),
         )
     }
+}
 
-    fun family(weight: Int, opticalSize: Float): FontFamily = synchronized(cache) {
-        cache.getOrPut(weight to opticalSize.toInt()) {
+/** User-tunable typography. [weightOffset] is added to every role's weight (0 = stock Material 3). */
+data class FontStyleSettings(
+    val font: AppFont = AppFont.System,
+    val weightOffset: Int = 0,
+    val width: Int = GoogleSansFlex.WIDTH_DEFAULT.toInt(),
+    val roundness: Int = GoogleSansFlex.ROUNDNESS.toInt(),
+)
+
+private val familyCache = HashMap<String, FontFamily>()
+
+/** The standard weight stops a family resolves; each one is rendered at stop + offset. */
+private val weightStops = listOf(100, 200, 300, 400, 500, 600, 700, 800, 900)
+
+private fun variationFor(font: AppFont, weight: Int, opsz: Float, s: FontStyleSettings): FontVariation.Settings {
+    val w = weight.coerceIn(font.minWeight, font.maxWeight)
+    return when (font) {
+        AppFont.GoogleSansFlex -> GoogleSansFlex.settings(w, opsz, s.width.toFloat(), s.roundness.toFloat())
+        AppFont.Inter -> FontVariation.Settings(FontVariation.weight(w), FontVariation.Setting("opsz", opsz.coerceIn(14f, 32f)))
+        else -> FontVariation.Settings(FontVariation.weight(w))
+    }
+}
+
+/**
+ * Family for [s.font] at optical size [opsz]. A variable font is registered at every weight stop,
+ * each stop carrying its own `wght` (stop + offset), so any `FontWeight` a composable requests lands
+ * on the right instance instead of being synthesized.
+ */
+fun fontFamilyFor(s: FontStyleSettings, opsz: Float): FontFamily {
+    val res = s.font.resId ?: return FontFamily.Default
+    val axisKey = if (s.font == AppFont.GoogleSansFlex) "${s.width}/${s.roundness}" else ""
+    val opszKey = if (s.font == AppFont.GoogleSansFlex || s.font == AppFont.Inter) opsz.toInt() else 0
+    val key = "${s.font.name}|${s.weightOffset}|$axisKey|$opszKey"
+    return synchronized(familyCache) {
+        familyCache.getOrPut(key) {
             FontFamily(
-                Font(
-                    resId = R.font.google_sans_flex,
-                    weight = FontWeight(weight),
-                    style = FontStyle.Normal,
-                    variationSettings = settings(weight, opticalSize),
-                ),
+                weightStops.map { stop ->
+                    Font(
+                        resId = res,
+                        weight = FontWeight(stop),
+                        style = FontStyle.Normal,
+                        variationSettings = variationFor(s.font, stop + s.weightOffset, opsz, s),
+                    )
+                },
             )
         }
     }
 }
 
 private fun role(
+    s: FontStyleSettings,
     sizeSp: Float,
     lineHeightSp: Float,
     weight: Int,
     letterSpacing: TextUnit,
 ): TextStyle = TextStyle(
-    fontFamily = GoogleSansFlex.family(weight, sizeSp),
-    fontWeight = FontWeight(weight),
+    fontFamily = fontFamilyFor(s, sizeSp),
+    // System font is not variable: apply the offset directly to the requested weight.
+    fontWeight = FontWeight((if (s.font.resId == null) weight + s.weightOffset else weight).coerceIn(1, 1000)),
     fontSize = sizeSp.sp,
     lineHeight = lineHeightSp.sp,
     letterSpacing = letterSpacing,
 )
 
-// Slightly heavier than stock M3 (+50 weight on every role) so text reads better on dense feeds.
-// headlineLarge / headlineMedium (h1 / h2) also grow a little in size and weight.
-val VibeTypography = Typography(
-    displayLarge = role(57f, 64f, 450, (-0.25).sp),
-    displayMedium = role(45f, 52f, 450, 0.sp),
-    displaySmall = role(36f, 44f, 450, 0.sp),
-    headlineLarge = role(34f, 42f, 650, 0.sp),
-    headlineMedium = role(30f, 38f, 650, 0.sp),
-    headlineSmall = role(24f, 32f, 550, 0.sp),
-    titleLarge = role(22f, 28f, 550, 0.sp),
-    titleMedium = role(16f, 24f, 650, 0.15.sp),
-    titleSmall = role(14f, 20f, 650, 0.1.sp),
-    bodyLarge = role(16f, 24f, 450, 0.5.sp),
-    bodyMedium = role(14f, 20f, 450, 0.25.sp),
-    bodySmall = role(12f, 16f, 450, 0.4.sp),
-    labelLarge = role(14f, 20f, 650, 0.1.sp),
-    labelMedium = role(12f, 16f, 650, 0.5.sp),
-    labelSmall = role(11f, 16f, 550, 0.5.sp),
-    displayLargeEmphasized = role(57f, 64f, 750, (-0.25).sp),
-    displayMediumEmphasized = role(45f, 52f, 750, 0.sp),
-    displaySmallEmphasized = role(36f, 44f, 750, 0.sp),
-    headlineLargeEmphasized = role(34f, 42f, 800, 0.sp),
-    headlineMediumEmphasized = role(30f, 38f, 800, 0.sp),
-    headlineSmallEmphasized = role(24f, 32f, 750, 0.sp),
-    titleLargeEmphasized = role(22f, 28f, 750, 0.sp),
-    titleMediumEmphasized = role(16f, 24f, 750, 0.15.sp),
-    titleSmallEmphasized = role(14f, 20f, 750, 0.1.sp),
-    bodyLargeEmphasized = role(16f, 24f, 650, 0.5.sp),
-    bodyMediumEmphasized = role(14f, 20f, 650, 0.25.sp),
-    bodySmallEmphasized = role(12f, 16f, 650, 0.4.sp),
-    labelLargeEmphasized = role(14f, 20f, 750, 0.1.sp),
-    labelMediumEmphasized = role(12f, 16f, 750, 0.5.sp),
-    labelSmallEmphasized = role(11f, 16f, 750, 0.5.sp),
+/** Stock Material 3 weights; headline sizes are a little larger than stock. */
+fun buildTypography(s: FontStyleSettings = FontStyleSettings()): Typography = Typography(
+    displayLarge = role(s, 57f, 64f, 400, (-0.25).sp),
+    displayMedium = role(s, 45f, 52f, 400, 0.sp),
+    displaySmall = role(s, 36f, 44f, 400, 0.sp),
+    headlineLarge = role(s, 34f, 42f, 400, 0.sp),
+    headlineMedium = role(s, 30f, 38f, 400, 0.sp),
+    headlineSmall = role(s, 24f, 32f, 400, 0.sp),
+    titleLarge = role(s, 22f, 28f, 400, 0.sp),
+    titleMedium = role(s, 16f, 24f, 500, 0.15.sp),
+    titleSmall = role(s, 14f, 20f, 500, 0.1.sp),
+    bodyLarge = role(s, 16f, 24f, 400, 0.5.sp),
+    bodyMedium = role(s, 14f, 20f, 400, 0.25.sp),
+    bodySmall = role(s, 12f, 16f, 400, 0.4.sp),
+    labelLarge = role(s, 14f, 20f, 500, 0.1.sp),
+    labelMedium = role(s, 12f, 16f, 500, 0.5.sp),
+    labelSmall = role(s, 11f, 16f, 500, 0.5.sp),
+    displayLargeEmphasized = role(s, 57f, 64f, 600, (-0.25).sp),
+    displayMediumEmphasized = role(s, 45f, 52f, 600, 0.sp),
+    displaySmallEmphasized = role(s, 36f, 44f, 600, 0.sp),
+    headlineLargeEmphasized = role(s, 34f, 42f, 600, 0.sp),
+    headlineMediumEmphasized = role(s, 30f, 38f, 600, 0.sp),
+    headlineSmallEmphasized = role(s, 24f, 32f, 600, 0.sp),
+    titleLargeEmphasized = role(s, 22f, 28f, 600, 0.sp),
+    titleMediumEmphasized = role(s, 16f, 24f, 700, 0.15.sp),
+    titleSmallEmphasized = role(s, 14f, 20f, 700, 0.1.sp),
+    bodyLargeEmphasized = role(s, 16f, 24f, 600, 0.5.sp),
+    bodyMediumEmphasized = role(s, 14f, 20f, 600, 0.25.sp),
+    bodySmallEmphasized = role(s, 12f, 16f, 600, 0.4.sp),
+    labelLargeEmphasized = role(s, 14f, 20f, 700, 0.1.sp),
+    labelMediumEmphasized = role(s, 12f, 16f, 700, 0.5.sp),
+    labelSmallEmphasized = role(s, 11f, 16f, 700, 0.5.sp),
 )

@@ -6,6 +6,20 @@ import java.util.Locale
 enum class ThemeMode { System, Light, Dark, Amoled }
 
 /**
+ * Selectable UI fonts. [resId] is null for the system font. All bundled fonts are variable and cover
+ * Vietnamese; [minWeight]..[maxWeight] is the `wght` axis range of each file. Enum names are persisted.
+ */
+enum class AppFont(val resId: Int?, val label: String?, val minWeight: Int = 1, val maxWeight: Int = 1000) {
+    System(null, null),
+    GoogleSansFlex(vibe.tube.R.font.google_sans_flex, "Google Sans Flex", 1, 1000),
+    Inter(vibe.tube.R.font.inter, "Inter", 100, 900),
+    NotoSans(vibe.tube.R.font.noto_sans, "Noto Sans", 100, 900),
+    OpenSans(vibe.tube.R.font.open_sans, "Open Sans", 300, 800),
+    Nunito(vibe.tube.R.font.nunito, "Nunito", 200, 1000),
+    Lexend(vibe.tube.R.font.lexend, "Lexend", 100, 900),
+}
+
+/**
  * Default playback quality. [maxFps] null means "no frame-rate limit"; entries named `*P60` allow
  * 60 fps while the plain ones prefer 30 fps. Enum names are persisted, so existing names must stay.
  */
@@ -35,6 +49,13 @@ enum class QualityCap(val maxHeight: Int?, val maxFps: Int? = null) {
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.System,
     val dynamicColor: Boolean = true,
+    val font: AppFont = AppFont.System,
+    /** Added to every text role's weight; 0 is stock Material 3. */
+    val fontWeightOffset: Int = 0,
+    /** Google Sans Flex only: `wdth` axis (default 100). */
+    val fontWidth: Int = 100,
+    /** Google Sans Flex only: `ROND` axis. */
+    val fontRoundness: Int = 100,
     val uiLanguage: String = SYSTEM,
     val contentLanguage: String = SYSTEM,
     val contentRegion: String = SYSTEM,

@@ -81,7 +81,7 @@ fun <T> ChoiceDialog(
 private val contentLanguages = listOf("en", "vi", "ja", "ko", "zh", "es", "fr", "de", "pt", "ru", "id", "th", "hi", "ar", "it", "tr")
 private val contentRegions = listOf("US", "VN", "GB", "JP", "KR", "DE", "FR", "ES", "BR", "IN", "ID", "TH", "RU", "AU", "CA", "SG", "TW", "PH", "MY")
 
-private enum class Dialog { Theme, UiLanguage, ContentLanguage, Region, WifiQuality, MobileQuality, ClearCache, ClearHistory, ClearSearch }
+private enum class Dialog { Theme, Font, UiLanguage, ContentLanguage, Region, WifiQuality, MobileQuality, ClearCache, ClearHistory, ClearSearch }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,6 +117,12 @@ fun SettingsScreen(
                     VIcon.LightMode, R.string.settings_dynamic_color, R.string.settings_dynamic_color_desc,
                     settings.dynamicColor,
                 ) { v -> viewModel.update { it.copy(dynamicColor = v) } }
+            }
+            item {
+                SettingRow(
+                    VIcon.Edit, R.string.settings_font,
+                    fontLabel(settings.font),
+                ) { dialog = Dialog.Font }
             }
             section(R.string.settings_section_language)
             item {
@@ -198,6 +204,7 @@ fun SettingsScreen(
             settings.themeMode,
             { dialog = null },
         ) { v -> viewModel.update { it.copy(themeMode = v) }; dialog = null }
+        Dialog.Font -> FontSheet(settings, { change -> viewModel.update { it.change() } }) { dialog = null }
         Dialog.UiLanguage -> ChoiceDialog(
             stringResource(R.string.settings_ui_language),
             listOf(AppSettings.SYSTEM, "en", "vi").map { Choice(it, languageLabel(it, systemLabel, displayLocale)) },

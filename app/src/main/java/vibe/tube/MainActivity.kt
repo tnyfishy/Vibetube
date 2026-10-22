@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.core.os.LocaleListCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -36,6 +37,7 @@ import vibe.tube.data.settings.ThemeMode
 import vibe.tube.feature.AppRoot
 import vibe.tube.feature.AppViewModel
 import vibe.tube.player.PlayerController
+import vibe.tube.ui.theme.FontStyleSettings
 import vibe.tube.ui.theme.VibetubeTheme
 import javax.inject.Inject
 
@@ -81,7 +83,10 @@ class MainActivity : AppCompatActivity() {
                     notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
-            VibetubeTheme(themeMode = settings.themeMode, dynamicColor = settings.dynamicColor) {
+            val fontStyle = remember(settings.font, settings.fontWeightOffset, settings.fontWidth, settings.fontRoundness) {
+                FontStyleSettings(settings.font, settings.fontWeightOffset, settings.fontWidth, settings.fontRoundness)
+            }
+            VibetubeTheme(themeMode = settings.themeMode, dynamicColor = settings.dynamicColor, fontStyle = fontStyle) {
                 AppRoot(onEnterPip = if (supportsPip()) ::enterPip else null)
             }
         }

@@ -59,8 +59,10 @@ fun vibeColorScheme(mode: ThemeMode, dynamicColor: Boolean, systemDark: Boolean)
 fun VibetubeTheme(
     themeMode: ThemeMode,
     dynamicColor: Boolean,
+    fontStyle: FontStyleSettings = FontStyleSettings(),
     content: @Composable () -> Unit,
 ) {
+    val typography = remember(fontStyle) { buildTypography(fontStyle) }
     val systemDark = isSystemInDarkTheme()
     val dark = resolveDark(themeMode, systemDark)
     val scheme = vibeColorScheme(themeMode, dynamicColor, systemDark)
@@ -81,7 +83,7 @@ fun VibetubeTheme(
             colorScheme = scheme,
             motionScheme = MotionScheme.expressive(),
             shapes = VibeShapes,
-            typography = VibeTypography,
+            typography = typography,
         ) {
             Surface(color = scheme.background, content = content)
         }

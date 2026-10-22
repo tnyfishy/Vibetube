@@ -148,6 +148,16 @@
     <string name="login_network_body">The network request failed, so nothing was saved yet. Retry verification.</string>
     <string name="settings_title">Settings</string>
     <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_font">Font</string>
+    <string name="settings_font_system">System font</string>
+    <string name="settings_font_weight">Weight</string>
+    <string name="settings_font_weight_normal">Normal</string>
+    <string name="settings_font_width">Width</string>
+    <string name="settings_font_roundness">Roundness</string>
+    <string name="settings_font_reset">Reset to default</string>
+    <string name="settings_font_preview_title">Vibetube — Watch with ease</string>
+    <string name="settings_font_preview_body">The quick brown fox jumps over the lazy dog. Tiếng Việt có dấu: ăn quả nhớ kẻ trồng cây.</string>
+    <string name="settings_font_preview_label">Aa Bb Cc 0123456789</string>
     <string name="settings_theme">Theme</string>
     <string name="settings_dynamic_color">Dynamic color</string>
     <string name="settings_dynamic_color_desc">Use colors from your wallpaper when supported</string>

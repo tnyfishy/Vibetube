@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +40,10 @@ class SettingsRepository(
         return AppSettings(
             themeMode = enumOr(this[THEME], d.themeMode),
             dynamicColor = this[DYNAMIC] ?: d.dynamicColor,
+            font = enumOr(this[FONT], d.font),
+            fontWeightOffset = this[FONT_WEIGHT] ?: d.fontWeightOffset,
+            fontWidth = this[FONT_WIDTH] ?: d.fontWidth,
+            fontRoundness = this[FONT_ROUND] ?: d.fontRoundness,
             uiLanguage = this[UI_LANG] ?: d.uiLanguage,
             contentLanguage = this[CONTENT_LANG] ?: d.contentLanguage,
             contentRegion = this[CONTENT_REGION] ?: d.contentRegion,
@@ -58,6 +63,10 @@ class SettingsRepository(
     private fun androidx.datastore.preferences.core.MutablePreferences.write(s: AppSettings) {
         this[THEME] = s.themeMode.name
         this[DYNAMIC] = s.dynamicColor
+        this[FONT] = s.font.name
+        this[FONT_WEIGHT] = s.fontWeightOffset
+        this[FONT_WIDTH] = s.fontWidth
+        this[FONT_ROUND] = s.fontRoundness
         this[UI_LANG] = s.uiLanguage
         this[CONTENT_LANG] = s.contentLanguage
         this[CONTENT_REGION] = s.contentRegion
@@ -79,6 +88,10 @@ class SettingsRepository(
     companion object {
         private val THEME = stringPreferencesKey("theme_mode")
         private val DYNAMIC = booleanPreferencesKey("dynamic_color")
+        private val FONT = stringPreferencesKey("font_family")
+        private val FONT_WEIGHT = intPreferencesKey("font_weight_offset")
+        private val FONT_WIDTH = intPreferencesKey("font_width")
+        private val FONT_ROUND = intPreferencesKey("font_roundness")
         private val UI_LANG = stringPreferencesKey("ui_language")
         private val CONTENT_LANG = stringPreferencesKey("content_language")
         private val CONTENT_REGION = stringPreferencesKey("content_region")
