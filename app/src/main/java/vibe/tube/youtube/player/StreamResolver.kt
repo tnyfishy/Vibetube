@@ -27,10 +27,20 @@ class StreamResolver(
     private val profiles: List<ClientProfile> = DEFAULT_PROFILES,
 ) {
 
-    suspend fun resolve(videoId: String, locale: ContentLocale, auth: RequestAuth?): ResolveResult {
+    /**
+     * Resolves playable streams, trying each client profile in turn. [skipClients] lists client names
+     * whose stream URLs already failed during playback (e.g. HTTP 403), so the next client is used.
+     */
+    suspend fun resolve(
+        videoId: String,
+        locale: ContentLocale,
+        auth: RequestAuth?,
+        skipClients: Set<String> = emptySet(),
+    ): ResolveResult {
         var firstBlocked: ResolveResult.Blocked? = null
         var lastError: AppError? = null
         for (profile in profiles) {
+            if (profile.name in skipClients) continue
             val result = try {
                 request(videoId, locale, null, profile)
             } catch (e: AppError.Network) {
@@ -45,7 +55,7 @@ class StreamResolver(
                 }
             }
         }
-        if (auth != null) {
+        if (auth != null && client.clientConfig.clientName !in skipClients) {
             val authenticated = try {
                 request(videoId, locale, auth, null)
             } catch (e: AppError.SessionExpired) {
@@ -206,6 +216,17 @@ class StreamResolver(
                     "deviceModel" to JsonPrimitive("iPhone16,2"),
                     "osName" to JsonPrimitive("iPhone"),
                     "osVersion" to JsonPrimitive("18.3.2.22D82"),
+                ),
+            ),
+            ClientProfile(
+                name = "ANDROID",
+                version = "20.10.38",
+                nameId = "3",
+                userAgent = "com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip",
+                extras = mapOf(
+                    "osName" to JsonPrimitive("Android"),
+                    "osVersion" to JsonPrimitive("11"),
+                    "androidSdkVersion" to JsonPrimitive(30),
                 ),
             ),
         )

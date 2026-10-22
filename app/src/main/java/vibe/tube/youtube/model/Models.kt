@@ -5,6 +5,13 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class Thumb(val url: String, val width: Int, val height: Int)
 
+/** Largest available thumbnail (highest resolution). */
+fun List<Thumb>.best(): String? {
+    if (isEmpty()) return null
+    val maxWidth = maxOf { it.width }
+    return last { it.width == maxWidth }.url
+}
+
 fun List<Thumb>.bestFor(minWidth: Int): String? {
     if (isEmpty()) return null
     val sorted = sortedBy { it.width }

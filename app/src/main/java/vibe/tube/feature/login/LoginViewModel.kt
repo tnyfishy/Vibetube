@@ -75,8 +75,8 @@ class LoginViewModel @Inject constructor(
             when (outcome) {
                 is LoginOutcome.Success -> {
                     pendingHeader = null
-                    WebSessionCleaner.clear()
                     mutableState.value = LoginUiState.Done
+                    WebSessionCleaner.clear()
                 }
                 LoginOutcome.NotLoggedIn -> {
                     pendingHeader = null

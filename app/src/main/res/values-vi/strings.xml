@@ -131,15 +131,12 @@
     <string name="account_active">Đang dùng</string>
     <string name="account_no_handle">Chưa có handle</string>
     <string name="account_add">Thêm tài khoản</string>
-    <string name="account_clear_local_data">Xóa dữ liệu Vibetube của tài khoản này trên thiết bị</string>
     <string name="account_sign_out_all">Đăng xuất tất cả tài khoản</string>
     <string name="dialog_sign_out_title">Đăng xuất?</string>
     <string name="dialog_sign_out_body">Xóa phiên và dữ liệu đã lưu của tài khoản này khỏi Vibetube. Không đăng xuất bạn khỏi ứng dụng hay trình duyệt khác.</string>
     <string name="dialog_sign_out_all_title">Đăng xuất tất cả tài khoản?</string>
     <string name="dialog_sign_out_all_body">Xóa mọi phiên và toàn bộ dữ liệu tài khoản đã lưu khỏi Vibetube.</string>
-    <string name="dialog_wipe_title">Xóa dữ liệu của tài khoản này?</string>
-    <string name="dialog_wipe_body">Xóa feed đã lưu, lịch sử tìm kiếm và lịch sử phát lưu trên thiết bị này cho tài khoản này. Phiên đăng nhập vẫn được giữ.</string>
-    <string name="login_title">Đăng nhập Google / YouTube</string>
+    <string name="login_title">Đăng nhập Google</string>
     <string name="login_hint">Bạn đang ở trang đăng nhập chính thức của Google. Vibetube không thấy mật khẩu của bạn; chỉ giữ phiên YouTube sau khi YouTube xác nhận.</string>
     <string name="login_verifying">Đang nhờ YouTube xác nhận phiên của bạn…</string>
     <string name="login_blocked_title">Google đã chặn đăng nhập trong trình duyệt nhúng này</string>

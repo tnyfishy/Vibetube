@@ -97,6 +97,42 @@ fun RemoteImage(
     AsyncImage(model = request, contentDescription = contentDescription, modifier = modifier, contentScale = contentScale)
 }
 
+/**
+ * Image that walks through [urls] in order: when one fails to load (for example a missing
+ * `maxresdefault.jpg`, which YouTube answers with 404) the next candidate is tried.
+ */
+@Composable
+fun RemoteImage(
+    urls: List<String>,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+) {
+    val context = LocalContext.current
+    val reduced = LocalReducedMotion.current
+    var index by androidx.compose.runtime.remember(urls) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val request = androidx.compose.runtime.remember(urls, index, reduced) {
+        ImageRequest.Builder(context).data(urls.getOrNull(index)).crossfade(!reduced).build()
+    }
+    AsyncImage(
+        model = request,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = contentScale,
+        onError = { if (index < urls.lastIndex) index++ },
+    )
+}
+
+/** Google/YouTube avatar URLs end with a size token such as `=s88-c-k-...`; ask for a large one. */
+fun upscaleAvatarUrl(url: String?, px: Int = 512): String? {
+    if (url == null) return null
+    val host = runCatching { android.net.Uri.parse(url).host }.getOrNull().orEmpty()
+    if (!(host.endsWith("googleusercontent.com") || host.endsWith("ggpht.com"))) return url
+    val sized = Regex("=s\\d+").replace(url, "=s$px")
+    if (sized != url) return sized
+    return Regex("=w\\d+-h\\d+").replace(url, "=w$px-h$px")
+}
+
 @Composable
 fun Avatar(url: String?, size: Dp, modifier: Modifier = Modifier, description: String? = null) {
     Surface(
@@ -104,7 +140,7 @@ fun Avatar(url: String?, size: Dp, modifier: Modifier = Modifier, description: S
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
         modifier = modifier.size(size),
     ) {
-        if (url != null) RemoteImage(url, description, Modifier.fillMaxSize())
+        if (url != null) RemoteImage(upscaleAvatarUrl(url, (size.value * 4).toInt().coerceIn(128, 800)), description, Modifier.fillMaxSize())
         else VIconImage(
             vibe.tube.ui.VIcon.AccountCircleFilled,
             description,

@@ -132,15 +132,12 @@
     <string name="account_active">Active</string>
     <string name="account_no_handle">No handle</string>
     <string name="account_add">Add account</string>
-    <string name="account_clear_local_data">Clear Vibetube data of this account on this device</string>
     <string name="account_sign_out_all">Sign out of all accounts</string>
     <string name="dialog_sign_out_title">Sign out?</string>
     <string name="dialog_sign_out_body">Removes this account\'s session and cached data from Vibetube. It does not sign you out of other apps or browsers.</string>
     <string name="dialog_sign_out_all_title">Sign out of all accounts?</string>
     <string name="dialog_sign_out_all_body">Removes every session and all cached account data from Vibetube.</string>
-    <string name="dialog_wipe_title">Clear data for this account?</string>
-    <string name="dialog_wipe_body">Removes cached feeds, search history and playback history stored on this device for this account. The session itself is kept.</string>
-    <string name="login_title">Sign in to Google / YouTube</string>
+    <string name="login_title">Sign in to Google</string>
     <string name="login_hint">You are on the official Google sign-in page. Vibetube never sees your password; it only keeps the YouTube session after YouTube confirms it.</string>
     <string name="login_verifying">Asking YouTube to confirm your session…</string>
     <string name="login_blocked_title">Google blocked sign-in inside this embedded browser</string>

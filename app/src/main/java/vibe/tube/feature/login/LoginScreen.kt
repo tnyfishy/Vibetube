@@ -104,7 +104,11 @@ fun LoginScreen(onClose: () -> Unit, viewModel: LoginViewModel = hiltViewModel()
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             onProgress = { progress = it },
                             onCreated = { webView = it },
-                            onYoutubeReached = { header -> if (viewModel.hasSessionCookies(header)) viewModel.onCookieHeader(header.orEmpty()) },
+                            onYoutubeReached = { header ->
+                                val ready = viewModel.hasSessionCookies(header)
+                                if (ready) viewModel.onCookieHeader(header.orEmpty())
+                                ready
+                            },
                             onBlocked = viewModel::onBlocked,
                         )
                     }
@@ -156,7 +160,7 @@ private fun LoginWebView(
     modifier: Modifier,
     onProgress: (Int) -> Unit,
     onCreated: (WebView) -> Unit,
-    onYoutubeReached: (String?) -> Unit,
+    onYoutubeReached: (String?) -> Boolean,
     onBlocked: (String) -> Unit,
 ) {
     val context = LocalContext.current
@@ -179,6 +183,12 @@ private fun LoginWebView(
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val uri = request.url
                 if (uri.scheme != "https" || !hostAllowed(uri.host)) return true
+                // The session cookies are ready as soon as Google hands off to youtube.com. Stop there
+                // instead of loading the heavy YouTube home page just to notice the cookies.
+                if (isYoutubeHost(uri.host) && onYoutubeReached(CookieManager.getInstance().getCookie("https://www.youtube.com"))) {
+                    view.stopLoading()
+                    return true
+                }
                 val text = uri.toString()
                 if (blockedMarkers.any { text.contains(it, ignoreCase = true) } || text.contains("signin/rejected")) {
                     onBlocked("rejected_url")
@@ -189,6 +199,10 @@ private fun LoginWebView(
 
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 onProgress(1)
+                val host = runCatching { android.net.Uri.parse(url).host }.getOrNull()
+                if (isYoutubeHost(host) && onYoutubeReached(CookieManager.getInstance().getCookie("https://www.youtube.com"))) {
+                    view.stopLoading()
+                }
             }
 
             override fun onPageFinished(view: WebView, url: String?) {

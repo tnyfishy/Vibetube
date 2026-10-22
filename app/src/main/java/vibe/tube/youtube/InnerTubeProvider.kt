@@ -40,6 +40,8 @@ import vibe.tube.youtube.parser.list
 import vibe.tube.youtube.parser.path
 import vibe.tube.youtube.parser.str
 import vibe.tube.youtube.parser.textOf
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 class InnerTubeProvider(
     private val client: InnerTubeClient,
@@ -54,16 +56,22 @@ class InnerTubeProvider(
         if (!vibe.tube.account.SapisidAuth.hasCredentials(jar)) return VerifyResult.LoggedOut
         val auth = RequestAuth(session.id, jar, session.pageId, session.visitorData)
         return try {
-            val menu = client.post("account/account_menu", locale = locale, auth = auth, skipLoggedOutCheck = true)
+            val (menu, pendingIdentities) = coroutineScope {
+                // accounts_list is independent of account_menu, so run both at once.
+                val list = async {
+                    runCatching {
+                        val r = client.post("account/accounts_list", locale = locale, auth = auth, skipLoggedOutCheck = true)
+                        AccountParser.parseIdentities(r.root)
+                    }.getOrDefault(emptyList())
+                }
+                client.post("account/account_menu", locale = locale, auth = auth, skipLoggedOutCheck = true) to list
+            }
             val profile = AccountParser.parseMenu(menu.root)
             if (!profile.loggedIn) {
                 client.forgetAccount(jar)
                 return VerifyResult.LoggedOut
             }
-            val identities = runCatching {
-                val list = client.post("account/accounts_list", locale = locale, auth = auth, skipLoggedOutCheck = true)
-                AccountParser.parseIdentities(list.root)
-            }.getOrDefault(emptyList())
+            val identities = pendingIdentities.await()
             VerifyResult.Verified(profile, identities, menu.visitorData ?: session.visitorData, jar.snapshot())
         } catch (e: AppError.SessionExpired) {
             VerifyResult.LoggedOut

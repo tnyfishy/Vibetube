@@ -1,6 +1,14 @@
 package vibe.tube.feature.account
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -51,7 +59,6 @@ import vibe.tube.ui.theme.Spacing
 
 private sealed interface Confirm {
     data class Logout(val id: String) : Confirm
-    data class Wipe(val id: String) : Confirm
     data object LogoutAll : Confirm
 }
 
@@ -84,7 +91,17 @@ fun AccountScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             item {
-                if (active == null) GuestCard(onLogin) else ActiveCard(active, auth, viewModel::refresh, onLogin)
+                val saved: @Composable () -> Unit = {
+                    SavedAccounts(
+                        sessions = sessions.values.toList(),
+                        activeId = context?.accountId,
+                        onSwitch = viewModel::switchAccount,
+                        onSignOut = { confirm = Confirm.Logout(it) },
+                        onAdd = onLogin,
+                    )
+                }
+                if (active == null) GuestCard(onLogin, saved.takeIf { sessions.isNotEmpty() })
+                else ActiveCard(active, auth, viewModel::refresh, onLogin, saved)
             }
             if (active != null && active.identities.size > 1) {
                 item {
@@ -115,52 +132,10 @@ fun AccountScreen(
                     }
                 }
             }
-            if (sessions.isNotEmpty()) {
-                item {
-                    HorizontalDivider()
-                    Text(stringResource(R.string.account_saved_accounts), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = Spacing.sm))
-                    Text(
-                        androidx.compose.ui.res.pluralStringResource(R.plurals.account_count, sessions.size, sessions.size),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                    Text(
-                        stringResource(R.string.account_isolation_note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                items(sessions.values.toList(), key = { "acc:${it.id}" }) { account ->
-                    val isActive = account.id == context?.accountId
-                    ListItem(
-                        modifier = Modifier.clickable(enabled = !isActive, role = Role.Button) { viewModel.switchAccount(account.id) },
-                        leadingContent = { Avatar(account.avatarUrl, Sizing.avatarLarge) },
-                        headlineContent = { Text(account.name) },
-                        supportingContent = { Text(account.handle ?: stringResource(R.string.account_no_handle)) },
-                        trailingContent = {
-                            if (isActive) {
-                                AssistChip(onClick = {}, label = { Text(stringResource(R.string.account_active)) })
-                            } else {
-                                TextButton(shapes = ButtonDefaults.shapes(), onClick = { confirm = Confirm.Logout(account.id) }) { Text(stringResource(R.string.action_sign_out)) }
-                            }
-                        },
-                    )
-                }
-            }
-            item {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = onLogin) {
-                        VIconImage(VIcon.PersonAdd, null)
-                        Text(stringResource(R.string.account_add), Modifier.padding(start = Spacing.sm))
-                    }
-                }
-            }
             if (active != null) {
                 item {
                     HorizontalDivider()
                     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm), modifier = Modifier.padding(top = Spacing.sm)) {
-                        OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { confirm = Confirm.Wipe(active.id) }, modifier = Modifier.fillMaxWidth()) {
-                            Text(stringResource(R.string.account_clear_local_data))
-                        }
                         OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = { confirm = Confirm.Logout(active.id) }, modifier = Modifier.fillMaxWidth()) {
                             VIconImage(VIcon.Logout, null)
                             Text(stringResource(R.string.action_sign_out), Modifier.padding(start = Spacing.sm))
@@ -187,7 +162,6 @@ fun AccountScreen(
     confirm?.let { c ->
         val (title, body, action) = when (c) {
             is Confirm.Logout -> Triple(R.string.dialog_sign_out_title, R.string.dialog_sign_out_body, { viewModel.logout(c.id) })
-            is Confirm.Wipe -> Triple(R.string.dialog_wipe_title, R.string.dialog_wipe_body, { viewModel.clearLocalData(c.id) })
             Confirm.LogoutAll -> Triple(R.string.dialog_sign_out_all_title, R.string.dialog_sign_out_all_body, { viewModel.logoutAll() })
         }
         AlertDialog(
@@ -201,18 +175,22 @@ fun AccountScreen(
 }
 
 @Composable
-private fun GuestCard(onLogin: () -> Unit) {
+private fun GuestCard(onLogin: () -> Unit, saved: (@Composable () -> Unit)?) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(stringResource(R.string.account_guest_title), style = MaterialTheme.typography.titleLarge)
             Text(stringResource(R.string.account_guest_body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Button(shapes = ButtonDefaults.shapes(), onClick = onLogin) { Text(stringResource(R.string.action_sign_in)) }
+            saved?.let {
+                HorizontalDivider()
+                it()
+            }
         }
     }
 }
 
 @Composable
-private fun ActiveCard(account: AccountSession, auth: AuthState, onRefresh: () -> Unit, onLogin: () -> Unit) {
+private fun ActiveCard(account: AccountSession, auth: AuthState, onRefresh: () -> Unit, onLogin: () -> Unit, saved: @Composable () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
@@ -245,6 +223,71 @@ private fun ActiveCard(account: AccountSession, auth: AuthState, onRefresh: () -
             OutlinedButton(shapes = ButtonDefaults.shapes(), onClick = onRefresh) {
                 VIconImage(VIcon.Refresh, null)
                 Text(stringResource(R.string.account_refresh), Modifier.padding(start = Spacing.sm))
+            }
+            HorizontalDivider()
+            saved()
+        }
+    }
+}
+
+/** "Accounts on this device": a collapsed row inside the profile card that expands on tap. */
+@Composable
+private fun SavedAccounts(
+    sessions: List<AccountSession>,
+    activeId: String?,
+    onSwitch: (String) -> Unit,
+    onSignOut: (String) -> Unit,
+    onAdd: () -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val rotation by animateFloatAsState(if (expanded) 180f else 0f, MaterialTheme.motionScheme.defaultSpatialSpec(), label = "chevron")
+    Column(Modifier.animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec())) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .clickable(role = Role.Button) { expanded = !expanded }
+                .padding(vertical = Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.account_saved_accounts), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    pluralStringResource(R.plurals.account_count, sessions.size, sessions.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            VIconImage(VIcon.ExpandMore, null, Modifier.rotate(rotation))
+        }
+        if (expanded) {
+            Text(
+                stringResource(R.string.account_isolation_note),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = Spacing.xs),
+            )
+            sessions.forEach { account ->
+                val isActive = account.id == activeId
+                ListItem(
+                    modifier = Modifier.clickable(enabled = !isActive, role = Role.Button) { onSwitch(account.id) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                    leadingContent = { Avatar(account.avatarUrl, Sizing.avatarLarge) },
+                    headlineContent = { Text(account.name) },
+                    supportingContent = { Text(account.handle ?: stringResource(R.string.account_no_handle)) },
+                    trailingContent = {
+                        if (isActive) {
+                            AssistChip(onClick = {}, label = { Text(stringResource(R.string.account_active)) })
+                        } else {
+                            TextButton(shapes = ButtonDefaults.shapes(), onClick = { onSignOut(account.id) }) { Text(stringResource(R.string.action_sign_out)) }
+                        }
+                    },
+                )
+            }
+            FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = onAdd, modifier = Modifier.padding(top = Spacing.xs)) {
+                VIconImage(VIcon.PersonAdd, null)
+                Text(stringResource(R.string.account_add), Modifier.padding(start = Spacing.sm))
             }
         }
     }

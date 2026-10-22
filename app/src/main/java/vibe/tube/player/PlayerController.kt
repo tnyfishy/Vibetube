@@ -77,6 +77,7 @@ class PlayerController @Inject constructor(
     private var suggestedNext: VideoItem? = null
     private var recoveredFor: String? = null
     private var avoidWebm = false
+    private val failedClients = mutableSetOf<String>()
     private var lastPersist = 0L
     private var wired = false
 
@@ -198,6 +199,7 @@ class PlayerController @Inject constructor(
         loadJob?.cancel()
         persistProgress()
         recoveredFor = if (keepSelection) recoveredFor else null
+        if (!keepSelection) failedClients.clear()
         mutable.update {
             it.copy(
                 current = video,
@@ -223,17 +225,20 @@ class PlayerController @Inject constructor(
                 val resume = startPositionMs ?: history.resumePosition(scopeKey(), video.id)
                 val ctx = session.currentContext()
                 val auth = ctx?.let { c -> session.authFor(c.accountId) }?.takeIf { session.authState.value is vibe.tube.account.AuthState.Verified }
-                val result = resolver.resolve(video.id, settings.latest.value.contentLocale(), auth)
+                val result = resolver.resolve(video.id, settings.latest.value.contentLocale(), auth, failedClients.toSet())
                 when (result) {
-                    is ResolveResult.Blocked -> fail(result.failure, result.detail ?: result.clientName)
+                    is ResolveResult.Blocked -> fail(
+                        if (failedClients.isNotEmpty()) PlaybackFailure.Expired else result.failure,
+                        result.detail ?: result.clientName,
+                    )
                     is ResolveResult.Playable -> startPlayback(result.media, video, resume)
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: AppError.Playback) {
-                fail(e.reason, e.detail)
+                fail(if (failedClients.isNotEmpty()) PlaybackFailure.Expired else e.reason, e.detail)
             } catch (e: Exception) {
-                fail(PlaybackFailure.Unavailable, e.message)
+                fail(if (failedClients.isNotEmpty()) PlaybackFailure.Expired else PlaybackFailure.Unavailable, e.message)
             }
         }
     }
@@ -301,10 +306,14 @@ class PlayerController @Inject constructor(
             load(video, engine.player.currentPosition.coerceAtLeast(0), keepSelection = true)
             return
         }
-        if (badStatus && recoveredFor != video.id) {
-            recoveredFor = video.id
-            load(video, engine.player.currentPosition.coerceAtLeast(0), keepSelection = true)
-            return
+        if (badStatus) {
+            // The stream URL was rejected: remember which client produced it and fail over to the next one.
+            currentMedia?.clientName?.let { failedClients += it }
+            if (failedClients.size < MAX_CLIENT_FAILOVERS) {
+                recoveredFor = video.id
+                load(video, engine.player.currentPosition.coerceAtLeast(0), keepSelection = true)
+                return
+            }
         }
         val failure = when {
             badStatus -> PlaybackFailure.Expired
@@ -332,6 +341,7 @@ class PlayerController @Inject constructor(
         val video = mutable.value.current ?: return
         recoveredFor = null
         avoidWebm = false
+        failedClients.clear()
         load(video, startPositionMs = mutable.value.positionMs.takeIf { it > 0 })
     }
 
@@ -484,5 +494,6 @@ class PlayerController @Inject constructor(
         private const val RESTART_THRESHOLD_MS = 3_000L
         private const val MAX_QUEUE_PAGES = 5
         const val NETWORK_DETAIL = "network"
+        private const val MAX_CLIENT_FAILOVERS = 4
     }
 }

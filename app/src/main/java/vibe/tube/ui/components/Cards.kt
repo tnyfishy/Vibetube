@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,6 +45,7 @@ import vibe.tube.youtube.model.ChannelItem
 import vibe.tube.youtube.model.PlaylistItem
 import vibe.tube.youtube.model.VideoAvailability
 import vibe.tube.youtube.model.VideoItem
+import vibe.tube.youtube.model.best
 import vibe.tube.youtube.model.bestFor
 
 @Composable
@@ -59,6 +62,13 @@ private fun OverlayBadge(text: String, modifier: Modifier = Modifier, container:
     )
 }
 
+/** Highest-resolution thumbnail first (maxres when it exists), then what the API returned. */
+private fun thumbnailCandidates(video: VideoItem): List<String> {
+    val given = video.thumbnails.best()
+    val maxres = if (video.isShort || video.isLive) null else "https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg"
+    return listOfNotNull(maxres, given, video.thumbnails.bestFor(480)).distinct()
+}
+
 @Composable
 fun VideoThumbnail(video: VideoItem, modifier: Modifier = Modifier) {
     val aspect = if (video.isShort) 9f / 16f else Sizing.THUMBNAIL_ASPECT
@@ -68,12 +78,16 @@ fun VideoThumbnail(video: VideoItem, modifier: Modifier = Modifier) {
             .clip(VibeShape.thumbnail)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest),
     ) {
+        // Note: `Modifier.align(..).then(matchParentSize())` lets `align` win and the image then
+        // renders at its intrinsic size (the "small picture in a grey box" bug), so size it explicitly.
         RemoteImage(
-            url = video.thumbnails.bestFor(480),
+            urls = thumbnailCandidates(video),
             contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .then(if (video.isShort) Modifier.aspectRatio(aspect) else Modifier.matchParentSize()),
+            modifier = if (video.isShort) {
+                Modifier.align(Alignment.Center).fillMaxHeight().aspectRatio(aspect)
+            } else {
+                Modifier.fillMaxSize()
+            },
         )
         val badge = when {
             video.isLive -> stringResource(R.string.badge_live)
@@ -259,7 +273,7 @@ fun PlaylistCard(
                 .clip(VibeShape.thumbnail)
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest),
         ) {
-            RemoteImage(playlist.thumbnails.bestFor(480), null, Modifier.matchParentSize())
+            RemoteImage(playlist.thumbnails.best(), null, Modifier.matchParentSize())
             playlist.videoCountText?.let {
                 OverlayBadge(it, Modifier.align(Alignment.BottomEnd).padding(Spacing.sm))
             }
