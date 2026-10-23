@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -241,8 +242,8 @@ internal fun MorphPlayer(
         val thumbH: () -> Float = { thumbW() / aspect }
         val videoH = wPx / aspect
         val dragRange: () -> Float = { max(maxY(), 1f) }
-        val slide: () -> Float = { away.value * (wPx - thumbX()) * (1f - p()) }
-        val awayAlpha: () -> Float = { 1f - away.value * (1f - p()) }
+        val slide: () -> Float = { away.value * (wPx - thumbX()) * (1f - progress.value.coerceIn(0f, 1f)) }
+        val awayAlpha: () -> Float = { 1f - away.value * (1f - progress.value.coerceIn(0f, 1f)) }
         val fadeRange = with(density) { 140.dp.toPx() }
 
         val p: () -> Float = { progress.value.coerceIn(0f, 1f) }
@@ -345,7 +346,7 @@ internal fun MorphPlayer(
                     }
                     .graphicsLayer {
                         alpha = ((p() - 0.12f) / 0.55f).coerceIn(0f, 1f)
-                        translationY = (1f - p()) * hPx * 0.16f
+                        translationY = (1f - progress.value.coerceIn(0f, 1f)) * hPx * 0.16f
                         compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
                     }
                     .background(pageColor)
