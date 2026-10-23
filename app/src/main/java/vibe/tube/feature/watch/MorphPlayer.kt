@@ -40,6 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -145,6 +146,11 @@ internal fun MorphPlayer(
     val anchorX = remember { Animatable(1f) }
     val anchorY = remember { Animatable(1f) }
     var miniDragging by remember { mutableStateOf(false) }
+    // Shared-element launch: when a video is started from a thumbnail the video flies out of that thumbnail's bounds.
+    // `originMix` is 1 while the card's bounds stand in for the mini card's, and fades to 0 once that is no longer needed.
+    val launchSeq = vibe.tube.ui.components.PlayerLaunch.seq
+    val launchRect = remember(launchSeq) { vibe.tube.ui.components.PlayerLaunch.take() }
+    val originMix = remember(launchRect) { Animatable(if (launchRect != null) 1f else 0f) }
 
     val target = if (visible && expanded) 1f else 0f
     // Whenever the player is minimized by swiping down (or any other way) it returns to the bottom-right corner. The
@@ -157,7 +163,15 @@ internal fun MorphPlayer(
             }
         }
     }
+    LaunchedEffect(originMix) {
+        if (originMix.value > 0f) {
+            // Once fully expanded the mini rect has no weight, so the switch is invisible.
+            snapshotFlow { progress.value >= 1f }.first { it }
+            originMix.snapTo(0f)
+        }
+    }
     LaunchedEffect(target) {
+        if (target == 0f && originMix.value > 0f) originMix.animateTo(0f, tween(260))
         if (target == 0f && !miniDragging) {
             launch { if (anchorX.value != 1f) anchorX.animateTo(1f, spring(dampingRatio = 1f, stiffness = 380f)) }
             launch { if (anchorY.value != 1f) anchorY.animateTo(1f, spring(dampingRatio = 1f, stiffness = 380f)) }
@@ -170,6 +184,7 @@ internal fun MorphPlayer(
         if (!visible) {
             progress.snapTo(0f)
             dismiss.snapTo(0f)
+            originMix.snapTo(0f)
         }
     }
 
@@ -196,14 +211,18 @@ internal fun MorphPlayer(
         // taller videos) that can be dragged around and always rests against an edge of the screen.
         val aspect = videoAspect
         val maxMiniW = wPx * MINI_WIDTH_FRACTION
-        val thumbW = minOf(maxMiniW, maxMiniW * 9f / 16f * aspect)
-        val thumbH = thumbW / aspect
+        val miniW = minOf(maxMiniW, maxMiniW * 9f / 16f * aspect)
+        val miniH = miniW / aspect
         val minX = sidePx
-        val maxX = max(wPx - sidePx - thumbW, minX)
+        val maxX = max(wPx - sidePx - miniW, minX)
         val minY = topInsetPx + sidePx
-        val maxY = max(hPx - bottomInsetPx - thumbH - gapPx, minY)
-        val thumbX: () -> Float = { minX + anchorX.value.coerceIn(0f, 1f) * (maxX - minX) }
-        val thumbY: () -> Float = { minY + anchorY.value.coerceIn(0f, 1f) * (maxY - minY) }
+        val maxY = max(hPx - bottomInsetPx - miniH - gapPx, minY)
+        val miniX: () -> Float = { minX + anchorX.value.coerceIn(0f, 1f) * (maxX - minX) }
+        val miniY: () -> Float = { minY + anchorY.value.coerceIn(0f, 1f) * (maxY - minY) }
+        val thumbX: () -> Float = { lerpF(miniX(), launchRect?.left ?: miniX(), originMix.value) }
+        val thumbY: () -> Float = { lerpF(miniY(), launchRect?.top ?: miniY(), originMix.value) }
+        val thumbW: () -> Float = { lerpF(miniW, launchRect?.width ?: miniW, originMix.value) }
+        val thumbH: () -> Float = { thumbW() / aspect }
         val videoH = wPx / aspect
         val dragRange = max(maxY, 1f)
         val fadeRange = with(density) { 140.dp.toPx() }
@@ -337,7 +356,7 @@ internal fun MorphPlayer(
                         layout(placeable.width, placeable.height) { placeable.place(0, 0) }
                     }
                     .graphicsLayer {
-                        val sc = lerpF(thumbW, wPx, p()) / wPx
+                        val sc = lerpF(thumbW(), wPx, p()) / wPx
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                         scaleX = sc
                         scaleY = sc
@@ -370,6 +389,27 @@ internal fun MorphPlayer(
                     chapters = activeChapters,
                     onChapters = { chaptersOpen = true },
                 )
+                // The tapped thumbnail stays visible inside the flying video until the first frame is there.
+                val video = current
+                if (video != null) {
+                    var firstFrame by remember(video.id) { mutableStateOf(false) }
+                    LaunchedEffect(video.id) {
+                        snapshotFlow { stateHolder.value.phase == vibe.tube.player.PlayerPhase.Ready }.first { it }
+                        firstFrame = true
+                    }
+                    val posterAlpha by androidx.compose.animation.core.animateFloatAsState(
+                        if (firstFrame) 0f else 1f,
+                        tween(if (firstFrame) 320 else 0),
+                        label = "poster",
+                    )
+                    if (posterAlpha > 0.001f) {
+                        vibe.tube.ui.components.RemoteImage(
+                            urls = vibe.tube.ui.components.thumbnailCandidates(video),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().graphicsLayer { alpha = posterAlpha },
+                        )
+                    }
+                }
             }
             // Playback progress: a straight line flush with the bottom edge of the minimized video.
             run {
@@ -380,9 +420,9 @@ internal fun MorphPlayer(
                         .placedRect(
                             x = { lerpF(thumbX(), 0f, p()) },
                             y = { lerpF(thumbY(), topInsetPx, p()) },
-                            w = { lerpF(thumbW, wPx, p()) },
-                            h = { lerpF(thumbH, videoH, p()) },
-                            show = { miniish },
+                            w = { lerpF(thumbW(), wPx, p()) },
+                            h = { lerpF(thumbH(), videoH, p()) },
+                            show = { miniish && originMix.value < 0.01f },
                         )
                         .graphicsLayer {
                             alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f)
@@ -409,7 +449,7 @@ internal fun MorphPlayer(
             // 3. Minimized: drag to move (it settles against the nearest screen edge on release), tap to expand.
             //    Play/pause and close are small icon buttons in the top corners.
             run {
-                val miniRect = Modifier.placedRect(thumbX, thumbY, { thumbW }, { thumbH }, show = { miniish || dragging })
+                val miniRect = Modifier.placedRect(miniX, miniY, { miniW }, { miniH }, show = { (miniish || dragging) && originMix.value < 0.01f })
                 val geo = remember { MiniGeo() }
                 val expandLabel = stringResource(R.string.action_expand_player)
                 geo.minX = minX; geo.maxX = maxX; geo.minY = minY; geo.maxY = maxY

@@ -223,6 +223,9 @@ object HomeIntro {
     const val HOLD = 1
     const val RUN = 2
     var phase by androidx.compose.runtime.mutableIntStateOf(NONE)
+
+    /** Set once the intro has played in this process, so rotating the screen does not replay it. */
+    var played = false
 }
 
 @Composable
@@ -270,6 +273,7 @@ fun SearchHeaderRow(
                 launch { titleShift.animateTo(0f, spring(dampingRatio = 0.42f, stiffness = 300f), initialVelocity = -bump * 0.9f) }
             }
             HomeIntro.phase = HomeIntro.NONE
+            HomeIntro.played = true
         }
     }
     val squish = with(density) { 28.dp.toPx() }

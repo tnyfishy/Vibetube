@@ -37,6 +37,8 @@ import vibe.tube.ui.components.LocalSharedTransitionScope
 import vibe.tube.ui.theme.LocalReducedMotion
 import kotlin.math.abs
 import androidx.compose.foundation.layout.Box
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
 import kotlin.math.max
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.layout.offset
@@ -241,7 +243,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     // Reserved for as long as the player exists (expanded or not), so expanding/collapsing never changes the padding of
     // every list underneath in the middle of the morph animation.
     val miniVisible = playerState.visible && !playerState.inPip
-    // The minimized player is a 16:9 card 84% of the width wide (see MorphPlayer); lists keep that much room below.
+    // The minimized player is a 16:9 card (MINI_WIDTH_FRACTION of the width) wide (see MorphPlayer); lists keep that much room below.
     val miniPadding = if (miniVisible) (windowConfig.screenWidthDp * vibe.tube.feature.watch.MINI_WIDTH_FRACTION * 9f / 16f).dp + 20.dp else 0.dp
 
     val hiddenIds = remember(settings.hiddenChannels)  { settings.hiddenChannelIds }
@@ -276,6 +278,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     // Distance (px) the mini player / snackbar sit above the bottom edge on Home.
     val homeLift: () -> Int = { max(barFullPx * (1f - hide), navInset.toFloat()).roundToInt() }
     CompositionLocalProvider(LocalVideoActions provides actions, vibe.tube.feature.watch.LocalSeekSeconds provides settings.seekSeconds, LocalMiniPlayerPadding provides (miniPadding + homeFeedPadding), vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds) {
+        val hazeState = dev.chrisbanes.haze.rememberHazeState()
         Box(Modifier.fillMaxSize().onSizeChanged { rootHeightPx = it.height }) {
             NavigationSuiteScaffold(
                 layoutType = if (isBar) NavigationSuiteType.None else suiteType,
@@ -297,7 +300,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                             .fillMaxSize()
                             .padding(bottom = reservedBottom)
                             .onGloballyPositioned { contentBottomPx = (it.positionInRoot().y + it.size.height).roundToInt() }
-                            
+                            .hazeSource(hazeState)
                             .tabSwipe(enabled = currentTab >= 0 && !(playerState.visible && playerState.expanded)) { direction ->
                                 tabs.getOrNull(currentTab + direction)?.let(goToTab)
                             },
@@ -319,13 +322,20 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                         )
                     }
                     if (isBar) {
+                        // Frosted glass: the feed that scrolls underneath is blurred behind the bar.
+                        val glassTint = MaterialTheme.colorScheme.surfaceContainer
                         Surface(
-                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            color = androidx.compose.ui.graphics.Color.Transparent,
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
                                 .height(barFullDp)
-                                .graphicsLayer { translationY = hide * barFullPx },
+                                .graphicsLayer { translationY = hide * barFullPx }
+                                .hazeEffect(hazeState) {
+                                    blurRadius = 24.dp
+                                    noiseFactor = 0f
+                                    tint = dev.chrisbanes.haze.HazeTint(glassTint.copy(alpha = 0.72f))
+                                },
                         ) {
                             Row(Modifier.fillMaxWidth().height(barBody)) {
                                 tabs.forEach { tab ->
@@ -377,7 +387,10 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
             var welcomeSeen by androidx.compose.runtime.remember {
                 val seen = welcomePrefs.getBoolean("welcome_seen", false)
                 // First launch: keep the home heading off screen under the welcome page until it is time to charge in.
-                if (!seen) vibe.tube.ui.components.HomeIntro.phase = vibe.tube.ui.components.HomeIntro.HOLD
+                // Every cold start plays the intro: straight away when the welcome page was already seen.
+                if (!vibe.tube.ui.components.HomeIntro.played) {
+                    vibe.tube.ui.components.HomeIntro.phase = if (seen) vibe.tube.ui.components.HomeIntro.RUN else vibe.tube.ui.components.HomeIntro.HOLD
+                }
                 androidx.compose.runtime.mutableStateOf(seen)
             }
             androidx.compose.animation.AnimatedVisibility(

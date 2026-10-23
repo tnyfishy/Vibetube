@@ -28,6 +28,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -64,7 +66,7 @@ private fun OverlayBadge(text: String, modifier: Modifier = Modifier, container:
 }
 
 /** Highest-resolution thumbnail first (maxres when it exists), then what the API returned. */
-private fun thumbnailCandidates(video: VideoItem): List<String> {
+internal fun thumbnailCandidates(video: VideoItem): List<String> {
     val given = video.thumbnails.best()
     val maxres = if (video.isShort || video.isLive) null else "https://i.ytimg.com/vi/${video.id}/maxresdefault.jpg"
     return listOfNotNull(maxres, given, video.thumbnails.bestFor(480)).distinct()
@@ -199,6 +201,7 @@ fun VideoCard(
     val description = metaLine(video.title, video.channelName, video.viewCountText, video.publishedText, video.durationText)
     val menuOpen = remember { mutableStateOf(false) }
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val thumbBounds = remember { ThumbnailBounds() }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -208,10 +211,13 @@ fun VideoCard(
                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                     menuOpen.value = true
                 },
-            ) { actions.play(video, if (queueMode) queue else listOf(video)) }
+            ) {
+                PlayerLaunch.set(thumbBounds.rect)
+                actions.play(video, if (queueMode) queue else listOf(video))
+            }
             .semantics(mergeDescendants = true) { contentDescription = description },
     ) {
-        VideoThumbnail(video, Modifier.fillMaxWidth())
+        VideoThumbnail(video, Modifier.fillMaxWidth().onGloballyPositioned { thumbBounds.rect = it.boundsInRoot() })
         Row(
             Modifier.padding(start = Spacing.xs, top = Spacing.sm, bottom = Spacing.sm),
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -247,6 +253,7 @@ fun VideoRow(
     val description = metaLine(video.title, video.channelName, video.viewCountText, video.publishedText, video.durationText)
     val menuOpen = remember { mutableStateOf(false) }
     val haptics = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val thumbBounds = remember { ThumbnailBounds() }
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -257,14 +264,17 @@ fun VideoRow(
                     haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                     menuOpen.value = true
                 },
-            ) { actions.play(video, if (queueMode) queue else listOf(video)) }
+            ) {
+                PlayerLaunch.set(thumbBounds.rect)
+                actions.play(video, if (queueMode) queue else listOf(video))
+            }
             .semantics(mergeDescendants = true) { contentDescription = description }
             .padding(vertical = Spacing.xs),
         horizontalArrangement = Arrangement.spacedBy(Spacing.md),
         verticalAlignment = Alignment.Top,
     ) {
         leading?.invoke()
-        VideoThumbnail(video, Modifier.width(Sizing.listThumbnailWidth), thumbnailShape)
+        VideoThumbnail(video, Modifier.width(Sizing.listThumbnailWidth).onGloballyPositioned { thumbBounds.rect = it.boundsInRoot() }, thumbnailShape)
         Column(Modifier.weight(1f)) {
             Text(
                 video.title,
