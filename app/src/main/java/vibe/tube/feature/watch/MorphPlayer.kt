@@ -76,7 +76,7 @@ import kotlin.math.roundToInt
 internal const val MINI_WIDTH_FRACTION = 0.53f
 
 /** Critically damped: glides to the end without overshooting or bouncing. */
-private val MORPH_SPEC = spring<Float>(dampingRatio = 1f, stiffness = 380f)
+private val MORPH_SPEC = spring<Float>(dampingRatio = 1f, stiffness = 250f)
 
 private fun lerpF(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
@@ -104,7 +104,8 @@ internal fun MorphPlayer(
     watch: WatchViewModel,
     onLogin: () -> Unit,
     onEnterPip: (() -> Unit)?,
-    contentBottomPx: Int,
+    contentBottom: () -> Int,
+    miniAway: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val ui by watch.state.collectAsStateWithLifecycle()
@@ -146,6 +147,15 @@ internal fun MorphPlayer(
     val anchorX = remember { Animatable(1f) }
     val anchorY = remember { Animatable(1f) }
     var miniDragging by remember { mutableStateOf(false) }
+    // Flinging the minimized player hard sends it flying off the screen in that direction and stops playback.
+    val flyP = remember { Animatable(0f) }
+    var flyDir by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    // Slides the minimized player off to the right (and fades it) while a page like Settings is open.
+    val away = androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (miniAway && !expanded) 1f else 0f,
+        animationSpec = tween(360, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        label = "miniAway",
+    )
     // Shared-element launch: when a video is started from a thumbnail the video flies out of that thumbnail's bounds.
     // `originMix` is 1 while the card's bounds stand in for the mini card's, and fades to 0 once that is no longer needed.
     val launchSeq = vibe.tube.ui.components.PlayerLaunch.seq
@@ -168,6 +178,7 @@ internal fun MorphPlayer(
             // Once fully expanded the mini rect has no weight, so the switch is invisible.
             snapshotFlow { progress.value >= 1f }.first { it }
             originMix.snapTo(0f)
+            flyP.snapTo(0f)
         }
     }
     LaunchedEffect(target) {
@@ -203,7 +214,12 @@ internal fun MorphPlayer(
         val hPx = constraints.maxHeight.toFloat()
         val topInsetPx = WindowInsets.safeDrawing.getTop(density).toFloat()
         val navInsetPx = WindowInsets.navigationBars.getBottom(density).toFloat()
-        val bottomInsetPx = max(navInsetPx, if (contentBottomPx > 0) hPx - contentBottomPx else 0f)
+        val imeInsets = WindowInsets.ime
+        // Read lazily (layout phase): the bar sliding or the keyboard opening moves the mini player without recomposing.
+        val bottomInset: () -> Float = {
+            val cb = contentBottom()
+            max(max(navInsetPx, imeInsets.getBottom(density).toFloat()), if (cb > 0) hPx - cb else 0f)
+        }
 
         val sidePx = with(density) { 8.dp.toPx() }
         val gapPx = with(density) { 8.dp.toPx() }
@@ -216,15 +232,17 @@ internal fun MorphPlayer(
         val minX = sidePx
         val maxX = max(wPx - sidePx - miniW, minX)
         val minY = topInsetPx + sidePx
-        val maxY = max(hPx - bottomInsetPx - miniH - gapPx, minY)
+        val maxY: () -> Float = { max(hPx - bottomInset() - miniH - gapPx, minY) }
         val miniX: () -> Float = { minX + anchorX.value.coerceIn(0f, 1f) * (maxX - minX) }
-        val miniY: () -> Float = { minY + anchorY.value.coerceIn(0f, 1f) * (maxY - minY) }
+        val miniY: () -> Float = { minY + anchorY.value.coerceIn(0f, 1f) * (maxY() - minY) }
         val thumbX: () -> Float = { lerpF(miniX(), launchRect?.left ?: miniX(), originMix.value) }
         val thumbY: () -> Float = { lerpF(miniY(), launchRect?.top ?: miniY(), originMix.value) }
         val thumbW: () -> Float = { lerpF(miniW, launchRect?.width ?: miniW, originMix.value) }
         val thumbH: () -> Float = { thumbW() / aspect }
         val videoH = wPx / aspect
-        val dragRange = max(maxY, 1f)
+        val dragRange: () -> Float = { max(maxY(), 1f) }
+        val slide: () -> Float = { away.value * (wPx - thumbX()) * (1f - p()) }
+        val awayAlpha: () -> Float = { 1f - away.value * (1f - p()) }
         val fadeRange = with(density) { 140.dp.toPx() }
 
         val p: () -> Float = { progress.value.coerceIn(0f, 1f) }
@@ -251,7 +269,7 @@ internal fun MorphPlayer(
                 } else if (progress.value <= 0.002f && (delta > 0f || dismiss.value > 0f)) {
                     dismiss.snapTo((dismiss.value + delta).coerceAtLeast(0f))
                 } else {
-                    progress.snapTo((progress.value - delta / dragRange).coerceIn(0f, 1f))
+                    progress.snapTo((progress.value - delta / dragRange()).coerceIn(0f, 1f))
                 }
             }
         }
@@ -285,7 +303,7 @@ internal fun MorphPlayer(
                             velocity < -900f -> true
                             else -> progress.value > 0.5f
                         }
-                        val v = -velocity / dragRange
+                        val v = -velocity / dragRange()
                         if (goExpanded == stateHolder.value.expanded) {
                             progress.animateTo(if (goExpanded) 1f else 0f, MORPH_SPEC, initialVelocity = v)
                         } else {
@@ -308,8 +326,9 @@ internal fun MorphPlayer(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    alpha = (1f - dismiss.value / fadeRange).coerceIn(0f, 1f) * enterFade.value
-                    translationY = dismiss.value * 0.5f
+                    alpha = (1f - dismiss.value / fadeRange).coerceIn(0f, 1f) * enterFade.value * (1f - flyP.value).coerceIn(0f, 1f)
+                    translationX = flyDir.x * flyP.value * wPx
+                    translationY = dismiss.value * 0.5f + flyDir.y * flyP.value * wPx
                 },
         ) {
             // Nothing below changes size while the card morphs: the page and the mini card only fade (and the page
@@ -360,11 +379,11 @@ internal fun MorphPlayer(
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
                         scaleX = sc
                         scaleY = sc
-                        translationX = lerpF(thumbX(), 0f, p())
+                        translationX = lerpF(thumbX(), 0f, p()) + slide()
                         translationY = lerpF(thumbY(), topInsetPx, p()) + fsOffset.value
                         shape = RoundedCornerShape(CornerSize(lerpF(12.dp.toPx(), 0f, t()) / sc))
                         clip = true
-                        alpha = (1f + fsOffset.value / fsRange).coerceIn(0f, 1f)
+                        alpha = (1f + fsOffset.value / fsRange).coerceIn(0f, 1f) * awayAlpha()
                     },
             ) {
                 // Position only matters to the controls; while they are hidden the surface sees a state that does not tick.
@@ -418,14 +437,14 @@ internal fun MorphPlayer(
                 Box(
                     Modifier
                         .placedRect(
-                            x = { lerpF(thumbX(), 0f, p()) },
+                            x = { lerpF(thumbX(), 0f, p()) + slide() },
                             y = { lerpF(thumbY(), topInsetPx, p()) },
                             w = { lerpF(thumbW(), wPx, p()) },
                             h = { lerpF(thumbH(), videoH, p()) },
                             show = { miniish && originMix.value < 0.01f },
                         )
                         .graphicsLayer {
-                            alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f)
+                            alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f) * awayAlpha()
                             compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
                             shape = RoundedCornerShape(lerpF(12.dp.toPx(), 0f, t()))
                             clip = true
@@ -449,18 +468,36 @@ internal fun MorphPlayer(
             // 3. Minimized: drag to move (it settles against the nearest screen edge on release), tap to expand.
             //    Play/pause and close are small icon buttons in the top corners.
             run {
-                val miniRect = Modifier.placedRect(miniX, miniY, { miniW }, { miniH }, show = { (miniish || dragging) && originMix.value < 0.01f })
+                val miniSettled by remember { derivedStateOf { progress.value < 0.01f } }
+                // The buttons appear only once the card has shrunk all the way down, and fade in then.
+                val btnAlpha = androidx.compose.animation.core.animateFloatAsState(
+                    targetValue = if (miniSettled && !miniDragging) 1f else 0f,
+                    animationSpec = tween(if (miniSettled && !miniDragging) 200 else 70, delayMillis = if (miniSettled && !miniDragging) 60 else 0),
+                    label = "miniButtons",
+                )
+                val miniRect = Modifier.placedRect({ miniX() + slide() }, miniY, { miniW }, { miniH }, show = { (miniish || dragging) && originMix.value < 0.01f && away.value < 0.5f })
+                val buttonsRect = Modifier.placedRect({ miniX() + slide() }, miniY, { miniW }, { miniH }, show = { btnAlpha.value > 0.01f && originMix.value < 0.01f && away.value < 0.5f })
                 val geo = remember { MiniGeo() }
                 val expandLabel = stringResource(R.string.action_expand_player)
-                geo.minX = minX; geo.maxX = maxX; geo.minY = minY; geo.maxY = maxY
+                geo.minX = minX; geo.maxX = maxX; geo.minY = minY; geo.maxYf = maxY
                 Box(
                     miniRect
                         .pointerInput(Unit) {
                             var total = androidx.compose.ui.geometry.Offset.Zero
                             val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
                             fun settle(velocity: androidx.compose.ui.unit.Velocity) {
+                                val speed = kotlin.math.hypot(velocity.x, velocity.y)
+                                if (speed > with(density) { 1500.dp.toPx() }) {
+                                    // A hard fling throws the player off the screen and stops it, like the close button.
+                                    flyDir = androidx.compose.ui.geometry.Offset(velocity.x / speed, velocity.y / speed)
+                                    scope.launch {
+                                        flyP.animateTo(1.15f, tween(260, easing = androidx.compose.animation.core.FastOutLinearInEasing))
+                                        controller.dismiss()
+                                    }
+                                    return
+                                }
                                 val rx = (geo.maxX - geo.minX).coerceAtLeast(1f)
-                                val ry = (geo.maxY - geo.minY).coerceAtLeast(1f)
+                                val ry = (geo.maxYf() - geo.minY).coerceAtLeast(1f)
                                 // Where it would coast to; the edge nearest to that point wins.
                                 val fx = (anchorX.value + velocity.x * 0.12f / rx).coerceIn(0f, 1f)
                                 val fy = (anchorY.value + velocity.y * 0.12f / ry).coerceIn(0f, 1f)
@@ -500,7 +537,7 @@ internal fun MorphPlayer(
                                 total += drag
                                 tracker.addPosition(change.uptimeMillis, total)
                                 val rx = (geo.maxX - geo.minX).coerceAtLeast(1f)
-                                val ry = (geo.maxY - geo.minY).coerceAtLeast(1f)
+                                val ry = (geo.maxYf() - geo.minY).coerceAtLeast(1f)
                                 scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
                                     anchorX.snapTo((anchorX.value + drag.x / rx).coerceIn(0f, 1f))
                                     anchorY.snapTo((anchorY.value + drag.y / ry).coerceIn(0f, 1f))
@@ -514,8 +551,8 @@ internal fun MorphPlayer(
                         },
                 )
                 Box(
-                    miniRect.graphicsLayer {
-                        alpha = ((0.3f - t()) / 0.3f).coerceIn(0f, 1f)
+                    buttonsRect.graphicsLayer {
+                        alpha = btnAlpha.value * awayAlpha()
                         compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
                     },
                 ) {
@@ -557,7 +594,7 @@ private class MiniGeo {
     var minX = 0f
     var maxX = 0f
     var minY = 0f
-    var maxY = 0f
+    var maxYf: () -> Float = { 0f }
 }
 
 /** Small M3 filled-tonal icon button (32dp container) for the corners of the minimized video. */

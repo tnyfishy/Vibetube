@@ -206,4 +206,5 @@ data class ChannelDetail(
     val subscriberText: String?,
     val description: String?,
     val subscribed: Boolean?,
+    val badge: ChannelBadge = ChannelBadge.None,
 )

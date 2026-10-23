@@ -106,7 +106,8 @@ fun PlayerOverlay(
     watch: WatchViewModel,
     onLogin: () -> Unit,
     onEnterPip: (() -> Unit)?,
-    contentBottomPx: Int = 0,
+    contentBottom: () -> Int = { 0 },
+    miniAway: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val config = LocalConfiguration.current
@@ -114,7 +115,7 @@ fun PlayerOverlay(
     val layoutFlags by remember { controller.state.map { it.fullscreen to it.inPip }.distinctUntilChanged() }
         .collectAsStateWithLifecycle(initialValue = false to false)
     if (!usesClassicPlayer(layoutFlags.first, layoutFlags.second, config.screenWidthDp, config.screenHeightDp)) {
-        MorphPlayer(player, controller, watch, onLogin, onEnterPip, contentBottomPx, modifier)
+        MorphPlayer(player, controller, watch, onLogin, onEnterPip, contentBottom, miniAway, modifier)
         return
     }
     val state by controller.state.collectAsStateWithLifecycle()

@@ -230,6 +230,7 @@ class InnerTubeProvider(
             },
             description = metadata.at("description").str,
             subscribed = subscribe.at("subscribed").let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.toBooleanStrictOrNull() },
+            badge = ItemParsers.badgeOf(header),
         )
     }
 

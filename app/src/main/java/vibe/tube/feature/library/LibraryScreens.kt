@@ -135,8 +135,11 @@ private fun LibraryCard(icon: Int, title: Int, onClick: () -> Unit, enabled: Boo
             Text(
                 stringResource(title),
                 style = MaterialTheme.typography.titleMedium,
+                // Always two lines tall, so a short label ("Downloaded") and a long one ("History on this device")
+                // give cards of the same height.
+                minLines = 2,
                 maxLines = 2,
-                modifier = Modifier.heightIn(min = 40.dp),
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
         }
     }

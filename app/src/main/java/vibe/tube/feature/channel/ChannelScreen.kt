@@ -69,7 +69,14 @@ fun ChannelScreen(
                     ) {
                         Avatar(d?.avatar, Sizing.avatarHero)
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                            Text(d?.name.orEmpty(), style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            vibe.tube.ui.components.ChannelMetaText(
+                                d?.name.orEmpty(),
+                                d?.badge ?: vibe.tube.youtube.model.ChannelBadge.None,
+                                emptyList(),
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 2,
+                            )
                             val meta = listOfNotNull(vibe.tube.youtube.parser.ItemParsers.decodeHandle(d?.handle), d?.subscriberText).joinToString(" · ")
                             if (meta.isNotBlank()) {
                                 Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

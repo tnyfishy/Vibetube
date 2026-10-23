@@ -283,6 +283,14 @@ private fun Controls(
     var dragValue by remember { mutableFloatStateOf(0f) }
     val duration = state.durationMs.coerceAtLeast(1)
     val fraction = if (dragging) dragValue else (state.positionMs.toFloat() / duration).coerceIn(0f, 1f)
+    // The pointer handler below lives for as long as the controls do (across videos), so it must read the current
+    // duration/callback instead of the ones from the first composition: a stale duration made a tap on the bar seek
+    // past the end of the video.
+    val latestDuration by androidx.compose.runtime.rememberUpdatedState(duration)
+    val latestSeek by androidx.compose.runtime.rememberUpdatedState(onSeek)
+    val latestInteract by androidx.compose.runtime.rememberUpdatedState(onInteract)
+    val busy = state.phase == PlayerPhase.Resolving || state.phase == PlayerPhase.Buffering
+    val playAlpha by androidx.compose.animation.core.animateFloatAsState(if (busy) 0f else 1f, tween(160), label = "playAlpha")
     Box(Modifier.fillMaxSize().background(MediaOverlayColors.controlsScrim)) {
         Row(
             Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(horizontal = Spacing.xs),
@@ -302,10 +310,12 @@ private fun Controls(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TooltipIconButton(VIcon.SkipPrevious, stringResource(R.string.action_previous), { onInteract(); onPrevious() }, tint = MediaOverlayColors.onScrim)
+            // While the player is loading (after a seek, say) only the loading indicator shows, not the play button on top of it.
             FilledIconButton(
                 onClick = { onInteract(); onTogglePlay() },
+                enabled = !busy,
                 shapes = IconButtonDefaults.shapes(),
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier.size(64.dp).graphicsLayer { alpha = playAlpha },
                 colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
             ) {
                 vibe.tube.ui.components.SwappingIcon(
@@ -329,17 +339,21 @@ private fun Controls(
                     )
                     val chapterIndex = vibe.tube.player.Chapters.currentIndex(chapters, shownMs)
                     if (chapterIndex >= 0) {
+                        // A small round separator, centred between the time and the chapter name with equal space on both sides.
+                        Box(
+                            Modifier
+                                .padding(horizontal = Spacing.sm)
+                                .size(3.dp)
+                                .background(MediaOverlayColors.onScrim.copy(alpha = 0.8f), androidx.compose.foundation.shape.CircleShape),
+                        )
                         Row(
                             Modifier
                                 .weight(1f, fill = false)
-                                .padding(start = Spacing.sm)
                                 .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
                                 .clickable(role = androidx.compose.ui.semantics.Role.Button) { onInteract(); onChapters() }
-                                .padding(horizontal = Spacing.sm, vertical = Spacing.xs),
+                                .padding(horizontal = Spacing.xs, vertical = Spacing.xs),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("\u2022", color = MediaOverlayColors.onScrim, style = MaterialTheme.typography.labelMedium)
-                            Spacer(Modifier.width(Spacing.xs))
                             Text(
                                 chapters[chapterIndex].title,
                                 color = MediaOverlayColors.onScrim,
@@ -348,6 +362,7 @@ private fun Controls(
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false),
                             )
+                            Spacer(Modifier.width(Spacing.xs))
                             VIconImage(VIcon.ArrowForward, null, Modifier.size(14.dp), tint = MediaOverlayColors.onScrim)
                         }
                     }
@@ -386,42 +401,48 @@ private fun Controls(
                                 fun at(x: Float) = ((x - insetPx) / (size.width - 2 * insetPx)).coerceIn(0f, 1f)
                                 dragging = true
                                 dragValue = at(down.position.x)
-                                onInteract()
+                                latestInteract()
                                 while (true) {
                                     val event = awaitPointerEvent()
                                     val change = event.changes.firstOrNull { it.id == down.id } ?: break
                                     if (!change.pressed) { change.consume(); break }
                                     dragValue = at(change.position.x)
                                     change.consume()
-                                    onInteract()
+                                    latestInteract()
                                 }
-                                onSeek((dragValue * duration).toLong())
+                                latestSeek((dragValue * latestDuration).toLong())
                                 dragging = false
                             }
                         },
                 ) {
-                    vibe.tube.ui.components.WavyProgress(
-                        progress = { fraction },
-                        amplitude = { waveAmp.value },
-                        animate = state.isPlaying && !dragging,
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MediaOverlayColors.onScrim.copy(alpha = 0.3f),
-                        thumb = androidx.compose.ui.unit.DpSize(4.dp, 20.dp),
-                    )
-                    if (chapters.size > 1) {
-                        // Chapter starts are marked as thin notches across the bar.
-                        androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
-                            val usable = size.width - 2 * insetPx
-                            val notch = 2.5.dp.toPx()
-                            chapters.drop(1).forEach { chapter ->
-                                val x = insetPx + usable * (chapter.startMs.toFloat() / duration).coerceIn(0f, 1f)
-                                drawRoundRect(
-                                    color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.55f),
-                                    topLeft = androidx.compose.ui.geometry.Offset(x - notch / 2f, size.height / 2f - 7.dp.toPx()),
-                                    size = androidx.compose.ui.geometry.Size(notch, 14.dp.toPx()),
-                                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(notch / 2f),
-                                )
+                    // The bar and its chapter gaps share one offscreen layer, so the gaps are real cuts through the line.
+                    Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }) {
+                        vibe.tube.ui.components.WavyProgress(
+                            progress = { fraction },
+                            amplitude = { waveAmp.value },
+                            animate = state.isPlaying && !dragging,
+                            modifier = Modifier.fillMaxSize(),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MediaOverlayColors.onScrim.copy(alpha = 0.3f),
+                            thumb = androidx.compose.ui.unit.DpSize(4.dp, 20.dp),
+                        )
+                        if (chapters.size > 1) {
+                            androidx.compose.foundation.Canvas(Modifier.fillMaxSize()) {
+                                val usable = size.width - 2 * insetPx
+                                val gap = 3.dp.toPx()
+                                val thumbX = insetPx + usable * fraction
+                                chapters.drop(1).forEach { chapter ->
+                                    val x = insetPx + usable * (chapter.startMs.toFloat() / duration).coerceIn(0f, 1f)
+                                    // Leave the thumb whole when it sits on a gap.
+                                    if (x <= insetPx + gap || x >= size.width - insetPx - gap) return@forEach
+                                    if (kotlin.math.abs(x - thumbX) < 5.dp.toPx()) return@forEach
+                                    drawRect(
+                                        color = androidx.compose.ui.graphics.Color.Black,
+                                        topLeft = androidx.compose.ui.geometry.Offset(x - gap / 2f, size.height / 2f - 8.dp.toPx()),
+                                        size = androidx.compose.ui.geometry.Size(gap, 16.dp.toPx()),
+                                        blendMode = androidx.compose.ui.graphics.BlendMode.Clear,
+                                    )
+                                }
                             }
                         }
                     }

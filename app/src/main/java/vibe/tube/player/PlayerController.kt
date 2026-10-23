@@ -22,6 +22,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -248,12 +249,19 @@ class PlayerController @Inject constructor(
             )
         }
         ensureService()
+        // The previous video must not keep playing (or reporting its own state) while the new one is being resolved:
+        // that is what left the old audio running under the new video's frozen picture.
+        engine.player.stop()
+        engine.player.clearMediaItems()
         loadJob = scope.launch {
             try {
                 val resume = startPositionMs ?: history.resumePosition(scopeKey(), video.id)
                 val ctx = session.currentContext()
                 val auth = ctx?.let { c -> session.authFor(c.accountId) }?.takeIf { session.authState.value is vibe.tube.account.AuthState.Verified }
                 val result = resolver.resolve(video.id, settings.latest.value.contentLocale(), auth, failedClients.toSet())
+                // A newer selection may have replaced this one while the (non-cooperative) network call was running.
+                kotlin.coroutines.coroutineContext.ensureActive()
+                if (mutable.value.current?.id != video.id) return@launch
                 when (result) {
                     is ResolveResult.Blocked -> fail(
                         if (failedClients.isNotEmpty()) PlaybackFailure.Expired else result.failure,

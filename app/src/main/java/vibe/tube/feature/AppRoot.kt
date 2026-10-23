@@ -248,7 +248,16 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
 
     val hiddenIds = remember(settings.hiddenChannels)  { settings.hiddenChannelIds }
     val density = androidx.compose.ui.platform.LocalDensity.current
-    val isBar = showNav && windowConfig.screenWidthDp < 600
+    val narrow = windowConfig.screenWidthDp < 600
+    val isBar = showNav && narrow
+    // Leaving the tabs slides the bar down (and bringing it back slides it up) instead of cutting it in or out.
+    val barOut = androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (showNav) 0f else 1f,
+        animationSpec = androidx.compose.animation.core.tween(320, easing = androidx.compose.animation.core.FastOutSlowInEasing),
+        label = "barOut",
+    )
+    val barOn by androidx.compose.runtime.remember { androidx.compose.runtime.derivedStateOf { barOut.value < 0.999f } }
+    val onSettings = destination?.hasRoute(SettingsRoute::class) == true
     val barBody = 60.dp
     val navInset = WindowInsets.navigationBars.getBottom(density)
     val barFullPx = with(density) { barBody.roundToPx() } + navInset
@@ -276,7 +285,11 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     val reservedBottom = if (isBar && !homeTab) barFullDp else 0.dp
     val homeFeedPadding = if (isBar && homeTab) barFullDp else 0.dp
     // Distance (px) the mini player / snackbar sit above the bottom edge on Home.
-    val homeLift: () -> Int = { max(barFullPx * (1f - hide), navInset.toFloat()).roundToInt() }
+    val homeLift: () -> Int = { max(barFullPx * (1f - max(hide, barOut.value)), navInset.toFloat()).roundToInt() }
+    val barLift: () -> Int = {
+        val h = if (homeTab || !showNav) max(hide, barOut.value) else barOut.value
+        max(barFullPx * (1f - h), navInset.toFloat()).roundToInt()
+    }
     CompositionLocalProvider(LocalVideoActions provides actions, vibe.tube.feature.watch.LocalSeekSeconds provides settings.seekSeconds, LocalMiniPlayerPadding provides (miniPadding + homeFeedPadding), vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds) {
         val hazeState = dev.chrisbanes.haze.rememberHazeState()
         Box(Modifier.fillMaxSize().onSizeChanged { rootHeightPx = it.height }) {
@@ -321,7 +334,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                             Modifier.align(Alignment.BottomCenter).padding(bottom = miniPadding).then(lift),
                         )
                     }
-                    if (isBar) {
+                    if (narrow && barOn) {
                         // Frosted glass: the feed that scrolls underneath is blurred behind the bar.
                         val glassTint = MaterialTheme.colorScheme.surfaceContainer
                         Surface(
@@ -330,7 +343,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
                                 .height(barFullDp)
-                                .graphicsLayer { translationY = hide * barFullPx }
+                                .graphicsLayer { translationY = max(hide, barOut.value) * barFullPx }
                                 .hazeEffect(hazeState) {
                                     blurRadius = 24.dp
                                     noiseFactor = 0f
@@ -380,8 +393,9 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                 onLogin = { controller.collapse(); nav.navigate(LoginRoute) },
                 onEnterPip = if (settings.pictureInPicture) onEnterPip else null,
                 contentBottom = {
-                    if (isBar) (if (homeTab) rootHeightPx - homeLift() else rootHeightPx - barFullPx).coerceAtLeast(0) else contentBottomPx
+                    if (narrow && barOn) (rootHeightPx - barLift()).coerceAtLeast(0) else contentBottomPx
                 },
+                miniAway = onSettings,
             )
             val welcomePrefs = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("app_state", android.content.Context.MODE_PRIVATE)
             var welcomeSeen by androidx.compose.runtime.remember {
@@ -622,9 +636,10 @@ private fun PlayerOverlayHost(
     onLogin: () -> Unit,
     onEnterPip: (() -> Unit)?,
     contentBottom: () -> Int,
+    miniAway: Boolean,
 ) {
-    // The lambda is read here, so only this host recomposes while the bottom bar slides.
-    PlayerOverlay(player = player, controller = controller, watch = watch, onLogin = onLogin, onEnterPip = onEnterPip, contentBottomPx = contentBottom())
+    // The bottom edge is passed as a lambda and only read in the layout phase, so the bar sliding does not recompose the player.
+    PlayerOverlay(player = player, controller = controller, watch = watch, onLogin = onLogin, onEnterPip = onEnterPip, contentBottom = contentBottom, miniAway = miniAway)
 }
 
 /** The few player facts the app shell reacts to; unlike the full state it does not change while playing. */
