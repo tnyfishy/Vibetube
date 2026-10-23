@@ -41,7 +41,7 @@ object GoogleSansFlex {
 
 /** User-tunable typography. [weightOffset] is added to every role's weight (0 = stock Material 3). */
 data class FontStyleSettings(
-    val font: AppFont = AppFont.System,
+    val font: AppFont = AppFont.GoogleSansFlex,
     val weightOffset: Int = 0,
     val width: Int = GoogleSansFlex.WIDTH_DEFAULT.toInt(),
     val roundness: Int = GoogleSansFlex.ROUNDNESS.toInt(),

@@ -81,7 +81,7 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.System,
     val dynamicColor: Boolean = true,
     val palette: vibe.tube.ui.theme.AppPalette = vibe.tube.ui.theme.AppPalette.Vibe,
-    val font: AppFont = AppFont.System,
+    val font: AppFont = AppFont.GoogleSansFlex,
     /** Added to every text role's weight; 0 is stock Material 3. */
     val fontWeightOffset: Int = 0,
     /** Google Sans Flex only: `wdth` axis (default 100). */
@@ -96,6 +96,8 @@ data class AppSettings(
     val autoplay: Boolean = true,
     /** Resume a paused video when headphones (wired or Bluetooth) connect. */
     val autoplayOnHeadphones: Boolean = false,
+    /** In fullscreen: swipe the left side for brightness and the right side for volume. */
+    val fullscreenGestures: Boolean = true,
     val backgroundPlayback: Boolean = true,
     /** Seconds skipped by a double tap on the video. */
     val seekSeconds: Int = 10,

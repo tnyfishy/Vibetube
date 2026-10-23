@@ -202,7 +202,7 @@ fun FontSheet(settings: AppSettings, onChange: (AppSettings.() -> AppSettings) -
             OutlinedButton(
                 shapes = ButtonDefaults.shapes(),
                 onClick = {
-                    font = AppFont.System; weight = 0f; width = GoogleSansFlex.WIDTH_DEFAULT; roundness = GoogleSansFlex.ROUNDNESS
+                    font = AppFont.GoogleSansFlex; weight = 0f; width = GoogleSansFlex.WIDTH_DEFAULT; roundness = GoogleSansFlex.ROUNDNESS
                     commit()
                 },
                 modifier = Modifier.padding(bottom = Spacing.lg),

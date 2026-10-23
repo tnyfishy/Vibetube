@@ -489,11 +489,31 @@ internal fun MorphPlayer(
                             fun settle(velocity: androidx.compose.ui.unit.Velocity) {
                                 val speed = kotlin.math.hypot(velocity.x, velocity.y)
                                 if (speed > with(density) { 1500.dp.toPx() }) {
-                                    // A hard fling throws the player off the screen and stops it, like the close button.
-                                    flyDir = androidx.compose.ui.geometry.Offset(velocity.x / speed, velocity.y / speed)
-                                    scope.launch {
-                                        flyP.animateTo(1.15f, tween(260, easing = androidx.compose.animation.core.FastOutLinearInEasing))
-                                        controller.dismiss()
+                                    val horizontal = kotlin.math.abs(velocity.x) >= kotlin.math.abs(velocity.y)
+                                    // Only a fling towards the screen edge the player is resting against sends it away.
+                                    val atLeft = anchorX.value <= 0.12f
+                                    val atRight = anchorX.value >= 0.88f
+                                    val atTop = anchorY.value <= 0.12f
+                                    val atBottom = anchorY.value >= 0.88f
+                                    val outward = if (horizontal) {
+                                        (velocity.x > 0f && atRight) || (velocity.x < 0f && atLeft)
+                                    } else {
+                                        (velocity.y > 0f && atBottom) || (velocity.y < 0f && atTop)
+                                    }
+                                    if (outward) {
+                                        // Like the close button: it flies off in that direction and playback stops.
+                                        flyDir = androidx.compose.ui.geometry.Offset(velocity.x / speed, velocity.y / speed)
+                                        scope.launch {
+                                            flyP.animateTo(1.15f, tween(260, easing = androidx.compose.animation.core.FastOutLinearInEasing))
+                                            controller.dismiss()
+                                        }
+                                    } else {
+                                        // The other way: it is thrown across to the opposite edge and stays on screen.
+                                        val toX = if (horizontal) (if (velocity.x > 0f) 1f else 0f) else anchorX.value
+                                        val toY = if (horizontal) anchorY.value else (if (velocity.y > 0f) 1f else 0f)
+                                        val throwSpec = spring<Float>(dampingRatio = 0.72f, stiffness = 380f)
+                                        scope.launch { anchorX.animateTo(toX, throwSpec) }
+                                        scope.launch { anchorY.animateTo(toY, throwSpec) }
                                     }
                                     return
                                 }

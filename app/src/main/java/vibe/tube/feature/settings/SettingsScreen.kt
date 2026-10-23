@@ -176,6 +176,9 @@ fun SettingsScreen(
                 SwitchRow(VIcon.MusicNote, R.string.settings_autoplay_headphones, R.string.settings_autoplay_headphones_desc, settings.autoplayOnHeadphones) { v -> viewModel.update { it.copy(autoplayOnHeadphones = v) } }
             }
             item {
+                SwitchRow(VIcon.Fullscreen, R.string.settings_fullscreen_gestures, R.string.settings_fullscreen_gestures_desc, settings.fullscreenGestures) { v -> viewModel.update { it.copy(fullscreenGestures = v) } }
+            }
+            item {
                 SwitchRow(VIcon.MusicNote, R.string.settings_background, R.string.settings_background_desc, settings.backgroundPlayback) { v -> viewModel.update { it.copy(backgroundPlayback = v) } }
             }
             item {

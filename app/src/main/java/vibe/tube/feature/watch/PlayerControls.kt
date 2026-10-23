@@ -124,6 +124,8 @@ fun VideoSurface(
     var controlsVisible by remember { mutableStateOf(true) }
     var interactions by remember { mutableFloatStateOf(0f) }
     val seekSeconds = LocalSeekSeconds.current
+    // In fullscreen the left/right thirds adjust brightness/volume; the middle keeps the swipe that leaves fullscreen.
+    val sideGestures = state.fullscreen && LocalFullscreenGestures.current
     var flashSide by remember { mutableStateOf(0) }
     var flashTotal by remember { mutableStateOf(0) }
     var flashKey by remember { mutableStateOf(0) }
@@ -145,7 +147,7 @@ fun VideoSurface(
     Box(
         modifier = modifier
             .background(MediaOverlayColors.videoBackground)
-            .then(dragModifier)
+            .then(if (sideGestures) Modifier else dragModifier)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = { controlsVisible = !controlsVisible },
@@ -176,6 +178,7 @@ fun VideoSurface(
             onRelease = { view -> view.player = null },
             modifier = Modifier.fillMaxSize(),
         )
+        if (sideGestures) FullscreenGestureZones(centerDrag = dragModifier)
         AnimatedVisibility(
             visible = flashVisible,
             enter = fadeIn(tween(80)),

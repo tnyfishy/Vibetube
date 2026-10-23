@@ -53,6 +53,7 @@ class SettingsRepository(
             mobileQuality = enumOr(this[MOBILE_Q], d.mobileQuality),
             autoplay = this[AUTOPLAY] ?: d.autoplay,
             autoplayOnHeadphones = this[AUTOPLAY_HEADPHONES] ?: d.autoplayOnHeadphones,
+            fullscreenGestures = this[FS_GESTURES] ?: d.fullscreenGestures,
             backgroundPlayback = this[BACKGROUND] ?: d.backgroundPlayback,
             seekSeconds = this[SEEK_SECONDS] ?: d.seekSeconds,
             pictureInPicture = this[PIP] ?: d.pictureInPicture,
@@ -81,6 +82,7 @@ class SettingsRepository(
         this[MOBILE_Q] = s.mobileQuality.name
         this[AUTOPLAY] = s.autoplay
         this[AUTOPLAY_HEADPHONES] = s.autoplayOnHeadphones
+        this[FS_GESTURES] = s.fullscreenGestures
         this[BACKGROUND] = s.backgroundPlayback
         this[SEEK_SECONDS] = s.seekSeconds
         this[PIP] = s.pictureInPicture
@@ -100,7 +102,7 @@ class SettingsRepository(
         private val THEME = stringPreferencesKey("theme_mode")
         private val DYNAMIC = booleanPreferencesKey("dynamic_color")
         private val PALETTE = stringPreferencesKey("palette")
-        private val FONT = stringPreferencesKey("font_family")
+        private val FONT = stringPreferencesKey("font_family_v2")
         private val FONT_WEIGHT = intPreferencesKey("font_weight_offset")
         private val FONT_WIDTH = intPreferencesKey("font_width")
         private val FONT_ROUND = intPreferencesKey("font_roundness")
@@ -111,6 +113,7 @@ class SettingsRepository(
         private val MOBILE_Q = stringPreferencesKey("mobile_quality")
         private val AUTOPLAY = booleanPreferencesKey("autoplay")
         private val AUTOPLAY_HEADPHONES = booleanPreferencesKey("autoplay_headphones")
+        private val FS_GESTURES = booleanPreferencesKey("fullscreen_gestures")
         private val BACKGROUND = booleanPreferencesKey("background_playback")
         private val SEEK_SECONDS = intPreferencesKey("seek_seconds")
         private val PIP = booleanPreferencesKey("pip")

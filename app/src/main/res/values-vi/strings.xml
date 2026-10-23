@@ -344,6 +344,10 @@
     <string name="palette_ocean">Đại dương</string>
     <string name="palette_rose">Hồng</string>
     <string name="palette_violet">Tím</string>
+    <string name="settings_fullscreen_gestures">Cử chỉ khi toàn màn hình</string>
+    <string name="settings_fullscreen_gestures_desc">Khi toàn màn hình, vuốt lên/xuống bên trái để chỉnh độ sáng, bên phải để chỉnh âm lượng</string>
+    <string name="gesture_brightness">Độ sáng</string>
+    <string name="gesture_volume">Âm lượng</string>
     <string name="settings_autoplay_headphones">Tự phát khi cắm tai nghe</string>
     <string name="settings_autoplay_headphones_desc">Tiếp tục phát video đang tạm dừng ngay khi kết nối tai nghe có dây hoặc Bluetooth</string>
     <string name="player_chapters">Các chương</string>

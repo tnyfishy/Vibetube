@@ -256,7 +256,6 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
         animationSpec = androidx.compose.animation.core.tween(320, easing = androidx.compose.animation.core.FastOutSlowInEasing),
         label = "barOut",
     )
-    val barOn by androidx.compose.runtime.remember { androidx.compose.runtime.derivedStateOf { barOut.value < 0.999f } }
     val onSettings = destination?.hasRoute(SettingsRoute::class) == true
     val barBody = 60.dp
     val navInset = WindowInsets.navigationBars.getBottom(density)
@@ -290,7 +289,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
         val h = if (homeTab || !showNav) max(hide, barOut.value) else barOut.value
         max(barFullPx * (1f - h), navInset.toFloat()).roundToInt()
     }
-    CompositionLocalProvider(LocalVideoActions provides actions, vibe.tube.feature.watch.LocalSeekSeconds provides settings.seekSeconds, LocalMiniPlayerPadding provides (miniPadding + homeFeedPadding), vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds) {
+    CompositionLocalProvider(LocalVideoActions provides actions, vibe.tube.feature.watch.LocalSeekSeconds provides settings.seekSeconds, vibe.tube.feature.watch.LocalFullscreenGestures provides settings.fullscreenGestures, LocalMiniPlayerPadding provides (miniPadding + homeFeedPadding), vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds) {
         val hazeState = dev.chrisbanes.haze.rememberHazeState()
         Box(Modifier.fillMaxSize().onSizeChanged { rootHeightPx = it.height }) {
             NavigationSuiteScaffold(
@@ -334,11 +333,14 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                             Modifier.align(Alignment.BottomCenter).padding(bottom = miniPadding).then(lift),
                         )
                     }
-                    if (narrow && barOn) {
+                    // Kept composed even while it is slid out of sight: removing and re-creating it lost the frosted-glass
+                    // effect (the bar came back see-through) after visiting a page without the bar, such as Settings.
+                    if (narrow) {
                         // Frosted glass: the feed that scrolls underneath is blurred behind the bar.
                         val glassTint = MaterialTheme.colorScheme.surfaceContainer
                         Surface(
-                            color = androidx.compose.ui.graphics.Color.Transparent,
+                            // A base tint under the blur keeps the bar readable even if the blur is not drawn.
+                            color = glassTint.copy(alpha = 0.6f),
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
@@ -347,7 +349,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                                 .hazeEffect(hazeState) {
                                     blurRadius = 24.dp
                                     noiseFactor = 0f
-                                    tints = listOf(dev.chrisbanes.haze.HazeTint(glassTint.copy(alpha = 0.72f)))
+                                    tints = listOf(dev.chrisbanes.haze.HazeTint(glassTint.copy(alpha = 0.5f)))
                                 },
                         ) {
                             Row(Modifier.fillMaxWidth().height(barBody)) {
@@ -393,7 +395,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                 onLogin = { controller.collapse(); nav.navigate(LoginRoute) },
                 onEnterPip = if (settings.pictureInPicture) onEnterPip else null,
                 contentBottom = {
-                    if (narrow && barOn) (rootHeightPx - barLift()).coerceAtLeast(0) else contentBottomPx
+                    if (narrow) (rootHeightPx - barLift()).coerceAtLeast(0) else contentBottomPx
                 },
                 miniAway = onSettings,
             )
