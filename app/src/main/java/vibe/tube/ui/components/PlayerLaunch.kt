@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
 
 /**
  * Hands the on-screen bounds of the thumbnail that was tapped to the player, so the video can fly out of that
@@ -25,7 +26,13 @@ object PlayerLaunch {
     fun take(): Rect? = rect.also { rect = null }
 }
 
-/** Remembers where a thumbnail currently is, without making every scroll frame a state write. */
+/**
+ * Remembers the thumbnail's layout node; the bounds are only computed at tap time, so scrolling does no extra work
+ * (no per-frame `boundsInRoot()` allocation).
+ */
 class ThumbnailBounds {
-    var rect: Rect? = null
+    var coordinates: androidx.compose.ui.layout.LayoutCoordinates? = null
+
+    val rect: Rect?
+        get() = coordinates?.takeIf { it.isAttached }?.let { it.boundsInRoot() }
 }

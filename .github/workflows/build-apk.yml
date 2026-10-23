@@ -46,6 +46,25 @@ jobs:
           fi
           exit "$code"
 
+      # Optimised build (R8 + resource shrinking + baseline profile): much smoother and lighter than the debug APK.
+      # Published as an extra asset; if it fails the debug APK still ships.
+      - name: Build optimized release APK
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          ./gradlew :app:assembleRelease --stacktrace > release.log 2>&1
+          code=$?
+          tail -n 60 release.log
+          if [ "$code" -ne 0 ]; then
+            grep -E '^e: |error:' release.log | head -9 | while IFS= read -r line; do
+              echo "::error title=Release build::${line:0:400}"
+            done
+            msg="$(grep -A12 'What went wrong' release.log | head -14 | sed ':a;N;$!ba;s/\n/%0A/g')"
+            echo "::error title=Release Gradle::${msg}"
+          fi
+          exit "$code"
+
       - name: Name the APK
         id: apk
         run: |
@@ -53,12 +72,21 @@ jobs:
           out="vibetube-debug-${short}.apk"
           cp app/build/outputs/apk/debug/app-debug.apk "$out"
           echo "file=$out" >> "$GITHUB_OUTPUT"
+          rel="vibetube-release-${short}.apk"
+          if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk "$rel"
+            echo "release=$rel" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=$out" >> "$GITHUB_OUTPUT"
+          fi
           echo "tag=build-${GITHUB_RUN_NUMBER}-${short}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
           name: vibetube-debug-apk
-          path: ${{ steps.apk.outputs.file }}
+          path: |
+            ${{ steps.apk.outputs.file }}
+            ${{ steps.apk.outputs.release }}
           if-no-files-found: error
 
       - name: Publish to GitHub Release (pre-release)
@@ -68,9 +96,12 @@ jobs:
           name: Vibetube debug ${{ steps.apk.outputs.tag }}
           target_commitish: ${{ github.sha }}
           prerelease: true
-          files: ${{ steps.apk.outputs.file }}
+          files: |
+            ${{ steps.apk.outputs.file }}
+            ${{ steps.apk.outputs.release }}
           body: |
-            Debug APK built from `${{ github.sha }}` on `${{ github.ref_name }}`.
+            Built from `${{ github.sha }}` on `${{ github.ref_name }}`.
+            `vibetube-release-*.apk` = optimized build (R8 + baseline profile, smoother/lighter); `vibetube-debug-*.apk` = debug build.
 
       # Unit tests run after the APK is published so a flaky test never blocks the download.
       - name: Unit tests

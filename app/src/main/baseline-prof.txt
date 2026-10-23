@@ -8,7 +8,6 @@ HSPLandroidx/compose/material3/**;->**(**)**
 HSPLandroidx/lifecycle/**;->**(**)**
 HSPLandroidx/navigation/**;->**(**)**
 HSPLcoil3/**;->**(**)**
-HSPLdev/chrisbanes/haze/**;->**(**)**
 HSPLvibe/tube/**;->**(**)**
 Landroidx/compose/runtime/**;
 Landroidx/compose/ui/**;

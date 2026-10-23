@@ -2,6 +2,10 @@ package vibe.tube
 
 import android.app.Application
 import androidx.appcompat.app.AppCompatDelegate
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import coil3.memory.MemoryCache
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -14,7 +18,7 @@ import vibe.tube.data.settings.ThemeMode
 import javax.inject.Inject
 
 @HiltAndroidApp
-class VibetubeApp : Application() {
+class VibetubeApp : Application(), SingletonImageLoader.Factory {
 
     @Inject lateinit var settings: SettingsRepository
     @Inject lateinit var sessionManager: SessionManager
@@ -37,6 +41,12 @@ class VibetubeApp : Application() {
             if (sessionManager.currentSession() != null) sessionManager.verifyActive()
         }
     }
+
+    /** Image cache tuned for scrolling feeds: moderate RAM share, no global crossfade (lists opt in per request). */
+    override fun newImageLoader(context: PlatformContext): ImageLoader =
+        ImageLoader.Builder(context)
+            .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.18).build() }
+            .build()
 
     private companion object {
         const val CACHE_RETENTION_MS = 7L * 24 * 60 * 60 * 1000

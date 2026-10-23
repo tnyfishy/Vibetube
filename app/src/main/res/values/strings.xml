@@ -348,6 +348,8 @@
     <string name="palette_rose">Rose</string>
     <string name="palette_violet">Violet</string>
     <string name="settings_fullscreen_gestures">Fullscreen gestures</string>
+    <string name="settings_fullscreen_swipe">Swipe to enter/exit fullscreen</string>
+    <string name="settings_fullscreen_swipe_desc">Swipe up on the player to go fullscreen and down to leave it. When off, brightness and volume each take half of the screen</string>
     <string name="settings_fullscreen_gestures_desc">In fullscreen, swipe up/down on the left side for brightness and on the right side for volume</string>
     <string name="gesture_brightness">Brightness</string>
     <string name="gesture_volume">Volume</string>

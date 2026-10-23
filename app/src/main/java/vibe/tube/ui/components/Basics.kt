@@ -141,7 +141,7 @@ fun RemoteImage(
     val reduced = LocalReducedMotion.current
     var index by androidx.compose.runtime.remember(urls) { androidx.compose.runtime.mutableIntStateOf(0) }
     val request = androidx.compose.runtime.remember(urls, index, reduced) {
-        ImageRequest.Builder(context).data(urls.getOrNull(index)).crossfade(!reduced).build()
+        ImageRequest.Builder(context).data(urls.getOrNull(index)).crossfade(if (reduced) 0 else 120).build()
     }
     AsyncImage(
         model = request,

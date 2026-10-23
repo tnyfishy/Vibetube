@@ -41,7 +41,10 @@ class PlayerEngine @Inject constructor(@ApplicationContext private val context: 
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .setLoadControl(
                 DefaultLoadControl.Builder()
-                    .setBufferDurationsMs(40_000, 120_000, 1_000, 2_500)
+                    // Smaller buffers keep memory and network wake-ups down; 60 s ahead is plenty for streaming.
+                    .setBufferDurationsMs(25_000, 60_000, 1_000, 2_500)
+                    .setTargetBufferBytes(48 * 1024 * 1024)
+                    .setBackBuffer(10_000, false)
                     .build(),
             )
             .setSeekBackIncrementMs(10_000)

@@ -28,8 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -84,7 +83,7 @@ fun VideoThumbnail(video: VideoItem, modifier: Modifier = Modifier, shape: andro
         // Note: `Modifier.align(..).then(matchParentSize())` lets `align` win and the image then
         // renders at its intrinsic size (the "small picture in a grey box" bug), so size it explicitly.
         RemoteImage(
-            urls = thumbnailCandidates(video),
+            urls = remember(video.id, video.isShort, video.isLive) { thumbnailCandidates(video) },
             contentDescription = null,
             modifier = if (video.isShort) {
                 Modifier.align(Alignment.Center).fillMaxHeight().aspectRatio(aspect)
@@ -217,7 +216,7 @@ fun VideoCard(
             }
             .semantics(mergeDescendants = true) { contentDescription = description },
     ) {
-        VideoThumbnail(video, Modifier.fillMaxWidth().onGloballyPositioned { thumbBounds.rect = it.boundsInRoot() })
+        VideoThumbnail(video, Modifier.fillMaxWidth().onPlaced { thumbBounds.coordinates = it })
         Row(
             Modifier.padding(start = Spacing.xs, top = Spacing.sm, bottom = Spacing.sm),
             horizontalArrangement = Arrangement.spacedBy(Spacing.md),
@@ -274,7 +273,7 @@ fun VideoRow(
         verticalAlignment = Alignment.Top,
     ) {
         leading?.invoke()
-        VideoThumbnail(video, Modifier.width(Sizing.listThumbnailWidth).onGloballyPositioned { thumbBounds.rect = it.boundsInRoot() }, thumbnailShape)
+        VideoThumbnail(video, Modifier.width(Sizing.listThumbnailWidth).onPlaced { thumbBounds.coordinates = it }, thumbnailShape)
         Column(Modifier.weight(1f)) {
             Text(
                 video.title,

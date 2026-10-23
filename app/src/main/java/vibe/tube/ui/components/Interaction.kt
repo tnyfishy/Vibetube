@@ -285,7 +285,8 @@ fun SearchHeaderRow(
             modifier = Modifier
                 .onSizeChanged { titleWidth = it.width }
                 .graphicsLayer {
-                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                    // Offscreen layer only while the fade mask is actually drawn.
+                    compositingStrategy = if (expansion.value > 0f) androidx.compose.ui.graphics.CompositingStrategy.Offscreen else androidx.compose.ui.graphics.CompositingStrategy.Auto
                     alpha = 1f - expansion.value
                     translationX = if (introPhase == HomeIntro.HOLD || (introPhase == HomeIntro.RUN && !introStarted)) -offscreen else titleShift.value
                 }

@@ -98,6 +98,7 @@ data class AppSettings(
     val autoplayOnHeadphones: Boolean = false,
     /** In fullscreen: swipe the left side for brightness and the right side for volume. */
     val fullscreenGestures: Boolean = true,
+    val fullscreenSwipeToggle: Boolean = true,
     val backgroundPlayback: Boolean = true,
     /** Seconds skipped by a double tap on the video. */
     val seekSeconds: Int = 10,

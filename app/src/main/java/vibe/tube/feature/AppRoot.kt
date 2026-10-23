@@ -37,8 +37,6 @@ import vibe.tube.ui.components.LocalSharedTransitionScope
 import vibe.tube.ui.theme.LocalReducedMotion
 import kotlin.math.abs
 import androidx.compose.foundation.layout.Box
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
 import kotlin.math.max
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.layout.offset
@@ -289,8 +287,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
         val h = if (homeTab || !showNav) max(hide, barOut.value) else barOut.value
         max(barFullPx * (1f - h), navInset.toFloat()).roundToInt()
     }
-    CompositionLocalProvider(LocalVideoActions provides actions, vibe.tube.feature.watch.LocalSeekSeconds provides settings.seekSeconds, vibe.tube.feature.watch.LocalFullscreenGestures provides settings.fullscreenGestures, LocalMiniPlayerPadding provides (miniPadding + homeFeedPadding), vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds) {
-        val hazeState = dev.chrisbanes.haze.rememberHazeState()
+    CompositionLocalProvider(LocalVideoActions provides actions, vibe.tube.feature.watch.LocalSeekSeconds provides settings.seekSeconds, vibe.tube.feature.watch.LocalFullscreenGestures provides settings.fullscreenGestures, vibe.tube.feature.watch.LocalFullscreenSwipeToggle provides settings.fullscreenSwipeToggle, LocalMiniPlayerPadding provides (miniPadding + homeFeedPadding), vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds) {
         Box(Modifier.fillMaxSize().onSizeChanged { rootHeightPx = it.height }) {
             NavigationSuiteScaffold(
                 layoutType = if (isBar) NavigationSuiteType.None else suiteType,
@@ -312,7 +309,6 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                             .fillMaxSize()
                             .padding(bottom = reservedBottom)
                             .onGloballyPositioned { contentBottomPx = (it.positionInRoot().y + it.size.height).roundToInt() }
-                            .hazeSource(hazeState)
                             .tabSwipe(enabled = currentTab >= 0 && !(playerState.visible && playerState.expanded)) { direction ->
                                 tabs.getOrNull(currentTab + direction)?.let(goToTab)
                             },
@@ -333,24 +329,15 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                             Modifier.align(Alignment.BottomCenter).padding(bottom = miniPadding).then(lift),
                         )
                     }
-                    // Kept composed even while it is slid out of sight: removing and re-creating it lost the frosted-glass
-                    // effect (the bar came back see-through) after visiting a page without the bar, such as Settings.
+                    // Kept composed even while it is slid out of sight, so it never has to be rebuilt.
                     if (narrow) {
-                        // Frosted glass: the feed that scrolls underneath is blurred behind the bar.
-                        val glassTint = MaterialTheme.colorScheme.surfaceContainer
                         Surface(
-                            // A base tint under the blur keeps the bar readable even if the blur is not drawn.
-                            color = glassTint.copy(alpha = 0.6f),
+                            color = MaterialTheme.colorScheme.surfaceContainer,
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
                                 .height(barFullDp)
-                                .graphicsLayer { translationY = max(hide, barOut.value) * barFullPx }
-                                .hazeEffect(hazeState) {
-                                    blurRadius = 24.dp
-                                    noiseFactor = 0f
-                                    tints = listOf(dev.chrisbanes.haze.HazeTint(glassTint.copy(alpha = 0.5f)))
-                                },
+                                .graphicsLayer { translationY = max(hide, barOut.value) * barFullPx },
                         ) {
                             Row(Modifier.fillMaxWidth().height(barBody)) {
                                 tabs.forEach { tab ->

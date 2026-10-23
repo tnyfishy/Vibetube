@@ -107,6 +107,7 @@ fun FeedContent(
     modifier: Modifier = Modifier,
     gridState: LazyGridState = rememberLazyGridState(),
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    indicatorTopPadding: androidx.compose.ui.unit.Dp = contentPadding.calculateTopPadding(),
     emptyTitle: String = stringResource(R.string.feed_empty_title),
     emptyBody: String? = stringResource(R.string.feed_empty_body),
     guestBanner: Boolean = false,
@@ -135,7 +136,7 @@ fun FeedContent(
             androidx.compose.material3.pulltorefresh.PullToRefreshDefaults.LoadingIndicator(
                 state = ptrState,
                 isRefreshing = refreshing,
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = contentPadding.calculateTopPadding()),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = indicatorTopPadding),
             )
         },
     ) {

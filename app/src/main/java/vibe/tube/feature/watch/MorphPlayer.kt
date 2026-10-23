@@ -262,10 +262,11 @@ internal fun MorphPlayer(
             controller.dismiss()
         }
 
+        val swipeToggleState = androidx.compose.runtime.rememberUpdatedState(LocalFullscreenSwipeToggle.current)
         val dragState = rememberDraggableState { delta ->
             // UNDISPATCHED: apply the delta in this very frame instead of queueing a coroutine per touch event.
             scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
-                if (progress.value >= 0.999f && !stateHolder.value.fullscreen && (delta < 0f || fsOffset.value < 0f)) {
+                if (swipeToggleState.value && progress.value >= 0.999f && !stateHolder.value.fullscreen && (delta < 0f || fsOffset.value < 0f)) {
                     fsOffset.snapTo((fsOffset.value + delta).coerceIn(-fsRange, 0f))
                 } else if (progress.value <= 0.002f && (delta > 0f || dismiss.value > 0f)) {
                     dismiss.snapTo((dismiss.value + delta).coerceAtLeast(0f))

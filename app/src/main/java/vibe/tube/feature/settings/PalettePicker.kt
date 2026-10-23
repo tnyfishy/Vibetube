@@ -1,9 +1,19 @@
 package vibe.tube.feature.settings
 
 import android.os.Build
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +27,6 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -109,23 +118,60 @@ private fun PaletteTile(
     dynamicBadge: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val border by animateColorAsState(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, label = "tileBorder")
+    // Circle at rest, squircle when chosen; the colour disc is split into three sectors (primary / secondary / tertiary).
+    val corner by animateDpAsState(
+        if (selected) 22.dp else 36.dp,
+        spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        label = "tileCorner",
+    )
+    val ring by animateDpAsState(if (selected) 3.dp else 0.dp, spring(stiffness = Spring.StiffnessMedium), label = "tileRing")
+    val badge by animateFloatAsState(if (selected) 1f else 0f, spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMediumLow), label = "tileBadge")
+    val ringColor = MaterialTheme.colorScheme.primary
+    val gap = MaterialTheme.colorScheme.surface
     Column(
         Modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = container,
-            border = BorderStroke(if (selected) 3.dp else 1.dp, border),
-            modifier = Modifier.size(72.dp),
-        ) {
-            Box(Modifier.size(72.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.size(44.dp).clip(CircleShape).background(primary))
-                Box(Modifier.align(Alignment.BottomEnd).padding(8.dp).size(18.dp).clip(CircleShape).background(secondary))
-                Box(Modifier.align(Alignment.TopStart).padding(8.dp).size(14.dp).clip(CircleShape).background(tertiary))
-                if (selected) {
-                    VIconImage(VIcon.Check, null, tint = contrastOn(primary), modifier = Modifier.size(22.dp))
+        Box(Modifier.size(76.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .size(68.dp)
+                    .graphicsLayer { scaleX = 1f - 0.04f * (1f - badge); scaleY = scaleX }
+                    .drawBehind {
+                        val r = androidx.compose.ui.geometry.CornerRadius(corner.toPx())
+                        val outline = ring.toPx()
+                        if (outline > 0.1f) {
+                            drawRoundRect(ringColor, cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner.toPx() + 4.dp.toPx()), topLeft = Offset(-4.dp.toPx(), -4.dp.toPx()), size = Size(size.width + 8.dp.toPx(), size.height + 8.dp.toPx()), style = Stroke(outline))
+                        }
+                        drawRoundRect(container, cornerRadius = r)
+                    }
+                    .clip(RoundedCornerShape(corner)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val w = size.width
+                    val h = size.height
+                    val g = 2.dp.toPx()
+                    drawRect(primary, topLeft = Offset.Zero, size = Size(w / 2f - g / 2f, h))
+                    drawRect(secondary, topLeft = Offset(w / 2f + g / 2f, 0f), size = Size(w / 2f - g / 2f, h / 2f - g / 2f))
+                    drawRect(tertiary, topLeft = Offset(w / 2f + g / 2f, h / 2f + g / 2f), size = Size(w / 2f - g / 2f, h / 2f - g / 2f))
+                }
+                if (dynamicBadge || selected) {
+                    Box(
+                        Modifier
+                            .size(30.dp)
+                            .graphicsLayer { val k = if (dynamicBadge && !selected) 1f else badge; scaleX = k; scaleY = k; alpha = k }
+                            .clip(CircleShape)
+                            .background(gap),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        VIconImage(
+                            if (selected) VIcon.Check else VIcon.Palette,
+                            null,
+                            tint = if (selected) ringColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                 }
             }
         }
@@ -139,6 +185,3 @@ private fun PaletteTile(
     }
 }
 
-private fun contrastOn(c: Color): Color = if (c.luminance() > 0.5f) Color.Black else Color.White
-
-private fun Color.luminance(): Float = 0.2126f * red + 0.7152f * green + 0.0722f * blue

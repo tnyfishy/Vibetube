@@ -54,6 +54,7 @@ class SettingsRepository(
             autoplay = this[AUTOPLAY] ?: d.autoplay,
             autoplayOnHeadphones = this[AUTOPLAY_HEADPHONES] ?: d.autoplayOnHeadphones,
             fullscreenGestures = this[FS_GESTURES] ?: d.fullscreenGestures,
+            fullscreenSwipeToggle = this[FS_SWIPE_TOGGLE] ?: d.fullscreenSwipeToggle,
             backgroundPlayback = this[BACKGROUND] ?: d.backgroundPlayback,
             seekSeconds = this[SEEK_SECONDS] ?: d.seekSeconds,
             pictureInPicture = this[PIP] ?: d.pictureInPicture,
@@ -83,6 +84,7 @@ class SettingsRepository(
         this[AUTOPLAY] = s.autoplay
         this[AUTOPLAY_HEADPHONES] = s.autoplayOnHeadphones
         this[FS_GESTURES] = s.fullscreenGestures
+        this[FS_SWIPE_TOGGLE] = s.fullscreenSwipeToggle
         this[BACKGROUND] = s.backgroundPlayback
         this[SEEK_SECONDS] = s.seekSeconds
         this[PIP] = s.pictureInPicture
@@ -114,6 +116,7 @@ class SettingsRepository(
         private val AUTOPLAY = booleanPreferencesKey("autoplay")
         private val AUTOPLAY_HEADPHONES = booleanPreferencesKey("autoplay_headphones")
         private val FS_GESTURES = booleanPreferencesKey("fullscreen_gestures")
+        private val FS_SWIPE_TOGGLE = booleanPreferencesKey("fullscreen_swipe_toggle")
         private val BACKGROUND = booleanPreferencesKey("background_playback")
         private val SEEK_SECONDS = intPreferencesKey("seek_seconds")
         private val PIP = booleanPreferencesKey("pip")

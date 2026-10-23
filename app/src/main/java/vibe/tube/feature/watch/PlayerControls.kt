@@ -126,6 +126,8 @@ fun VideoSurface(
     val seekSeconds = LocalSeekSeconds.current
     // In fullscreen the left/right thirds adjust brightness/volume; the middle keeps the swipe that leaves fullscreen.
     val sideGestures = state.fullscreen && LocalFullscreenGestures.current
+    val swipeToggle = LocalFullscreenSwipeToggle.current
+    val fullscreenZones = state.fullscreen && (sideGestures || swipeToggle)
     var flashSide by remember { mutableStateOf(0) }
     var flashTotal by remember { mutableStateOf(0) }
     var flashKey by remember { mutableStateOf(0) }
@@ -147,7 +149,7 @@ fun VideoSurface(
     Box(
         modifier = modifier
             .background(MediaOverlayColors.videoBackground)
-            .then(if (sideGestures) Modifier else dragModifier)
+            .then(if (state.fullscreen) Modifier else dragModifier)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = { controlsVisible = !controlsVisible },
@@ -178,7 +180,7 @@ fun VideoSurface(
             onRelease = { view -> view.player = null },
             modifier = Modifier.fillMaxSize(),
         )
-        if (sideGestures) FullscreenGestureZones(centerDrag = dragModifier)
+        if (fullscreenZones) FullscreenGestureZones(brightnessVolume = sideGestures, centerDrag = if (swipeToggle) dragModifier else null)
         AnimatedVisibility(
             visible = flashVisible,
             enter = fadeIn(tween(80)),
@@ -419,7 +421,8 @@ private fun Controls(
                         },
                 ) {
                     // The bar and its chapter gaps share one offscreen layer, so the gaps are real cuts through the line.
-                    Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }) {
+                    val hasGaps = chapters.size > 1
+                    Box(Modifier.fillMaxSize().then(if (hasGaps) Modifier.graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen } else Modifier)) {
                         vibe.tube.ui.components.WavyProgress(
                             progress = { fraction },
                             amplitude = { waveAmp.value },

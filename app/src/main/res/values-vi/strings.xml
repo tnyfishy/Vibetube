@@ -345,6 +345,8 @@
     <string name="palette_rose">Hồng</string>
     <string name="palette_violet">Tím</string>
     <string name="settings_fullscreen_gestures">Cử chỉ khi toàn màn hình</string>
+    <string name="settings_fullscreen_swipe">Vuốt để vào/thoát toàn màn hình</string>
+    <string name="settings_fullscreen_swipe_desc">Vuốt lên trên trình phát để toàn màn hình, vuốt xuống để thoát. Khi tắt, độ sáng và âm lượng chiếm mỗi bên một nửa màn hình</string>
     <string name="settings_fullscreen_gestures_desc">Khi toàn màn hình, vuốt lên/xuống bên trái để chỉnh độ sáng, bên phải để chỉnh âm lượng</string>
     <string name="gesture_brightness">Độ sáng</string>
     <string name="gesture_volume">Âm lượng</string>

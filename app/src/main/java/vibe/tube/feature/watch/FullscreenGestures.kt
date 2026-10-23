@@ -50,6 +50,13 @@ import kotlin.math.roundToInt
 /** Whether the fullscreen brightness / volume swipes are enabled (Settings). */
 val LocalFullscreenGestures = androidx.compose.runtime.compositionLocalOf { true }
 
+/** Whether swiping up/down in the player enters / leaves fullscreen (Settings). */
+val LocalFullscreenSwipeToggle = androidx.compose.runtime.compositionLocalOf { true }
+
+// Strips along the screen edges stay free so the system's own edge swipes (status bar, gesture navigation) still work.
+private val EdgeGuardTop = 64.dp
+private val EdgeGuardBottom = 48.dp
+
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
@@ -59,11 +66,12 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 private data class GestureHud(val brightness: Boolean, val value: Float)
 
 /**
- * Fullscreen touch zones: swiping up/down on the left third changes the screen brightness, on the right third the
- * media volume, and in the middle [centerDrag] (leave fullscreen) keeps working as before.
+ * Fullscreen touch zones: swiping up/down on the left 40% changes the screen brightness, on the right 40% the media
+ * volume, and the middle 20% runs [centerDrag] (leave fullscreen). Without the centre swipe the sides take 50% each.
+ * Without the side gestures the whole area is [centerDrag].
  */
 @Composable
-internal fun FullscreenGestureZones(centerDrag: Modifier, modifier: Modifier = Modifier) {
+internal fun FullscreenGestureZones(brightnessVolume: Boolean, centerDrag: Modifier?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val audio = remember(context) { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
@@ -119,10 +127,15 @@ internal fun FullscreenGestureZones(centerDrag: Modifier, modifier: Modifier = M
     }
 
     Box(modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(0.3f).fillMaxHeight().then(adjust(brightness = true)))
-            Box(Modifier.weight(0.4f).fillMaxHeight().then(centerDrag))
-            Box(Modifier.weight(0.3f).fillMaxHeight().then(adjust(brightness = false)))
+        Row(Modifier.fillMaxSize().padding(top = EdgeGuardTop, bottom = EdgeGuardBottom)) {
+            if (brightnessVolume) {
+                val side = if (centerDrag != null) 0.4f else 0.5f
+                Box(Modifier.weight(side).fillMaxHeight().then(adjust(brightness = true)))
+                if (centerDrag != null) Box(Modifier.weight(0.2f).fillMaxHeight().then(centerDrag))
+                Box(Modifier.weight(side).fillMaxHeight().then(adjust(brightness = false)))
+            } else if (centerDrag != null) {
+                Box(Modifier.fillMaxSize().then(centerDrag))
+            }
         }
         val shown = hud
         AnimatedVisibility(

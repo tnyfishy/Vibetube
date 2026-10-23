@@ -49,7 +49,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfigs.findByName("release")?.let { signingConfig = it }
+            // Without a real keystore the release APK is signed like the debug one, so it installs as an update.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
@@ -141,7 +142,6 @@ dependencies {
     implementation(libs.androidx.media3.ui)
     implementation(libs.okhttp)
     implementation(libs.coil.compose)
-    implementation(libs.haze)
     implementation(libs.androidx.profileinstaller)
     implementation(libs.coil.network.okhttp)
     implementation(libs.kotlinx.serialization.json)

@@ -134,7 +134,7 @@ fun SettingsScreen(
             }
             item {
                 SettingRow(
-                    VIcon.Edit, R.string.settings_font,
+                    VIcon.TextFields, R.string.settings_font,
                     fontLabel(settings.font),
                 ) { dialog = Dialog.Font }
             }
@@ -177,6 +177,7 @@ fun SettingsScreen(
             }
             item {
                 SwitchRow(VIcon.Fullscreen, R.string.settings_fullscreen_gestures, R.string.settings_fullscreen_gestures_desc, settings.fullscreenGestures) { v -> viewModel.update { it.copy(fullscreenGestures = v) } }
+                SwitchRow(VIcon.Fullscreen, R.string.settings_fullscreen_swipe, R.string.settings_fullscreen_swipe_desc, settings.fullscreenSwipeToggle) { v -> viewModel.update { it.copy(fullscreenSwipeToggle = v) } }
             }
             item {
                 SwitchRow(VIcon.MusicNote, R.string.settings_background, R.string.settings_background_desc, settings.backgroundPlayback) { v -> viewModel.update { it.copy(backgroundPlayback = v) } }
