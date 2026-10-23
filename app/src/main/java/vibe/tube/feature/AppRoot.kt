@@ -334,7 +334,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                                 .hazeEffect(hazeState) {
                                     blurRadius = 24.dp
                                     noiseFactor = 0f
-                                    tint = dev.chrisbanes.haze.HazeTint(glassTint.copy(alpha = 0.72f))
+                                    tints = listOf(dev.chrisbanes.haze.HazeTint(glassTint.copy(alpha = 0.72f)))
                                 },
                         ) {
                             Row(Modifier.fillMaxWidth().height(barBody)) {
