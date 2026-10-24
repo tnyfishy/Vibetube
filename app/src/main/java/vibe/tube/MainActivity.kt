@@ -47,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     @Inject lateinit var controller: PlayerController
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var uiEvents: vibe.tube.feature.common.UiEvents
+    @Inject lateinit var newVideoPoller: vibe.tube.notifications.NewVideoPoller
 
     override fun onCreate(savedInstanceState: Bundle?) {
         if (SettingsRepository.readBootTheme(this) == ThemeMode.Amoled) {
@@ -65,6 +66,9 @@ class MainActivity : AppCompatActivity() {
                 val wanted = if (language == AppSettings.SYSTEM) LocaleListCompat.getEmptyLocaleList() else LocaleListCompat.forLanguageTags(language)
                 if (AppCompatDelegate.getApplicationLocales() != wanted) AppCompatDelegate.setApplicationLocales(wanted)
             }
+        }
+        lifecycleScope.launch {
+            settingsRepository.settings.map { it.notifyNewVideos }.distinctUntilChanged().collect { newVideoPoller.sync(it) }
         }
         lifecycleScope.launch {
             controller.state.map { it.fullscreen && it.visible && it.expanded }.distinctUntilChanged().collect { applyFullscreen(it) }
@@ -104,6 +108,9 @@ class MainActivity : AppCompatActivity() {
         if (intent?.action == vibe.tube.download.DownloadService.ACTION_OPEN_DOWNLOADS) {
             intent.action = null
             uiEvents.requestOpenDownloads()
+        } else if (intent?.action == vibe.tube.notifications.NewVideoNotifier.ACTION_OPEN_NOTIFICATIONS) {
+            intent.action = null
+            uiEvents.requestOpenNotifications()
         }
     }
 

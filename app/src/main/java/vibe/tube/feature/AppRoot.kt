@@ -198,6 +198,9 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
         }
     }
     LaunchedEffect(Unit) { appViewModel.events.openDownloadsRequests.collect { openDownloads() } }
+    LaunchedEffect(Unit) {
+        appViewModel.events.openNotificationsRequests.collect { nav.navigate(NotificationsRoute) { launchSingleTop = true } }
+    }
 
     LaunchedEffect(Unit) {
         appViewModel.events.messages.collect { message ->

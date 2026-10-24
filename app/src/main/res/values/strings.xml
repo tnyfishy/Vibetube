@@ -307,6 +307,9 @@
     <string name="welcome_skip">Skip</string>
     <string name="welcome_next">Next</string>
     <string name="welcome_start">Get started</string>
+    <string name="notify_channel_name">New videos</string>
+    <string name="settings_notify_new">New video notifications</string>
+    <string name="settings_notify_new_desc">Check every half hour for uploads from channels with the bell on. Needs a signed-in account.</string>
     <string name="player_audio_effects">Audio effects</string>
     <string name="player_equalizer">Equalizer</string>
     <string name="eq_off">Off</string>

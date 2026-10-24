@@ -114,6 +114,9 @@ fun SettingsScreen(
         }
     }
 
+    val askNotifications = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -200,6 +203,16 @@ fun SettingsScreen(
                     if (settings.hiddenChannels.isEmpty()) stringResource(R.string.settings_hidden_channels_none)
                     else stringResource(R.string.settings_hidden_channels_count, settings.hiddenChannels.size),
                 ) { dialog = Dialog.HiddenChannels }
+            }
+            item {
+                SwitchRow(VIcon.Notifications, R.string.settings_notify_new, R.string.settings_notify_new_desc, settings.notifyNewVideos) { v ->
+                    viewModel.update { it.copy(notifyNewVideos = v) }
+                    if (v && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+                        context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) {
+                        askNotifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }
             }
             item {
                 SwitchRow(VIcon.VisibilityOff, R.string.settings_hide_shorts, R.string.settings_hide_shorts_desc, settings.hideShorts) { v -> viewModel.update { it.copy(hideShorts = v) } }

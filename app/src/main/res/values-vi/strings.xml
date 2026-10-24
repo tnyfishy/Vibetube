@@ -314,6 +314,9 @@
     <string name="settings_setup">Trang thiết lập nhanh</string>
     <string name="settings_setup_desc">Chủ đề, màu sắc, ngôn ngữ và Shorts trong một trang</string>
     <string name="welcome_start">Bắt đầu</string>
+    <string name="notify_channel_name">Video mới</string>
+    <string name="settings_notify_new">Thông báo video mới</string>
+    <string name="settings_notify_new_desc">Kiểm tra mỗi nửa giờ video mới từ các kênh đã bật chuông. Cần đăng nhập tài khoản.</string>
     <string name="player_audio_effects">Hiệu ứng âm thanh</string>
     <string name="player_equalizer">Equalizer</string>
     <string name="eq_off">Tắt</string>

@@ -118,6 +118,8 @@ data class AppSettings(
     val saveLocalHistory: Boolean = true,
     val privateMode: Boolean = false,
     val hideShorts: Boolean = false,
+    /** A system notification for new uploads of channels with the bell on (checked every half hour in the background). */
+    val notifyNewVideos: Boolean = false,
     /** Shorts have their own default quality (same options as long videos, up to 1080p60). */
     val shortsWifiQuality: QualityCap = QualityCap.P720,
     val shortsMobileQuality: QualityCap = QualityCap.P480,

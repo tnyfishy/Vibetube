@@ -68,6 +68,7 @@ class SettingsRepository(
             saveLocalHistory = this[LOCAL_HISTORY] ?: d.saveLocalHistory,
             privateMode = this[PRIVATE] ?: d.privateMode,
             hideShorts = this[HIDE_SHORTS] ?: d.hideShorts,
+            notifyNewVideos = this[NOTIFY_NEW_VIDEOS] ?: d.notifyNewVideos,
             downloadDir = this[DOWNLOAD_DIR] ?: d.downloadDir,
             hiddenChannels = this[HIDDEN_CHANNELS] ?: d.hiddenChannels,
         )
@@ -103,6 +104,7 @@ class SettingsRepository(
         this[LOCAL_HISTORY] = s.saveLocalHistory
         this[PRIVATE] = s.privateMode
         this[HIDE_SHORTS] = s.hideShorts
+        this[NOTIFY_NEW_VIDEOS] = s.notifyNewVideos
         this[DOWNLOAD_DIR] = s.downloadDir
         this[HIDDEN_CHANNELS] = s.hiddenChannels
     }
@@ -141,6 +143,7 @@ class SettingsRepository(
         private val LOCAL_HISTORY = booleanPreferencesKey("local_history")
         private val PRIVATE = booleanPreferencesKey("private_mode")
         private val HIDE_SHORTS = booleanPreferencesKey("hide_shorts_v2")
+        private val NOTIFY_NEW_VIDEOS = booleanPreferencesKey("notify_new_videos")
         private val DOWNLOAD_DIR = stringPreferencesKey("download_dir")
         private val HIDDEN_CHANNELS = stringSetPreferencesKey("hidden_channels")
 

@@ -50,6 +50,14 @@ class UiEvents {
         openDownloadsChannel.trySend(Unit)
     }
 
+    /** Asks the app shell to open the Notifications screen (from the new-video system notification). */
+    private val openNotificationsChannel = Channel<Unit>(Channel.CONFLATED)
+    val openNotificationsRequests = openNotificationsChannel.receiveAsFlow()
+
+    fun requestOpenNotifications() {
+        openNotificationsChannel.trySend(Unit)
+    }
+
     /** True when the open download dialog should offer video only (Shorts: no separate audio download). */
     private val downloadVideoOnlyState = MutableStateFlow(false)
     val downloadVideoOnly: StateFlow<Boolean> = downloadVideoOnlyState.asStateFlow()
