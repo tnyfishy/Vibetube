@@ -34,6 +34,7 @@ import vibe.tube.account.AuthState
 import vibe.tube.account.SessionManager
 import vibe.tube.data.settings.SettingsRepository
 import vibe.tube.feature.common.UiEvents
+import vibe.tube.feature.common.UiMessage
 import vibe.tube.youtube.model.VideoItem
 import vibe.tube.youtube.player.ResolveResult
 import vibe.tube.youtube.player.StreamFormat
@@ -59,6 +60,7 @@ data class DownloadJob(
     val progress: Float = 0f,
     val quality: String? = null,
     val choice: DownloadPlanner.Choice? = null,
+    val paused: Boolean = false,
 ) {
     val active: Boolean get() = phase != DownloadPhase.Done && phase != DownloadPhase.Failed
 }
@@ -81,9 +83,40 @@ class DownloadManager @Inject constructor(
     val jobs: StateFlow<List<DownloadJob>> = jobsState.asStateFlow()
     private val queue = Channel<DownloadJob>(Channel.UNLIMITED)
     private var nextId = 1L
+    private val running = java.util.concurrent.ConcurrentHashMap<Long, kotlinx.coroutines.Job>()
+    private val cancelled = java.util.concurrent.ConcurrentHashMap.newKeySet<Long>()
 
     init {
-        scope.launch { for (job in queue) process(job) }
+        scope.launch {
+            for (job in queue) {
+                if (job.id in cancelled) continue
+                val child = scope.launch { process(job) }
+                running[job.id] = child
+                child.join()
+                running.remove(job.id)
+            }
+        }
+    }
+
+    /** Pauses (or resumes) a download. The file already fetched is kept; the next chunk simply waits. */
+    fun togglePause(id: Long) {
+        update(id) { if (it.active) it.copy(paused = !it.paused) else it }
+    }
+
+    /** Stops a download for good (running or still queued) and throws away what was fetched so far. */
+    fun cancel(id: Long) {
+        cancelled += id
+        running[id]?.cancel()
+        jobsState.update { list -> list.filterNot { it.id == id } }
+    }
+
+    private fun isPaused(id: Long) = jobsState.value.firstOrNull { it.id == id }?.paused == true
+
+    private suspend fun awaitResumed(id: Long) {
+        while (isPaused(id)) {
+            delay(250)
+            currentCoroutineContext().ensureActive()
+        }
     }
 
     /** Resolves the streams of [videoId] and lists the qualities that can be downloaded. */
@@ -108,7 +141,7 @@ class DownloadManager @Inject constructor(
         jobsState.update { list -> list.filter { it.active } + job }
         queue.trySend(job)
         DownloadService.start(context)
-        events.post(R.string.msg_download_started, video.title)
+        events.showDownloadToast(job.id)
     }
 
     private fun update(id: Long, transform: (DownloadJob) -> DownloadJob) {
@@ -137,13 +170,17 @@ class DownloadManager @Inject constructor(
                     throw e
                 }
             }
-            update(job.id) { it.copy(phase = DownloadPhase.Done, progress = 1f) }
-            events.post(R.string.msg_download_done, job.title)
+            update(job.id) { it.copy(phase = DownloadPhase.Done, progress = 1f, paused = false) }
+            events.hideDownloadToast(job.id)
+            events.post(UiMessage(R.string.msg_download_done, listOf(job.title), R.string.action_view) { events.requestOpenDownloads() })
+            DownloadService.notifyFinished(context, job.title, ok = true)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            update(job.id) { it.copy(phase = DownloadPhase.Failed) }
+            update(job.id) { it.copy(phase = DownloadPhase.Failed, paused = false) }
+            events.hideDownloadToast(job.id)
             events.post(R.string.msg_download_failed, job.title)
+            DownloadService.notifyFinished(context, job.title, ok = false)
         } finally {
             temp.deleteRecursively()
         }
@@ -164,7 +201,7 @@ class DownloadManager @Inject constructor(
             is DownloadPlan.Single -> {
                 val file = File(temp, "single")
                 val total = plan.format.contentLength ?: 0L
-                fetch(plan.format, media.userAgent, file) { done -> if (total > 0) update(job.id) { it.copy(progress = done.toFloat() / total) } }
+                fetch(job.id, plan.format, media.userAgent, file) { done -> if (total > 0) update(job.id) { it.copy(progress = done.toFloat() / total) } }
                 update(job.id) { it.copy(phase = DownloadPhase.Saving, progress = 1f) }
                 val name = base + (quality?.let { " [$it]" } ?: "") + "." + DownloadPlanner.extension(plan.format)
                 save(name, DownloadPlanner.mimeType(plan)) { fd -> FileOutputStream(fd).use { out -> file.inputStream().use { it.copyTo(out) } } }
@@ -175,8 +212,8 @@ class DownloadManager @Inject constructor(
                 val vTotal = plan.video.contentLength ?: 0L
                 val aTotal = plan.audio.contentLength ?: 0L
                 val all = (vTotal + aTotal).coerceAtLeast(1L)
-                fetch(plan.video, media.userAgent, videoFile) { done -> update(job.id) { it.copy(progress = 0.9f * done / all) } }
-                fetch(plan.audio, media.userAgent, audioFile) { done -> update(job.id) { it.copy(progress = 0.9f * (vTotal + done) / all) } }
+                fetch(job.id, plan.video, media.userAgent, videoFile) { done -> update(job.id) { it.copy(progress = 0.9f * done / all) } }
+                fetch(job.id, plan.audio, media.userAgent, audioFile) { done -> update(job.id) { it.copy(progress = 0.9f * (vTotal + done) / all) } }
                 update(job.id) { it.copy(phase = DownloadPhase.Merging, progress = 0.92f) }
                 val ext = if (plan.webm) "webm" else "mp4"
                 val name = base + (quality?.let { " [$it]" } ?: "") + "." + ext
@@ -189,7 +226,7 @@ class DownloadManager @Inject constructor(
      * Downloads [format] in [CHUNK]-sized pieces the way NewPipe does: POST `x\0` with the range in a `&range=`
      * query parameter (plain `Range` headers are rejected by googlevideo). [onBytes] gets the running total.
      */
-    private suspend fun fetch(format: StreamFormat, userAgent: String, target: File, onBytes: (Long) -> Unit) {
+    private suspend fun fetch(jobId: Long, format: StreamFormat, userAgent: String, target: File, onBytes: (Long) -> Unit) {
         var total = format.contentLength ?: -1L
         var position = 0L
         var failures = 0
@@ -197,6 +234,7 @@ class DownloadManager @Inject constructor(
         FileOutputStream(target).buffered().use { out ->
             while (total < 0 || position < total) {
                 currentCoroutineContext().ensureActive()
+                awaitResumed(jobId)
                 val end = if (total > 0) minOf(position + CHUNK, total) - 1 else -1L
                 val request = Request.Builder()
                     .url(YoutubeRequests.rangedUrl(format.url, position, end, requestNumber++))
@@ -216,9 +254,11 @@ class DownloadManager @Inject constructor(
                             failures = 0
                             onBytes(position)
                             currentCoroutineContext().ensureActive()
+                            // Paused mid-chunk: drop this connection; the loop above waits and then continues from `position`.
+                            if (isPaused(jobId)) break
                         }
                     }
-                    if (total < 0) total = position
+                    if (total < 0 && !isPaused(jobId)) total = position
                 } catch (e: IOException) {
                     if (e.message?.startsWith("http_4") == true || ++failures >= MAX_FAILURES) throw e
                     delay(800L * failures)

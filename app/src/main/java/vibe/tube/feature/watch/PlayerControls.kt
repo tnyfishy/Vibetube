@@ -175,10 +175,11 @@ fun VideoSurface(
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     setShutterBackgroundColor(android.graphics.Color.TRANSPARENT)
                     setKeepContentOnPlayerReset(true)
+                    AmbientVideo.attach(this)
                 }
             },
             update = { view -> if (view.player !== player) view.player = player },
-            onRelease = { view -> view.player = null },
+            onRelease = { view -> AmbientVideo.detach(view); view.player = null },
             modifier = Modifier.fillMaxSize(),
         )
         if (fullscreenZones) FullscreenGestureZones(brightnessVolume = sideGestures, centerDrag = if (swipeToggle) dragModifier else null)

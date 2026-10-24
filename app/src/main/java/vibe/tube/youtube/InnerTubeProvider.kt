@@ -41,6 +41,7 @@ import vibe.tube.youtube.parser.path
 import vibe.tube.youtube.parser.str
 import vibe.tube.youtube.parser.textOf
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
 class InnerTubeProvider(
@@ -100,26 +101,49 @@ class InnerTubeProvider(
         return page(browse(call, "FEwhat_to_watch", continuation))
     }
 
-    private val trendingCursor = java.util.concurrent.atomic.AtomicInteger(0)
-
     /**
-     * Guest home feed: the first load is the region's plain "trending" search, every later first-page load
-     * (pull to refresh) moves on to another topic so refreshing really brings different videos.
+     * Guest home feed: a mix. Several different topics are searched at once and their results are woven together
+     * (one video of each topic in turn), so the feed is never just football, or just games, or just music. Every fresh
+     * load draws another random set of topics, so pull-to-refresh brings a different mix. The continuation is a bundle of
+     * the topics' own continuation tokens.
      */
-    private fun nextTrendingQuery(locale: ContentLocale): String {
-        val pool = TRENDING_QUERIES[locale.region] ?: if (locale.language == "vi") TRENDING_QUERIES.getValue("VN") else TRENDING_QUERIES.getValue("")
-        val index = trendingCursor.getAndIncrement()
-        return if (index == 0) pool.first() else pool[1 + (index - 1 + (System.nanoTime() % 7).toInt().coerceAtLeast(0)) % (pool.size - 1)]
-    }
-
     override suspend fun trending(call: ProviderCall, continuation: String?): Page<FeedItem> {
-        val body = buildJsonObject {
-            if (continuation != null) put("continuation", continuation) else {
-                put("query", nextTrendingQuery(call.locale))
-                put("params", TRENDING_SEARCH_PARAMS)
+        val requests: List<JsonObject> = if (continuation == null) {
+            val pool = TRENDING_QUERIES[call.locale.region]
+                ?: if (call.locale.language == "vi") TRENDING_QUERIES.getValue("VN") else TRENDING_QUERIES.getValue("")
+            // The plain "trending" query always takes part (first entry); the rest are drawn at random.
+            val topics = listOf(pool.first()) + pool.drop(1).shuffled().take(MIX_TOPICS - 1)
+            topics.map { topic ->
+                buildJsonObject {
+                    put("query", topic)
+                    put("params", TRENDING_SEARCH_PARAMS)
+                }
             }
+        } else if (continuation.startsWith(MIX_PREFIX)) {
+            continuation.removePrefix(MIX_PREFIX).split(MIX_SEPARATOR).filter { it.isNotEmpty() }
+                .map { token -> buildJsonObject { put("continuation", token) } }
+        } else {
+            listOf(buildJsonObject { put("continuation", continuation) })
         }
-        return page(client.post("search", body, call.locale, call.auth))
+        val pages: List<Page<FeedItem>> = kotlinx.coroutines.coroutineScope {
+            requests.map { body ->
+                async { runCatching { page(client.post("search", body, call.locale, call.auth)) }.getOrNull() }
+            }.awaitAll().filterNotNull()
+        }
+        if (pages.isEmpty()) throw AppError.Network(null, "trending")
+        val seen = HashSet<String>()
+        val woven = ArrayList<FeedItem>()
+        val longest = pages.maxOf { it.items.size }
+        for (i in 0 until longest) {
+            for (p in pages) p.items.getOrNull(i)?.let { if (seen.add(it.id)) woven += it }
+        }
+        val tokens = pages.mapNotNull { it.continuation }
+        val next = when {
+            tokens.isEmpty() -> null
+            tokens.size == 1 && continuation != null && !continuation.startsWith(MIX_PREFIX) -> tokens.first()
+            else -> MIX_PREFIX + tokens.joinToString(MIX_SEPARATOR)
+        }
+        return Page(woven, next)
     }
 
     private val shortsCursor = java.util.concurrent.atomic.AtomicInteger(0)
@@ -434,11 +458,22 @@ class InnerTubeProvider(
             "" to listOf("#shorts", "#shorts funny", "#shorts music", "#shorts food", "#shorts sports", "#shorts travel", "#shorts cats"),
         )
 
+        private const val MIX_TOPICS = 6
+        private const val MIX_PREFIX = "mix:"
+        private const val MIX_SEPARATOR = "\u0001"
+
+        /** Topic pools for the guest feed (first entry = the plain "trending" query); a handful is mixed per load. */
         private val TRENDING_QUERIES: Map<String, List<String>> = mapOf(
-            "VN" to listOf("thịnh hành", "nhạc thịnh hành", "tin tức hôm nay", "giải trí", "game", "ẩm thực", "du lịch", "bóng đá"),
-            "JP" to listOf("急上昇", "音楽 人気", "ニュース", "ゲーム", "料理", "旅行", "アニメ"),
-            "KR" to listOf("인기 급상승", "음악 인기", "뉴스", "게임", "먹방", "여행", "예능"),
-            "" to listOf("trending", "trending music", "news today", "gaming", "entertainment", "cooking", "travel", "sports"),
+            "VN" to listOf(
+                "thịnh hành", "nhạc thịnh hành", "tin tức hôm nay", "giải trí", "game", "ẩm thực", "du lịch", "bóng đá",
+                "phim hay", "công nghệ", "hài hước", "khoa học", "học tiếng anh", "xe", "thời trang", "sức khỏe", "podcast",
+            ),
+            "JP" to listOf("急上昇", "音楽 人気", "ニュース", "ゲーム", "料理", "旅行", "アニメ", "テクノロジー", "お笑い", "映画"),
+            "KR" to listOf("인기 급상승", "음악 인기", "뉴스", "게임", "먹방", "여행", "예능", "영화", "테크", "스포츠"),
+            "" to listOf(
+                "trending", "trending music", "news today", "gaming", "entertainment", "cooking", "travel", "sports",
+                "movie trailers", "technology", "comedy", "science", "documentary", "fitness", "cars", "podcast",
+            ),
         )
     }
 }

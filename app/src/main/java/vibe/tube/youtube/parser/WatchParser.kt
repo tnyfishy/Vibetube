@@ -35,6 +35,7 @@ object WatchParser {
                 subscriberText = it.at("subscriberCountText").textOf(),
                 subscribed = subscribeButton.at("subscribed").bool ?: subscribedEntity,
                 badge = ItemParsers.badgeOf(it.at("badges")),
+                handle = it.firstString("canonicalBaseUrl")?.substringAfterLast('/')?.takeIf { h -> h.startsWith("@") },
             )
         }
 

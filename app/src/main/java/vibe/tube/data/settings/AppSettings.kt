@@ -99,7 +99,6 @@ data class AppSettings(
     /** In fullscreen: swipe the left side for brightness and the right side for volume. */
     val fullscreenGestures: Boolean = true,
     val fullscreenSwipeToggle: Boolean = true,
-    val shortsTab: Boolean = true,
     val backgroundPlayback: Boolean = true,
     /** Seconds skipped by a double tap on the video. */
     val seekSeconds: Int = 10,
@@ -108,7 +107,7 @@ data class AppSettings(
     val subtitleLanguage: String = SYSTEM,
     val saveLocalHistory: Boolean = true,
     val privateMode: Boolean = false,
-    val hideShorts: Boolean = true,
+    val hideShorts: Boolean = false,
     /** Folder (SAF tree URI) chosen for downloads; blank means the default `Download/VibeTube`. */
     val downloadDir: String = "",
     /** Channels the user asked not to be recommended, stored as `channelId|name`. */

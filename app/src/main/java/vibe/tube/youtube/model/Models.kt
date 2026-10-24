@@ -127,6 +127,8 @@ data class ChannelRef(
     val subscriberText: String?,
     val subscribed: Boolean?,
     val badge: ChannelBadge = ChannelBadge.None,
+    /** "@handle" when the page names it. */
+    val handle: String? = null,
 )
 
 enum class LikeStatus { Like, Indifferent, Dislike }

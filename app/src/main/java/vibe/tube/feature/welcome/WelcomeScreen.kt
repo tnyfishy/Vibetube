@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -64,11 +65,23 @@ fun WelcomeScreen(onDone: () -> Unit) {
     val scope = rememberCoroutineScope()
     val last = pager.currentPage == pages.lastIndex
     val cs = MaterialTheme.colorScheme
-    val looks = listOf(
-        PageLook(cs.primaryContainer, cs.onPrimaryContainer, cs.primary, cs.onPrimary),
-        PageLook(cs.tertiaryContainer, cs.onTertiaryContainer, cs.tertiary, cs.onTertiary),
-        PageLook(cs.secondaryContainer, cs.onSecondaryContainer, cs.secondary, cs.onSecondary),
-    )
+    val dark = cs.surface.luminance() < 0.5f
+    // Light mode keeps the pastel containers. In dark mode those containers are all near-identical dark tones, so every page
+    // looked the same: there each page is the (dark) surface washed with its own accent hue instead, with bright accents.
+    val looks = if (dark) {
+        fun look(accent: Color, onAccent: Color) = PageLook(lerp(cs.surface, accent, 0.26f), cs.onSurface, accent, onAccent)
+        listOf(
+            look(cs.primary, cs.onPrimary),
+            look(cs.tertiary, cs.onTertiary),
+            look(cs.secondary, cs.onSecondary),
+        )
+    } else {
+        listOf(
+            PageLook(cs.primaryContainer, cs.onPrimaryContainer, cs.primary, cs.onPrimary),
+            PageLook(cs.tertiaryContainer, cs.onTertiaryContainer, cs.tertiary, cs.onTertiary),
+            PageLook(cs.secondaryContainer, cs.onSecondaryContainer, cs.secondary, cs.onSecondary),
+        )
+    }
     // Blend between neighbouring pages while swiping so the background glides rather than snaps.
     val pos = pager.currentPage + pager.currentPageOffsetFraction
     val lo = pos.toInt().coerceIn(0, looks.lastIndex)

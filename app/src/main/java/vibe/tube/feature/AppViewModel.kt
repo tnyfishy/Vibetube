@@ -59,6 +59,13 @@ class AppViewModel @Inject constructor(
         }
     }
 
+    val downloadJobs: StateFlow<List<vibe.tube.download.DownloadJob>> = downloads.jobs
+    fun toggleDownloadPause(id: Long) = downloads.togglePause(id)
+    fun cancelDownload(id: Long) {
+        downloads.cancel(id)
+        events.hideDownloadToast(id)
+    }
+
     fun download(video: VideoItem, choice: vibe.tube.download.DownloadPlanner.Choice) {
         downloads.enqueue(video, choice)
     }

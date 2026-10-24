@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -64,6 +65,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -345,9 +347,23 @@ internal fun Details(
 @Composable
 internal fun SheetUnderVideo(modifier: Modifier, stripAlpha: () -> Float = { 1f }, content: @Composable () -> Unit) {
     val surface = MaterialTheme.colorScheme.surface
+    val ambient = rememberVideoBottomColors()
     Box(modifier.fillMaxWidth()) {
-        // The black strip only shows while the player is fully open; during the morph it must not hang below the shrinking video.
-        Box(Modifier.fillMaxWidth().height(SHEET_RADIUS).graphicsLayer { alpha = stripAlpha() }.background(Color.Black))
+        // The strip behind the rounded corners is filled with the colours along the bottom edge of the playing video (ambient light),
+        // so the corners read as part of the picture. It only shows while the player is fully open; during the morph it must not
+        // hang below the shrinking video.
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(SHEET_RADIUS)
+                .graphicsLayer { alpha = stripAlpha() }
+                .drawBehind {
+                    val c = ambient.value
+                    val stops = Array(c.size) { i -> i / (c.size - 1f) to c[i] }
+                    drawRect(Brush.horizontalGradient(colorStops = stops))
+                    drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.22f))))
+                },
+        )
         Box(
             Modifier
                 .fillMaxSize()

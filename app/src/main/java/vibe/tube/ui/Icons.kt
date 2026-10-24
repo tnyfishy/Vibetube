@@ -45,6 +45,9 @@ object VIcon {
     @DrawableRes val MoreVert: Int = R.drawable.ic_more_vert
     @DrawableRes val MusicNote: Int = R.drawable.ic_music_note
     @DrawableRes val OpenInNew: Int = R.drawable.ic_open_in_new
+    @DrawableRes val Share: Int = R.drawable.ic_share
+    @DrawableRes val Comment: Int = R.drawable.ic_comment
+    @DrawableRes val Stop: Int = R.drawable.ic_stop
     @DrawableRes val Palette: Int = R.drawable.ic_palette
     @DrawableRes val Pause: Int = R.drawable.ic_pause
     @DrawableRes val Person: Int = R.drawable.ic_person

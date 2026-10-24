@@ -26,6 +26,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.LinearWavyProgressIndicator
+import vibe.tube.ui.components.downloadStatus
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -67,6 +70,7 @@ class DownloadsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val manager: DownloadManager,
     private val settings: SettingsRepository,
+    private val events: vibe.tube.feature.common.UiEvents,
 ) : ViewModel() {
     val jobs: StateFlow<List<DownloadJob>> = manager.jobs
     private val mutableFiles = MutableStateFlow<List<DownloadedFile>?>(null)
@@ -76,6 +80,37 @@ class DownloadsViewModel @Inject constructor(
         viewModelScope.launch {
             val found = withContext(Dispatchers.IO) { runCatching { scan() }.getOrDefault(emptyList()) }
             mutableFiles.value = found.sortedByDescending { it.modifiedMs }
+        }
+    }
+
+    fun togglePause(id: Long) = manager.togglePause(id)
+
+    fun cancel(id: Long) = manager.cancel(id)
+
+    /** Deletes the file from the device's storage (not just from this list). */
+    fun delete(file: DownloadedFile) {
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) { runCatching { removeFromStorage(file.uri) }.getOrDefault(false) }
+            if (ok) {
+                mutableFiles.value = mutableFiles.value?.filterNot { it.uri == file.uri }
+                events.post(R.string.msg_download_deleted)
+            } else {
+                events.post(R.string.msg_delete_failed)
+            }
+        }
+    }
+
+    private fun removeFromStorage(uri: Uri): Boolean {
+        val resolver = context.contentResolver
+        return when {
+            uri.scheme == "file" -> {
+                val f = File(requireNotNull(uri.path))
+                val deleted = f.delete()
+                if (deleted) android.media.MediaScannerConnection.scanFile(context, arrayOf(f.absolutePath), null, null)
+                deleted
+            }
+            DocumentsContract.isDocumentUri(context, uri) -> DocumentsContract.deleteDocument(resolver, uri)
+            else -> resolver.delete(uri, null, null) > 0
         }
     }
 
@@ -136,6 +171,7 @@ fun DownloadsScreen(onBack: () -> Unit, viewModel: DownloadsViewModel = hiltView
     val doneCount = jobs.count { it.phase == DownloadPhase.Done }
     LaunchedEffect(doneCount) { viewModel.reload() }
     val context = LocalContext.current
+    var pendingDelete by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<DownloadedFile?>(null) }
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
         topBar = {
@@ -155,10 +191,37 @@ fun DownloadsScreen(onBack: () -> Unit, viewModel: DownloadsViewModel = hiltView
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter),
                 verticalArrangement = Arrangement.spacedBy(Spacing.xs),
             ) {
+                if (active.isNotEmpty()) {
+                    item(key = "header:active") {
+                        Text(stringResource(R.string.downloads_in_progress), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = Spacing.xs))
+                    }
+                }
                 items(active, key = { "job:${it.id}" }) { job ->
-                    Column(Modifier.fillMaxWidth().padding(vertical = Spacing.sm)) {
-                        Text(job.title, style = MaterialTheme.typography.titleSmall, maxLines = 1)
-                        androidx.compose.material3.LinearWavyProgressIndicator(progress = { job.progress }, modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs))
+                    Row(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(job.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Text(downloadStatus(job), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (job.phase == DownloadPhase.Downloading) {
+                                LinearWavyProgressIndicator(
+                                    progress = { job.progress },
+                                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.xs, end = Spacing.sm),
+                                    amplitude = { if (job.paused) 0f else 1f },
+                                )
+                            } else {
+                                LinearWavyProgressIndicator(Modifier.fillMaxWidth().padding(top = Spacing.xs, end = Spacing.sm))
+                            }
+                        }
+                        TooltipIconButton(
+                            if (job.paused) VIcon.PlayArrowFilled else VIcon.Pause,
+                            stringResource(if (job.paused) R.string.download_resume else R.string.download_pause),
+                            { viewModel.togglePause(job.id) },
+                        )
+                        TooltipIconButton(VIcon.Stop, stringResource(R.string.download_stop), { viewModel.cancel(job.id) })
+                    }
+                }
+                if (active.isNotEmpty() && list.isNotEmpty()) {
+                    item(key = "header:saved") {
+                        Text(stringResource(R.string.downloads_saved), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = Spacing.md, bottom = Spacing.xs))
                     }
                 }
                 items(list, key = { it.uri.toString() }) { file ->
@@ -179,10 +242,24 @@ fun DownloadsScreen(onBack: () -> Unit, viewModel: DownloadsViewModel = hiltView
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                        TooltipIconButton(VIcon.Delete, stringResource(R.string.download_delete), { pendingDelete = file })
                     }
                 }
             }
         }
+    }
+    pendingDelete?.let { file ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text(stringResource(R.string.download_delete_title)) },
+            text = { Text(stringResource(R.string.download_delete_body, file.name)) },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { viewModel.delete(file); pendingDelete = null }) { Text(stringResource(R.string.download_delete)) }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
     }
 }
 

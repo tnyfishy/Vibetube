@@ -4,8 +4,6 @@
     <string name="nav_home">Home</string>
     <string name="nav_subscriptions">Subscriptions</string>
     <string name="nav_shorts">Shorts</string>
-    <string name="settings_shorts_tab">Shorts tab</string>
-    <string name="settings_shorts_tab_desc">Show a Shorts tab in the bottom bar (videos come from YouTube)</string>
     <string name="shorts_empty">No Shorts to show right now</string>
     <string name="nav_library">Library</string>
     <string name="nav_account">Account</string>
@@ -363,4 +361,26 @@
     <string name="settings_autoplay_headphones">Play when headphones connect</string>
     <string name="settings_autoplay_headphones_desc">Resume the paused video as soon as wired or Bluetooth headphones are connected</string>
     <string name="player_chapters">Chapters</string>
+    <string name="action_view">View</string>
+    <string name="download_paused">Paused</string>
+    <string name="download_pause">Pause download</string>
+    <string name="download_resume">Resume download</string>
+    <string name="download_stop">Stop download</string>
+    <string name="download_open_list">View progress</string>
+    <string name="download_status_downloading">Downloading · %1$d%%</string>
+    <string name="download_status_preparing">Preparing…</string>
+    <string name="download_status_merging">Merging video and audio…</string>
+    <string name="download_status_saving">Saving…</string>
+    <string name="download_status_failed">Failed</string>
+    <string name="download_status_done">Done</string>
+    <string name="download_done_channel_name">Finished downloads</string>
+    <string name="download_done_title">Download finished</string>
+    <string name="download_failed_title">Download failed</string>
+    <string name="download_delete">Delete from device</string>
+    <string name="download_delete_title">Delete this file?</string>
+    <string name="download_delete_body">“%1$s” will be removed from this device\'s storage.</string>
+    <string name="msg_delete_failed">Could not delete the file</string>
+    <string name="msg_download_deleted">Deleted</string>
+    <string name="downloads_in_progress">In progress</string>
+    <string name="downloads_saved">Saved on this device</string>
 </resources>

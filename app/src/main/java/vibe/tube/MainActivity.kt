@@ -46,6 +46,7 @@ class MainActivity : AppCompatActivity() {
 
     @Inject lateinit var controller: PlayerController
     @Inject lateinit var settingsRepository: SettingsRepository
+    @Inject lateinit var uiEvents: vibe.tube.feature.common.UiEvents
 
     override fun onCreate(savedInstanceState: Bundle?) {
         if (SettingsRepository.readBootTheme(this) == ThemeMode.Amoled) {
@@ -58,6 +59,7 @@ class MainActivity : AppCompatActivity() {
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
 
+        if (savedInstanceState == null) handleIntent(intent)
         lifecycleScope.launch {
             settingsRepository.settings.map { it.uiLanguage }.distinctUntilChanged().collect { language ->
                 val wanted = if (language == AppSettings.SYSTEM) LocaleListCompat.getEmptyLocaleList() else LocaleListCompat.forLanguageTags(language)
@@ -89,6 +91,19 @@ class MainActivity : AppCompatActivity() {
             VibetubeTheme(themeMode = settings.themeMode, dynamicColor = settings.dynamicColor, palette = settings.palette, fontStyle = fontStyle) {
                 AppRoot(onEnterPip = if (supportsPip()) ::enterPip else null)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: android.content.Intent?) {
+        if (intent?.action == vibe.tube.download.DownloadService.ACTION_OPEN_DOWNLOADS) {
+            intent.action = null
+            uiEvents.requestOpenDownloads()
         }
     }
 

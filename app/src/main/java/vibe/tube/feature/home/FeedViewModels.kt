@@ -21,7 +21,7 @@ import javax.inject.Inject
 abstract class FeedViewModel(settings: SettingsRepository, session: SessionManager) : ViewModel() {
     abstract val controller: FeedController
     val hideShorts: StateFlow<Boolean> = settings.settings.map { it.hideShorts }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val authState: StateFlow<AuthState> = session.authState
     fun refresh() = controller.refresh()
     fun loadMore() = controller.loadMore()

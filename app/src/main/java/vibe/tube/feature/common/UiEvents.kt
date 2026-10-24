@@ -1,7 +1,9 @@
 package vibe.tube.feature.common
 
 import androidx.annotation.StringRes
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,6 +29,26 @@ class UiEvents {
 
     private val downloadTargetState = MutableStateFlow<VideoItem?>(null)
     val downloadTarget: StateFlow<VideoItem?> = downloadTargetState.asStateFlow()
+
+    /** The download whose progress toast is on screen (null = none). Set when a download starts, cleared when it ends. */
+    private val downloadToastState = MutableStateFlow<Long?>(null)
+    val downloadToast: StateFlow<Long?> = downloadToastState.asStateFlow()
+
+    fun showDownloadToast(jobId: Long) {
+        downloadToastState.value = jobId
+    }
+
+    fun hideDownloadToast(jobId: Long? = null) {
+        if (jobId == null || downloadToastState.value == jobId) downloadToastState.value = null
+    }
+
+    /** Asks the app shell to open the Downloaded screen (from a toast, or the system notification). Kept until consumed. */
+    private val openDownloadsChannel = Channel<Unit>(Channel.CONFLATED)
+    val openDownloadsRequests = openDownloadsChannel.receiveAsFlow()
+
+    fun requestOpenDownloads() {
+        openDownloadsChannel.trySend(Unit)
+    }
 
     fun requestDownload(video: VideoItem) {
         downloadTargetState.value = video

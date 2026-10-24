@@ -82,6 +82,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -161,8 +162,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     val playerState by remember { controller.state.map { PlayerFlags(it.visible, it.expanded, it.fullscreen, it.inPip) }.distinctUntilChanged() }
         .collectAsStateWithLifecycle(initialValue = PlayerFlags())
     val settings by appViewModel.settings.collectAsStateWithLifecycle()
-    // The Shorts tab can be switched off in Settings.
-    val tabs = remember(settings.shortsTab) { allTabs.filter { it.route != ShortsRoute || settings.shortsTab } }
+    val tabs = allTabs
     val avatarUrl by appViewModel.avatarUrl.collectAsStateWithLifecycle()
     val saveTarget by appViewModel.events.saveTarget.collectAsStateWithLifecycle()
     val downloadTarget by appViewModel.events.downloadTarget.collectAsStateWithLifecycle()
@@ -174,6 +174,25 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     val showNav = onTopLevel || onSearch
     val snackbar = remember { SnackbarHostState() }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+
+    // Progress toast of the download that was just started: stays for a few seconds after the last touch, or until it ends.
+    val downloadToastId by appViewModel.events.downloadToast.collectAsStateWithLifecycle()
+    val downloadJobs by appViewModel.downloadJobs.collectAsStateWithLifecycle()
+    val toastJob = downloadJobs.firstOrNull { it.id == downloadToastId }
+    var toastTouch by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    LaunchedEffect(downloadToastId, toastTouch) {
+        val id = downloadToastId ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(9_000)
+        appViewModel.events.hideDownloadToast(id)
+    }
+    val openDownloads = remember(nav, controller) {
+        {
+            controller.collapse()
+            appViewModel.events.hideDownloadToast()
+            nav.navigate(DownloadsRoute) { launchSingleTop = true }
+        }
+    }
+    LaunchedEffect(Unit) { appViewModel.events.openDownloadsRequests.collect { openDownloads() } }
 
     LaunchedEffect(Unit) {
         appViewModel.events.messages.collect { message ->
@@ -328,9 +347,13 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                             enabled = classicPlayer,
                             modifier = Modifier.align(Alignment.BottomCenter).then(lift),
                         )
-                        SnackbarHost(
+                        vibe.tube.ui.components.ToastHost(
                             snackbar,
-                            Modifier.align(Alignment.BottomCenter).padding(bottom = miniPadding).then(lift),
+                            download = toastJob,
+                            onTogglePause = { toastTouch++; toastJob?.let { appViewModel.toggleDownloadPause(it.id) } },
+                            onCancel = { toastJob?.let { appViewModel.cancelDownload(it.id) } },
+                            onOpenDownloads = openDownloads,
+                            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = miniPadding).then(lift),
                         )
                     }
                     // Kept composed even while it is slid out of sight, so it never has to be rebuilt.
@@ -366,10 +389,9 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                                             contentAlignment = Alignment.Center,
                                         ) { VIconImage(if (selected) tab.iconSelected else tab.icon, null, Modifier.size(22.dp)) }
                                         Spacer(Modifier.height(2.dp))
-                                        Text(
+                                        NavLabel(
                                             stringResource(tab.label),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            maxLines = 1,
+                                            selected = selected,
                                             color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
@@ -413,7 +435,14 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
             }
             if (playerState.expanded && playerState.visible) {
                 Box(Modifier.align(Alignment.BottomCenter)) {
-                    SnackbarHost(snackbar, Modifier.windowInsetsPadding(WindowInsets.navigationBars))
+                    vibe.tube.ui.components.ToastHost(
+                        snackbar,
+                        download = toastJob,
+                        onTogglePause = { toastTouch++; toastJob?.let { appViewModel.toggleDownloadPause(it.id) } },
+                        onCancel = { toastJob?.let { appViewModel.cancelDownload(it.id) } },
+                        onOpenDownloads = openDownloads,
+                        modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars),
+                    )
                 }
             }
             downloadTarget?.let { video ->
@@ -433,6 +462,35 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
             }
         }
     }
+}
+
+/**
+ * Bottom-bar label: one line, no extra tracking, and it shrinks (down to 9sp) rather than being cut off, so longer words
+ * ("Subscriptions", Vietnamese labels, wide fonts) always show in full and sit on the same baseline in every slot.
+ */
+@Composable
+private fun NavLabel(text: String, selected: Boolean, color: androidx.compose.ui.graphics.Color) {
+    val base = MaterialTheme.typography.labelMedium
+    var size by remember(text, base.fontFamily) { androidx.compose.runtime.mutableFloatStateOf(12f) }
+    Text(
+        text,
+        style = base.copy(
+            fontSize = size.sp,
+            lineHeight = 16.sp,
+            letterSpacing = 0.sp,
+            fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else androidx.compose.ui.text.font.FontWeight.Medium,
+            lineHeightStyle = androidx.compose.ui.text.style.LineHeightStyle(
+                androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+                androidx.compose.ui.text.style.LineHeightStyle.Trim.None,
+            ),
+        ),
+        color = color,
+        maxLines = 1,
+        softWrap = false,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+        onTextLayout = { layout -> if (layout.hasVisualOverflow && size > 9f) size = (size - 0.5f).coerceAtLeast(9f) },
+    )
 }
 
 @Composable

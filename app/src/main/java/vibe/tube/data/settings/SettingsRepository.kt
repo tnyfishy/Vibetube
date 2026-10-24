@@ -55,7 +55,6 @@ class SettingsRepository(
             autoplayOnHeadphones = this[AUTOPLAY_HEADPHONES] ?: d.autoplayOnHeadphones,
             fullscreenGestures = this[FS_GESTURES] ?: d.fullscreenGestures,
             fullscreenSwipeToggle = this[FS_SWIPE_TOGGLE] ?: d.fullscreenSwipeToggle,
-            shortsTab = this[SHORTS_TAB] ?: d.shortsTab,
             backgroundPlayback = this[BACKGROUND] ?: d.backgroundPlayback,
             seekSeconds = this[SEEK_SECONDS] ?: d.seekSeconds,
             pictureInPicture = this[PIP] ?: d.pictureInPicture,
@@ -86,7 +85,6 @@ class SettingsRepository(
         this[AUTOPLAY_HEADPHONES] = s.autoplayOnHeadphones
         this[FS_GESTURES] = s.fullscreenGestures
         this[FS_SWIPE_TOGGLE] = s.fullscreenSwipeToggle
-        this[SHORTS_TAB] = s.shortsTab
         this[BACKGROUND] = s.backgroundPlayback
         this[SEEK_SECONDS] = s.seekSeconds
         this[PIP] = s.pictureInPicture
@@ -119,7 +117,6 @@ class SettingsRepository(
         private val AUTOPLAY_HEADPHONES = booleanPreferencesKey("autoplay_headphones")
         private val FS_GESTURES = booleanPreferencesKey("fullscreen_gestures")
         private val FS_SWIPE_TOGGLE = booleanPreferencesKey("fullscreen_swipe_toggle")
-        private val SHORTS_TAB = booleanPreferencesKey("shorts_tab")
         private val BACKGROUND = booleanPreferencesKey("background_playback")
         private val SEEK_SECONDS = intPreferencesKey("seek_seconds")
         private val PIP = booleanPreferencesKey("pip")
@@ -127,7 +124,7 @@ class SettingsRepository(
         private val SUB_LANG = stringPreferencesKey("subtitle_language")
         private val LOCAL_HISTORY = booleanPreferencesKey("local_history")
         private val PRIVATE = booleanPreferencesKey("private_mode")
-        private val HIDE_SHORTS = booleanPreferencesKey("hide_shorts")
+        private val HIDE_SHORTS = booleanPreferencesKey("hide_shorts_v2")
         private val DOWNLOAD_DIR = stringPreferencesKey("download_dir")
         private val HIDDEN_CHANNELS = stringSetPreferencesKey("hidden_channels")
 

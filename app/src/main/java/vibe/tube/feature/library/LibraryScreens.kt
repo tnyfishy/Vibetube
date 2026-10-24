@@ -21,6 +21,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -157,9 +158,27 @@ private fun HistoryCard(video: VideoItem) {
         verticalArrangement = Arrangement.spacedBy(Spacing.xs),
     ) {
         vibe.tube.ui.components.VideoThumbnail(video, Modifier.fillMaxWidth().onPlaced { bounds.coordinates = it })
-        Text(video.title, style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 2.dp))
+        // Explicit line boxes (no trimming): with the app's own fonts the default trimmed first line cut the top off the channel name.
+        val roomy = androidx.compose.ui.text.style.LineHeightStyle(
+            androidx.compose.ui.text.style.LineHeightStyle.Alignment.Center,
+            androidx.compose.ui.text.style.LineHeightStyle.Trim.None,
+        )
+        Text(
+            video.title,
+            style = MaterialTheme.typography.labelLarge.copy(lineHeight = 21.sp, lineHeightStyle = roomy),
+            maxLines = 2,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 2.dp),
+        )
         video.channelName?.let {
-            Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 2.dp))
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp, lineHeightStyle = roomy),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 2.dp, vertical = 1.dp),
+            )
         }
     }
 }

@@ -3,8 +3,6 @@
     <string name="nav_home">Trang chủ</string>
     <string name="nav_subscriptions">Kênh đăng ký</string>
     <string name="nav_shorts">Shorts</string>
-    <string name="settings_shorts_tab">Tab Shorts</string>
-    <string name="settings_shorts_tab_desc">Hiện tab Shorts ở thanh dưới (video lấy từ YouTube)</string>
     <string name="shorts_empty">Hiện chưa có Shorts nào để hiển thị</string>
     <string name="nav_library">Thư viện</string>
     <string name="nav_account">Tài khoản</string>
@@ -360,4 +358,26 @@
     <string name="settings_autoplay_headphones">Tự phát khi cắm tai nghe</string>
     <string name="settings_autoplay_headphones_desc">Tiếp tục phát video đang tạm dừng ngay khi kết nối tai nghe có dây hoặc Bluetooth</string>
     <string name="player_chapters">Các chương</string>
+    <string name="action_view">Xem</string>
+    <string name="download_paused">Đã tạm dừng</string>
+    <string name="download_pause">Tạm dừng tải</string>
+    <string name="download_resume">Tiếp tục tải</string>
+    <string name="download_stop">Dừng tải</string>
+    <string name="download_open_list">Xem tiến trình</string>
+    <string name="download_status_downloading">Đang tải · %1$d%%</string>
+    <string name="download_status_preparing">Đang chuẩn bị…</string>
+    <string name="download_status_merging">Đang ghép video và âm thanh…</string>
+    <string name="download_status_saving">Đang lưu…</string>
+    <string name="download_status_failed">Thất bại</string>
+    <string name="download_status_done">Xong</string>
+    <string name="download_done_channel_name">Tải xuống hoàn tất</string>
+    <string name="download_done_title">Đã tải xong</string>
+    <string name="download_failed_title">Tải thất bại</string>
+    <string name="download_delete">Xoá khỏi thiết bị</string>
+    <string name="download_delete_title">Xoá tệp này?</string>
+    <string name="download_delete_body">“%1$s” sẽ bị xoá khỏi bộ nhớ thiết bị.</string>
+    <string name="msg_delete_failed">Không xoá được tệp</string>
+    <string name="msg_download_deleted">Đã xoá</string>
+    <string name="downloads_in_progress">Đang tải</string>
+    <string name="downloads_saved">Đã lưu trên thiết bị</string>
 </resources>
