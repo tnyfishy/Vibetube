@@ -121,7 +121,7 @@ fun SetupScreen(onDone: () -> Unit, viewModel: SettingsViewModel = hiltViewModel
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .selectable(!settings.hideShorts, role = Role.Switch) { on -> viewModel.update { it.copy(hideShorts = !on) } }
+                    .selectable(!settings.hideShorts, role = Role.Switch) { viewModel.update { it.copy(hideShorts = !it.hideShorts) } }
                     .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

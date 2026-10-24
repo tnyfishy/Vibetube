@@ -87,7 +87,7 @@ fun NotificationsScreen(onBack: () -> Unit, onLogin: () -> Unit, viewModel: Noti
                 )
                 else -> LazyColumn(state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = Spacing.sm)) {
                     items(state.items, key = { it.id }) { item ->
-                        NotificationRow(item) { open(item, actions) }
+                        NotificationRow(item) { openNotification(item, actions) }
                     }
                     if (state.loadingMore) {
                         item(key = "more") {
@@ -100,7 +100,7 @@ fun NotificationsScreen(onBack: () -> Unit, onLogin: () -> Unit, viewModel: Noti
     }
 }
 
-private fun open(item: NotificationItem, actions: vibe.tube.ui.components.VideoActions) {
+private fun openNotification(item: NotificationItem, actions: vibe.tube.ui.components.VideoActions) {
     val videoId = item.videoId
     val channelId = item.channelPath?.takeIf { it.startsWith("/channel/") }?.removePrefix("/channel/")?.substringBefore('/')
     when {
