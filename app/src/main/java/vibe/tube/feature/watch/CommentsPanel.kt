@@ -34,27 +34,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.RoundRect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineStart
@@ -67,9 +55,8 @@ import vibe.tube.ui.VIcon
 import vibe.tube.ui.theme.Spacing
 
 /**
- * Drives the comments panel as a container transform: it grows out of the comments card (its rect, colour and corners)
- * to fill the area under the video, and shrinks back into exactly that card when closed (X, Back, or pulled down).
- * Everything the animation needs is kept in plain fields and read in the draw phase, so nothing recomposes per frame.
+ * Drives the comments panel: it slides up from the bottom over the area under the video and slides back down when
+ * closed (X, Back, or pulled down by the finger). Read in the draw phase, so nothing recomposes per frame.
  */
 @Stable
 internal class CommentsTransition {
@@ -77,62 +64,21 @@ internal class CommentsTransition {
         private set
     val progress = Animatable(0f).apply { updateBounds(0f, 1f) }
 
-    private var cardRootX = 0f
-    private var cardRootY = 0f
-    var cardW = 0f
-        private set
-    var cardH = 0f
-        private set
-    private var originX = 0f
-    private var originY = 0f
     var panelH = 1f
         private set
 
-    val cardX: Float get() = cardRootX - originX
-    val cardY: Float get() = cardRootY - originY
-
-    fun cardPositioned(c: LayoutCoordinates) {
-        val p = c.positionInRoot()
-        cardRootX = p.x
-        cardRootY = p.y
-        cardW = c.size.width.toFloat()
-        cardH = c.size.height.toFloat()
-    }
-
     fun containerPositioned(c: LayoutCoordinates) {
-        val p = c.positionInRoot()
-        originX = p.x
-        originY = p.y
         panelH = c.size.height.toFloat().coerceAtLeast(1f)
     }
 
     suspend fun show() {
         open = true
-        progress.animateTo(1f, tween(380, easing = vibe.tube.ui.components.EmphasizedDecelerate))
+        progress.animateTo(1f, tween(260, easing = vibe.tube.ui.components.EmphasizedDecelerate))
     }
 
     suspend fun hide() {
-        progress.animateTo(0f, tween(300, easing = FastOutSlowInEasing))
+        progress.animateTo(0f, tween(200, easing = FastOutSlowInEasing))
         open = false
-    }
-}
-
-/** The shape of the growing container: a rounded rect interpolated between the card's bounds and the whole panel. */
-private class ContainerShape(
-    private val tr: CommentsTransition,
-    private val p: Float,
-    private val startRadius: Float,
-    private val endRadius: Float,
-) : Shape {
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        fun l(a: Float, b: Float) = a + (b - a) * p
-        val left = l(tr.cardX, 0f)
-        val top = l(tr.cardY, 0f)
-        val right = l(tr.cardX + tr.cardW, size.width)
-        val bottom = l(tr.cardY + tr.cardH, size.height)
-        val topR = CornerRadius(l(startRadius, endRadius))
-        val bottomR = CornerRadius(l(startRadius, 0f))
-        return Outline.Rounded(RoundRect(left, top, right, bottom, topR, topR, bottomR, bottomR))
     }
 }
 
@@ -145,13 +91,11 @@ internal fun CommentsPanel(tr: CommentsTransition, ui: WatchUiState, auth: AuthS
     if (!shown) return
 
     val density = LocalDensity.current
-    val startRadius = with(density) { 16.dp.toPx() }
-    val endRadius = with(density) { 20.dp.toPx() }
-    val cardColor = MaterialTheme.colorScheme.surfaceContainerHigh
     val panelColor = MaterialTheme.colorScheme.surfaceContainerLow
+    val topCorner = with(density) { 20.dp.toPx() }
 
-    // How far the finger has to travel to shrink the panel all the way back into the card.
-    fun range() = tr.panelH * 0.6f
+    // The panel follows the finger one to one.
+    fun range() = tr.panelH
     fun pull(delta: Float): Float {
         val before = tr.progress.value
         val after = (before - delta / range()).coerceIn(0f, 1f)
@@ -193,24 +137,17 @@ internal fun CommentsPanel(tr: CommentsTransition, ui: WatchUiState, auth: AuthS
         Modifier
             .fillMaxSize()
             .graphicsLayer {
-                shape = ContainerShape(tr, tr.progress.value, startRadius, endRadius)
+                val p = tr.progress.value
+                translationY = (1f - p) * size.height
+                alpha = (p * 4f).coerceIn(0f, 1f)
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = topCorner, topEnd = topCorner)
                 clip = true
             }
-            .drawBehind {
-                val p = tr.progress.value
-                drawRect(lerp(cardColor, panelColor, p), alpha = (p * 3f).coerceIn(0f, 1f))
-            }
+            .background(panelColor)
             .pointerInput(Unit) {}
             .nestedScroll(nested),
     ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    alpha = ((tr.progress.value - 0.15f) / 0.45f).coerceIn(0f, 1f)
-                    compositingStrategy = CompositingStrategy.ModulateAlpha
-                },
-        ) {
+        Column(Modifier.fillMaxSize()) {
             Column(
                 Modifier
                     .fillMaxWidth()

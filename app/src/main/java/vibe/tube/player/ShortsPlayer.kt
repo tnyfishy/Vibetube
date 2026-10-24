@@ -297,7 +297,7 @@ class ShortsPlayer @Inject constructor(
                     return@launch
                 }
                 slot.client = media.clientName
-                slot.player.setMediaSource(builder.build(plan, media, video, emptyList()))
+                slot.player.setMediaSource(builder.build(plan, media, video))
                 slot.player.playWhenReady = playWhenReady && slot === currentSlot
                 slot.player.prepare()
             } catch (e: CancellationException) {

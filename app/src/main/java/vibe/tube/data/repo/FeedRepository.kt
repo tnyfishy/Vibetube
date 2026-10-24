@@ -66,9 +66,9 @@ class FeedRepository(
         scope,
     )
 
-    fun channelVideos(channelId: String, scope: CoroutineScope) = controller(
+    fun channelVideos(channelId: String, sort: () -> vibe.tube.youtube.model.ChannelSort, scope: CoroutineScope) = controller(
         FeedSpec("channel_videos", requiresAuth = false, cacheable = false, extra = channelId) { c, t ->
-            provider.channelVideos(c, channelId, t)
+            provider.channelVideos(c, channelId, t, sort())
         },
         scope,
     )

@@ -9,6 +9,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -42,6 +43,7 @@ fun ChannelScreen(
     val state by viewModel.controller.state.collectAsStateWithLifecycle()
     val hideShorts by viewModel.hideShorts.collectAsStateWithLifecycle()
     val detail by detailViewModel.state.collectAsStateWithLifecycle()
+    val sort by viewModel.sort.collectAsStateWithLifecycle()
     Scaffold(
         topBar = {
             TopAppBar(
@@ -91,6 +93,27 @@ fun ChannelScreen(
                                     Text(stringResource(R.string.action_subscribe))
                                 }
                             }
+                        }
+                    }
+                }
+                item(key = "channel-sort", span = { GridItemSpan(maxLineSpan) }) {
+                    Row(Modifier.padding(bottom = Spacing.sm), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        for (option in vibe.tube.youtube.model.ChannelSort.entries) {
+                            FilterChip(
+                                selected = sort == option,
+                                onClick = { viewModel.setSort(option) },
+                                label = {
+                                    Text(
+                                        stringResource(
+                                            when (option) {
+                                                vibe.tube.youtube.model.ChannelSort.Latest -> R.string.channel_sort_latest
+                                                vibe.tube.youtube.model.ChannelSort.Popular -> R.string.channel_sort_popular
+                                                vibe.tube.youtube.model.ChannelSort.Oldest -> R.string.channel_sort_oldest
+                                            },
+                                        ),
+                                    )
+                                },
+                            )
                         }
                     }
                 }

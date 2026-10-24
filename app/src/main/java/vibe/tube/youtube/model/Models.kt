@@ -201,6 +201,9 @@ enum class PlaylistPrivacy(val wire: String) {
     Public("PUBLIC"),
 }
 
+/** The order of a channel's videos; maps onto the "Latest / Popular / Oldest" chips of the channel's Videos tab. */
+enum class ChannelSort(val chipIndex: Int) { Latest(0), Popular(1), Oldest(2) }
+
 data class ChannelDetail(
     val id: String,
     val name: String,

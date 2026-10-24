@@ -13,6 +13,20 @@ object MediaPlanner {
             .distinctBy { it.audioTrackId }
             .map { AudioTrackOption(it.audioTrackId!!, it.audioTrackName ?: it.audioTrackId, it.isDefaultAudio) }
 
+    /**
+     * The audio track that matches [language] (a base code such as "vi"), for videos that come with several dubbed
+     * tracks; null when there is no choice or no track in that language, which leaves the video's own default.
+     */
+    fun audioTrackFor(media: ResolvedMedia, language: String): String? {
+        val tracks = audioTracks(media)
+        if (tracks.size < 2) return null
+        fun base(tag: String) = tag.substringBefore('-').substringBefore('_').substringBefore('.').lowercase()
+        val wanted = base(language)
+        val matching = tracks.filter { base(it.id) == wanted }
+        // Several tracks in one language (original plus a dub): the one YouTube marks as the default wins.
+        return (matching.firstOrNull { it.isDefault } ?: matching.firstOrNull())?.id
+    }
+
     fun plan(
         media: ResolvedMedia,
         maxHeight: Int?,

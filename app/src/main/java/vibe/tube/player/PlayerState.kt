@@ -37,7 +37,11 @@ data class PlayerUiState(
     val audioTracks: List<AudioTrackOption> = emptyList(),
     val selectedAudioTrack: String? = null,
     val captions: List<CaptionTrack> = emptyList(),
+    /** [CaptionTrack.id] of the track being shown. */
     val selectedCaption: String? = null,
+    /** Languages the captions can be machine-translated into. */
+    val captionTranslations: List<String> = emptyList(),
+    val captionLoading: Boolean = false,
     val clientName: String? = null,
     val videoAspect: Float = 16f / 9f,
 ) {

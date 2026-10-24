@@ -5,6 +5,11 @@ import java.util.Locale
 
 enum class ThemeMode { System, Light, Dark, Amoled }
 
+/** Subtitle text colour and backdrop (persisted by name). */
+enum class SubtitleColor(val argb: Long) { White(0xFFFFFFFF), Yellow(0xFFFFEB3B), Cyan(0xFF80DEEA), Green(0xFFA5D6A7) }
+
+enum class SubtitleBackground(val alpha: Float) { None(0f), Semi(0.55f), Solid(1f) }
+
 /**
  * Selectable UI fonts. [resId] is null for the system font. All bundled fonts are variable and cover
  * Vietnamese; [minWeight]..[maxWeight] is the `wght` axis range of each file. Enum names are persisted.
@@ -103,8 +108,13 @@ data class AppSettings(
     /** Seconds skipped by a double tap on the video. */
     val seekSeconds: Int = 10,
     val pictureInPicture: Boolean = true,
-    val subtitlesEnabled: Boolean = false,
+    /** Like YouTube's CC button: on means subtitles open by themselves whenever the video has any. */
+    val subtitlesEnabled: Boolean = true,
     val subtitleLanguage: String = SYSTEM,
+    /** Percent of the normal subtitle size. */
+    val subtitleSize: Int = 100,
+    val subtitleColor: SubtitleColor = SubtitleColor.White,
+    val subtitleBackground: SubtitleBackground = SubtitleBackground.Semi,
     val saveLocalHistory: Boolean = true,
     val privateMode: Boolean = false,
     val hideShorts: Boolean = false,
@@ -122,6 +132,10 @@ data class AppSettings(
         val region = if (contentRegion == SYSTEM) ipRegion ?: device.country.ifBlank { "US" } else contentRegion
         return ContentLocale(language, region)
     }
+
+    /** The language of the app (the device's unless one is chosen): subtitles and dubbed audio default to it. */
+    fun appLanguage(device: Locale = Locale.getDefault()): String =
+        if (uiLanguage == SYSTEM) device.language.ifBlank { "en" } else uiLanguage
 
     val recordsLocalHistory: Boolean get() = saveLocalHistory && !privateMode
 

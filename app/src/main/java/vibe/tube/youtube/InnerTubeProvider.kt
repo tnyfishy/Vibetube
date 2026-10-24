@@ -283,8 +283,19 @@ class InnerTubeProvider(
         )
     }
 
-    override suspend fun channelVideos(call: ProviderCall, channelId: String, continuation: String?): Page<FeedItem> =
-        page(browse(call, channelId, continuation, VIDEOS_TAB_PARAMS))
+    override suspend fun channelVideos(call: ProviderCall, channelId: String, continuation: String?, sort: vibe.tube.youtube.model.ChannelSort): Page<FeedItem> {
+        // Later pages carry their order inside the continuation token; the default order is what the tab opens with.
+        if (continuation != null || sort == vibe.tube.youtube.model.ChannelSort.Latest) {
+            return page(browse(call, channelId, continuation, VIDEOS_TAB_PARAMS))
+        }
+        // Another order is a chip above the grid (Latest / Popular / Oldest), each one a continuation that reloads the grid.
+        val tab = browse(call, channelId, null, VIDEOS_TAB_PARAMS)
+        val chips = tab.root.firstObject("feedFilterChipBarRenderer").at("contents").list()
+        val token = chips.getOrNull(sort.chipIndex)
+            ?.at("chipCloudChipRenderer")?.at("navigationEndpoint")?.at("continuationCommand")?.at("token")?.str
+            ?: throw AppError.Rejected("channel_sort", "no_sort_chip")
+        return page(browse(call, channelId, token))
+    }
 
     override suspend fun watch(call: ProviderCall, videoId: String, playlistId: String?, playlistIndex: Int?): WatchInfo {
         val body = buildJsonObject {

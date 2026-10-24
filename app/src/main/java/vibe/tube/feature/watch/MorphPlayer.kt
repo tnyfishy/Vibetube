@@ -76,8 +76,16 @@ import kotlin.math.roundToInt
 /** Share of the screen width the minimized player takes (keep in sync with the list padding in AppRoot). */
 internal const val MINI_WIDTH_FRACTION = 0.53f
 
-/** Critically damped: glides to the end without overshooting or bouncing. */
-private val MORPH_SPEC = spring<Float>(dampingRatio = 1f, stiffness = 250f)
+/**
+ * Critically damped and soft: glides to the end without overshooting or bouncing. The visibility threshold is tiny on
+ * purpose: with the default (0.01 of the whole travel) the spring is cut off up to ~15px early and the card visibly snaps
+ * the last bit into place, which showed up as a jerk right at the fully expanded / fully minimized ends.
+ */
+private val MORPH_SPEC = spring<Float>(dampingRatio = 1f, stiffness = 210f, visibilityThreshold = 0.0004f)
+
+/** The minimized card settling against an edge: a soft, barely springy glide (no hard bounce). */
+private val DOCK_SPEC = spring<Float>(dampingRatio = 0.88f, stiffness = 260f, visibilityThreshold = 0.0004f)
+private val DOCK_SPEC_CALM = spring<Float>(dampingRatio = 1f, stiffness = 300f, visibilityThreshold = 0.0004f)
 
 private fun lerpF(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
@@ -111,6 +119,7 @@ internal fun MorphPlayer(
 ) {
     val ui by watch.state.collectAsStateWithLifecycle()
     val auth by watch.authState.collectAsStateWithLifecycle()
+    val captionCues by controller.captionCues.collectAsStateWithLifecycle()
     // The full state ticks with the playback position several times a second. Nothing structural may read it directly,
     // otherwise the whole card (and the lists in it) would recompose while it morphs; each piece below reads a derived
     // value that only changes when that piece actually has something new to show.
@@ -187,12 +196,15 @@ internal fun MorphPlayer(
     LaunchedEffect(target) {
         if (target == 0f && originMix.value > 0f) originMix.animateTo(0f, tween(260))
         if (target == 0f && !miniDragging) {
-            launch { if (anchorX.value != 1f) anchorX.animateTo(1f, spring(dampingRatio = 1f, stiffness = 380f)) }
-            launch { if (anchorY.value != 1f) anchorY.animateTo(1f, spring(dampingRatio = 1f, stiffness = 380f)) }
+            launch { if (anchorX.value != 1f) anchorX.animateTo(1f, DOCK_SPEC_CALM) }
+            launch { if (anchorY.value != 1f) anchorY.animateTo(1f, DOCK_SPEC_CALM) }
         }
         val velocity = pendingVelocity
         pendingVelocity = 0f
-        progress.animateTo(target, MORPH_SPEC, initialVelocity = velocity)
+        // A release already started this very animation (with the finger's velocity): do not restart it from zero speed.
+        if (!(progress.isRunning && progress.targetValue == target)) {
+            progress.animateTo(target, MORPH_SPEC, initialVelocity = velocity)
+        }
     }
     LaunchedEffect(visible) {
         if (!visible) {
@@ -258,7 +270,7 @@ internal fun MorphPlayer(
         val showPage = pageComposed
         val miniish by remember { derivedStateOf { progress.value < 0.35f } }
         val pageVisible by remember { derivedStateOf { progress.value > 0.1f } }
-        val controlsOn by remember { derivedStateOf { progress.value > 0.92f } }
+        val controlsOn by remember { derivedStateOf { progress.value > 0.97f } }
 
         suspend fun shrinkAndDismiss() {
             closeP.animateTo(1f, tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing))
@@ -283,12 +295,17 @@ internal fun MorphPlayer(
                 }
             }
         }
+        val dragToken = remember { IntArray(1) }
         val dragModifier = Modifier.draggable(
             orientation = Orientation.Vertical,
             state = dragState,
-            onDragStarted = { dragging = true },
+            onDragStarted = {
+                dragToken[0]++
+                dragging = true
+            },
             onDragStopped = { velocity ->
-                scope.launch {
+                val myToken = dragToken[0]
+                scope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
                     try {
                     if (dismiss.value > 0f) {
                         val threshold = with(density) { 72.dp.toPx() }
@@ -308,21 +325,24 @@ internal fun MorphPlayer(
                             }
                             return@launch
                         }
-                        val goExpanded = when {
-                            velocity > 900f -> false
-                            velocity < -900f -> true
-                            else -> progress.value > 0.5f
-                        }
                         val v = -velocity / dragRange()
-                        if (goExpanded == stateHolder.value.expanded) {
-                            progress.animateTo(if (goExpanded) 1f else 0f, MORPH_SPEC, initialVelocity = v)
-                        } else {
+                        // Where the card would coast to if let go: a slow drag decides by where it is, a flick by where it is heading.
+                        val projected = progress.value + v * 0.14f
+                        val goExpanded = when {
+                            velocity > 800f -> false
+                            velocity < -800f -> true
+                            else -> projected > 0.5f
+                        }
+                        if (goExpanded != stateHolder.value.expanded) {
                             pendingVelocity = v
                             if (goExpanded) controller.expand() else controller.collapse()
                         }
+                        // Starts moving in this very frame, carrying the finger's speed. Waiting for the state change to come
+                        // back round (a recomposition) left the card standing still for a frame or two after the finger left.
+                        progress.animateTo(if (goExpanded) 1f else 0f, MORPH_SPEC, initialVelocity = v)
                     }
                     } finally {
-                        dragging = false
+                        if (dragToken[0] == myToken) dragging = false
                     }
                 }
             },
@@ -429,6 +449,10 @@ internal fun MorphPlayer(
                     dragModifier = if (controlsOn || !miniish || dragging) dragModifier else Modifier,
                     chapters = activeChapters,
                     onChapters = { chaptersOpen = true },
+                    captionCues = captionCues,
+                    captionsAvailable = surfaceState.captions.isNotEmpty(),
+                    captionsOn = surfaceState.selectedCaption != null,
+                    onToggleCaptions = controller::toggleCaptions,
                 )
                 // The tapped thumbnail stays visible inside the flying video until the first frame is there.
                 val video = current
@@ -463,7 +487,7 @@ internal fun MorphPlayer(
                             y = { lerpF(thumbY(), topInsetPx, p()) },
                             w = { lerpF(thumbW(), wPx, p()) },
                             h = { lerpF(thumbH(), videoH, p()) },
-                            show = { miniish && originMix.value < 0.01f },
+                            show = { t() < 0.5f && originMix.value < 0.01f },
                         )
                         .graphicsLayer {
                             alpha = ((0.5f - t()) / 0.5f).coerceIn(0f, 1f) * awayAlpha()
@@ -490,13 +514,14 @@ internal fun MorphPlayer(
             // 3. Minimized: drag to move (it settles against the nearest screen edge on release), tap to expand.
             //    Play/pause and close are small icon buttons in the top corners.
             run {
-                val miniSettled by remember { derivedStateOf { progress.value < 0.01f } }
-                // The buttons appear only once the card has shrunk all the way down, and fade in then.
-                val btnAlpha = androidx.compose.animation.core.animateFloatAsState(
-                    targetValue = if (miniSettled && !miniDragging) 1f else 0f,
-                    animationSpec = tween(if (miniSettled && !miniDragging) 200 else 70, delayMillis = if (miniSettled && !miniDragging) 60 else 0),
+                // The buttons fade in as the card finishes shrinking (tied to the progress, so there is no moment where they pop),
+                // and out quickly while the card is being dragged around.
+                val btnCalm = androidx.compose.animation.core.animateFloatAsState(
+                    targetValue = if (miniDragging) 0f else 1f,
+                    animationSpec = tween(if (miniDragging) 70 else 180),
                     label = "miniButtons",
                 )
+                val btnAlpha = remember { derivedStateOf { btnCalm.value * ((0.1f - progress.value) / 0.1f).coerceIn(0f, 1f) } }
                 val miniRect = Modifier.placedRect({ miniX() + slide() }, miniY, { miniW }, { miniH }, show = { (miniish || dragging) && originMix.value < 0.01f && away.value < 0.5f })
                 val buttonsRect = Modifier.placedRect({ miniX() + slide() }, miniY, { miniW }, { miniH }, show = { btnAlpha.value > 0.01f && originMix.value < 0.01f && away.value < 0.5f })
                 val geo = remember { MiniGeo() }
@@ -536,7 +561,7 @@ internal fun MorphPlayer(
                                         // The other way: it is thrown across to the opposite edge and stays on screen.
                                         val toX = if (horizontal) (if (velocity.x > 0f) 1f else 0f) else anchorX.value
                                         val toY = if (horizontal) anchorY.value else (if (velocity.y > 0f) 1f else 0f)
-                                        val throwSpec = spring<Float>(dampingRatio = 0.72f, stiffness = 380f)
+                                        val throwSpec = DOCK_SPEC
                                         scope.launch { anchorX.animateTo(toX, throwSpec) }
                                         scope.launch { anchorY.animateTo(toY, throwSpec) }
                                     }
@@ -559,7 +584,7 @@ internal fun MorphPlayer(
                                     dt -> ty = 0f
                                     else -> ty = 1f
                                 }
-                                val spec = spring<Float>(dampingRatio = 0.72f, stiffness = 380f)
+                                val spec = DOCK_SPEC
                                 scope.launch { anchorX.animateTo(tx, spec) }
                                 scope.launch { anchorY.animateTo(ty, spec) }
                             }

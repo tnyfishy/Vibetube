@@ -62,6 +62,9 @@ class SettingsRepository(
             pictureInPicture = this[PIP] ?: d.pictureInPicture,
             subtitlesEnabled = this[SUBS] ?: d.subtitlesEnabled,
             subtitleLanguage = this[SUB_LANG] ?: d.subtitleLanguage,
+            subtitleSize = this[SUB_SIZE] ?: d.subtitleSize,
+            subtitleColor = enumOr(this[SUB_COLOR], d.subtitleColor),
+            subtitleBackground = enumOr(this[SUB_BG], d.subtitleBackground),
             saveLocalHistory = this[LOCAL_HISTORY] ?: d.saveLocalHistory,
             privateMode = this[PRIVATE] ?: d.privateMode,
             hideShorts = this[HIDE_SHORTS] ?: d.hideShorts,
@@ -94,6 +97,9 @@ class SettingsRepository(
         this[PIP] = s.pictureInPicture
         this[SUBS] = s.subtitlesEnabled
         this[SUB_LANG] = s.subtitleLanguage
+        this[SUB_SIZE] = s.subtitleSize
+        this[SUB_COLOR] = s.subtitleColor.name
+        this[SUB_BG] = s.subtitleBackground.name
         this[LOCAL_HISTORY] = s.saveLocalHistory
         this[PRIVATE] = s.privateMode
         this[HIDE_SHORTS] = s.hideShorts
@@ -126,8 +132,12 @@ class SettingsRepository(
         private val BACKGROUND = booleanPreferencesKey("background_playback")
         private val SEEK_SECONDS = intPreferencesKey("seek_seconds")
         private val PIP = booleanPreferencesKey("pip")
-        private val SUBS = booleanPreferencesKey("subtitles")
+        // v2: subtitles now default to on (and follow the CC button), so an old stored "off" must not carry over.
+        private val SUBS = booleanPreferencesKey("subtitles_v2")
         private val SUB_LANG = stringPreferencesKey("subtitle_language")
+        private val SUB_SIZE = intPreferencesKey("subtitle_size")
+        private val SUB_COLOR = stringPreferencesKey("subtitle_color")
+        private val SUB_BG = stringPreferencesKey("subtitle_background")
         private val LOCAL_HISTORY = booleanPreferencesKey("local_history")
         private val PRIVATE = booleanPreferencesKey("private_mode")
         private val HIDE_SHORTS = booleanPreferencesKey("hide_shorts_v2")

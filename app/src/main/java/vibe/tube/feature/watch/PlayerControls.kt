@@ -123,6 +123,10 @@ fun VideoSurface(
     dragModifier: Modifier = Modifier,
     chapters: List<vibe.tube.player.Chapter> = emptyList(),
     onChapters: () -> Unit = {},
+    captionCues: List<vibe.tube.player.CaptionCue> = emptyList(),
+    captionsAvailable: Boolean = false,
+    captionsOn: Boolean = false,
+    onToggleCaptions: () -> Unit = {},
 ) {
     var controlsVisible by remember { mutableStateOf(true) }
     var interactions by remember { mutableFloatStateOf(0f) }
@@ -265,8 +269,15 @@ fun VideoSurface(
                     onInteract = { interactions += 1f },
                     chapters = chapters,
                     onChapters = onChapters,
+                    captionsAvailable = captionsAvailable,
+                    captionsOn = captionsOn,
+                    onToggleCaptions = onToggleCaptions,
                 )
             }
+        }
+        // Over the controls' scrim, so the text is never dimmed; only while the player is big enough to read it.
+        if (showControls && captionsOn && captionCues.isNotEmpty() && !state.inPip) {
+            CaptionOverlay(captionCues, player, raised = controlsVisible)
         }
     }
 }
@@ -290,6 +301,9 @@ private fun Controls(
     onInteract: () -> Unit,
     chapters: List<vibe.tube.player.Chapter> = emptyList(),
     onChapters: () -> Unit = {},
+    captionsAvailable: Boolean = false,
+    captionsOn: Boolean = false,
+    onToggleCaptions: () -> Unit = {},
 ) {
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableFloatStateOf(0f) }
@@ -310,6 +324,14 @@ private fun Controls(
         ) {
             TooltipIconButton(VIcon.KeyboardArrowDown, stringResource(R.string.action_minimize), onCollapse, tint = MediaOverlayColors.onScrim)
             Spacer(Modifier.weight(1f))
+            if (captionsAvailable) {
+                TooltipIconButton(
+                    VIcon.ClosedCaption,
+                    stringResource(if (captionsOn) R.string.player_caption_off else R.string.player_caption_on),
+                    { onInteract(); onToggleCaptions() },
+                    tint = if (captionsOn) MaterialTheme.colorScheme.primary else MediaOverlayColors.onScrim,
+                )
+            }
             if (onPip != null) {
                 TooltipIconButton(VIcon.PictureInPicture, stringResource(R.string.action_pip), onPip, tint = MediaOverlayColors.onScrim)
             }

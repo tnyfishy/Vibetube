@@ -316,7 +316,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
         val h = if (homeTab || !showNav) max(hide, barOut.value) else barOut.value
         max(barFullPx * (1f - h), navInset.toFloat()).roundToInt()
     }
-    CompositionLocalProvider(LocalVideoActions provides actions, vibe.tube.feature.watch.LocalSeekSeconds provides settings.seekSeconds, vibe.tube.feature.watch.LocalFullscreenGestures provides settings.fullscreenGestures, vibe.tube.feature.watch.LocalFullscreenSwipeToggle provides settings.fullscreenSwipeToggle, LocalMiniPlayerPadding provides (miniPadding + homeFeedPadding), vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds, vibe.tube.ui.components.LocalWatchProgress provides watchProgress) {
+    CompositionLocalProvider(LocalVideoActions provides actions, vibe.tube.feature.watch.LocalSeekSeconds provides settings.seekSeconds, vibe.tube.feature.watch.LocalSubtitleStyle provides vibe.tube.feature.watch.SubtitleStyle(settings.subtitleSize, settings.subtitleColor, settings.subtitleBackground), vibe.tube.feature.watch.LocalFullscreenGestures provides settings.fullscreenGestures, vibe.tube.feature.watch.LocalFullscreenSwipeToggle provides settings.fullscreenSwipeToggle, LocalMiniPlayerPadding provides (miniPadding + homeFeedPadding), vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds, vibe.tube.ui.components.LocalWatchProgress provides watchProgress) {
         Box(Modifier.fillMaxSize().onSizeChanged { rootHeightPx = it.height }) {
             NavigationSuiteScaffold(
                 layoutType = if (isBar) NavigationSuiteType.None else suiteType,

@@ -54,7 +54,7 @@ interface YouTubeProvider {
     suspend fun suggestions(locale: ContentLocale, query: String): List<String>
 
     suspend fun channel(call: ProviderCall, channelId: String): ChannelDetail
-    suspend fun channelVideos(call: ProviderCall, channelId: String, continuation: String?): Page<FeedItem>
+    suspend fun channelVideos(call: ProviderCall, channelId: String, continuation: String?, sort: vibe.tube.youtube.model.ChannelSort = vibe.tube.youtube.model.ChannelSort.Latest): Page<FeedItem>
 
     suspend fun watch(call: ProviderCall, videoId: String, playlistId: String?, playlistIndex: Int?): WatchInfo
     suspend fun related(call: ProviderCall, continuation: String): Page<FeedItem>

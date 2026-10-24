@@ -81,7 +81,18 @@ class ChannelVideosViewModel @Inject constructor(
     session: SessionManager,
 ) : FeedViewModel(settings, session) {
     val channelId: String = savedState.toRoute<ChannelRoute>().id
-    override val controller = feeds.channelVideos(channelId, viewModelScope)
+
+    private val mutableSort = kotlinx.coroutines.flow.MutableStateFlow(vibe.tube.youtube.model.ChannelSort.Latest)
+    val sort: kotlinx.coroutines.flow.StateFlow<vibe.tube.youtube.model.ChannelSort> = mutableSort
+
+    override val controller = feeds.channelVideos(channelId, { mutableSort.value }, viewModelScope)
+
+    /** Reloads the video list in the chosen order. */
+    fun setSort(value: vibe.tube.youtube.model.ChannelSort) {
+        if (mutableSort.value == value) return
+        mutableSort.value = value
+        controller.refresh()
+    }
 }
 
 @HiltViewModel

@@ -51,7 +51,7 @@ open class FakeProvider : YouTubeProvider {
     override suspend fun search(call: ProviderCall, query: String, kind: SearchKind, sort: SearchSort, continuation: String?): Page<FeedItem> = notImplemented()
     override suspend fun suggestions(locale: ContentLocale, query: String): List<String> = notImplemented()
     override suspend fun channel(call: ProviderCall, channelId: String): ChannelDetail = notImplemented()
-    override suspend fun channelVideos(call: ProviderCall, channelId: String, continuation: String?): Page<FeedItem> = notImplemented()
+    override suspend fun channelVideos(call: ProviderCall, channelId: String, continuation: String?, sort: vibe.tube.youtube.model.ChannelSort): Page<FeedItem> = notImplemented()
     override suspend fun watch(call: ProviderCall, videoId: String, playlistId: String?, playlistIndex: Int?): WatchInfo = notImplemented()
     override suspend fun related(call: ProviderCall, continuation: String): Page<FeedItem> = notImplemented()
     override suspend fun comments(call: ProviderCall, continuation: String): CommentsPage = notImplemented()

@@ -126,6 +126,7 @@ fun PlayerOverlay(
         return
     }
     val state by controller.state.collectAsStateWithLifecycle()
+    val captionCues by controller.captionCues.collectAsStateWithLifecycle()
     val expanded = state.visible && state.expanded
     BackHandler(enabled = expanded) {
         if (state.fullscreen) controller.setFullscreen(false) else controller.collapse()
@@ -228,6 +229,10 @@ private fun PlayerPage(
                     dragModifier = if (state.fullscreen) exitFullscreenDrag else if (fullscreen) Modifier else dragModifier,
                     chapters = activeChapters,
                     onChapters = { chaptersOpen = true },
+                    captionCues = captionCues,
+                    captionsAvailable = state.captions.isNotEmpty(),
+                    captionsOn = state.selectedCaption != null,
+                    onToggleCaptions = controller::toggleCaptions,
                 )
             }
 
@@ -335,7 +340,7 @@ internal fun Details(
             if (includeTabs) {
                 // Comments live in their own card (opens a panel); the next videos follow right below it.
                 item(key = "comments-card") {
-                    CommentsPreviewCard(ui.comments, Modifier.onGloballyPositioned { comments.cardPositioned(it) }) { commentsScope.launch { comments.show() } }
+                    CommentsPreviewCard(ui.comments) { commentsScope.launch { comments.show() } }
                 }
                 upNext(ui, state, controller, watch, hiddenChannels)
             }
@@ -400,7 +405,7 @@ private fun SidePanel(
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
             item(key = "comments-card") {
-                    CommentsPreviewCard(ui.comments, Modifier.onGloballyPositioned { comments.cardPositioned(it) }) { commentsScope.launch { comments.show() } }
+                    CommentsPreviewCard(ui.comments) { commentsScope.launch { comments.show() } }
                 }
             upNext(ui, state, controller, watch, hiddenChannels)
         }
