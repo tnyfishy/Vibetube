@@ -470,7 +470,7 @@ private fun ShortsSeekBar(player: ShortsPlayer, active: Boolean, modifier: Modif
     val thumbSize by animateDpAsState(if (dragging) 22.dp else 15.dp, spring(dampingRatio = 0.6f, stiffness = 500f), label = "thumb")
     val trackHeight by animateDpAsState(if (dragging) 6.dp else 4.dp, spring(stiffness = 500f), label = "track")
     val padding = 16.dp
-    val thumbShape = remember { MaterialShapes.Sunny.toShape() }
+    val thumbShape = MaterialShapes.Sunny.toShape()
 
     Box(
         modifier
