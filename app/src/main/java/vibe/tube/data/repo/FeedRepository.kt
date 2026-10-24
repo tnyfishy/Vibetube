@@ -34,6 +34,10 @@ class FeedRepository(
         FeedSpec("playlists", requiresAuth = true, cacheable = true) { c, t -> provider.userPlaylists(c, t) }, scope,
     )
 
+    fun shorts(scope: CoroutineScope) = controller(
+        FeedSpec("shorts", requiresAuth = false, cacheable = false) { c, t -> provider.shorts(c, t) }, scope,
+    )
+
     fun history(scope: CoroutineScope) = controller(
         FeedSpec("history", requiresAuth = true, cacheable = true) { c, t -> provider.history(c, t) }, scope,
     )

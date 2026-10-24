@@ -14,6 +14,9 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -229,14 +232,18 @@ private fun PlayerPage(
                 state.inPip || fullscreen -> surface(Modifier.fillMaxSize())
                 wide -> Row(Modifier.fillMaxSize().then(insets)) {
                     Column(Modifier.weight(0.62f).fillMaxHeight()) {
-                        surface(Modifier.fillMaxWidth().aspectRatio(state.videoAspect.coerceIn(1.2f, 2.4f)).clip(RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)))
-                        Details(ui, state, controller, watch, auth, onLogin, includeTabs = false, modifier = Modifier.weight(1f))
+                        surface(Modifier.fillMaxWidth().aspectRatio(state.videoAspect.coerceIn(1.2f, 2.4f)))
+                        SheetUnderVideo(Modifier.weight(1f)) {
+                            Details(ui, state, controller, watch, auth, onLogin, includeTabs = false, modifier = Modifier.fillMaxSize())
+                        }
                     }
                     SidePanel(ui, state, controller, watch, auth, onLogin, Modifier.weight(0.38f).fillMaxHeight())
                 }
                 else -> Column(Modifier.fillMaxSize().then(insets)) {
-                    surface(Modifier.fillMaxWidth().aspectRatio(Sizing.THUMBNAIL_ASPECT).clip(RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)))
-                    Details(ui, state, controller, watch, auth, onLogin, includeTabs = true, modifier = Modifier.weight(1f))
+                    surface(Modifier.fillMaxWidth().aspectRatio(Sizing.THUMBNAIL_ASPECT))
+                    SheetUnderVideo(Modifier.weight(1f)) {
+                        Details(ui, state, controller, watch, auth, onLogin, includeTabs = true, modifier = Modifier.fillMaxSize())
+                    }
                 }
             }
         }
@@ -313,21 +320,44 @@ internal fun Details(
             if (includeTabs) watch.loadMoreRelated()
         }
     }
-    LazyColumn(
-        modifier = modifier.fillMaxWidth(),
-        state = listState,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        detailsHeader(ui, state, watch, onLogin)
-        if (includeTabs) {
-            // Comments live in their own card (opens a sheet); the next videos follow right below it.
-            item(key = "comments-card") { CommentsPreviewCard(ui.comments) { commentsOpen = true } }
-            upNext(ui, state, controller, watch, hiddenChannels)
+    Box(modifier.fillMaxWidth()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            detailsHeader(ui, state, watch, onLogin)
+            if (includeTabs) {
+                // Comments live in their own card (opens a panel); the next videos follow right below it.
+                item(key = "comments-card") { CommentsPreviewCard(ui.comments) { commentsOpen = true } }
+                upNext(ui, state, controller, watch, hiddenChannels)
+            }
         }
+        CommentsPanel(commentsOpen, ui, auth, watch, onLogin) { commentsOpen = false }
     }
-    if (commentsOpen) CommentsSheet(ui, auth, watch, onLogin) { commentsOpen = false }
 }
+
+/**
+ * The page under the video: a surface with softly rounded top corners that sits on a black strip, so the video's
+ * bottom corners read as cut into the page (like YouTube) instead of the video itself being rounded.
+ */
+@Composable
+internal fun SheetUnderVideo(modifier: Modifier, stripAlpha: () -> Float = { 1f }, content: @Composable () -> Unit) {
+    val surface = MaterialTheme.colorScheme.surface
+    Box(modifier.fillMaxWidth()) {
+        // The black strip only shows while the player is fully open; during the morph it must not hang below the shrinking video.
+        Box(Modifier.fillMaxWidth().height(SHEET_RADIUS).graphicsLayer { alpha = stripAlpha() }.background(Color.Black))
+        Box(
+            Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(topStart = SHEET_RADIUS, topEnd = SHEET_RADIUS))
+                .background(surface),
+        ) { content() }
+    }
+}
+
+private val SHEET_RADIUS = 18.dp
 
 @Composable
 private fun SidePanel(
@@ -348,16 +378,18 @@ private fun SidePanel(
             (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 4
         }.distinctUntilChanged().filter { it }.collect { watch.loadMoreRelated() }
     }
-    LazyColumn(
-        modifier = modifier.windowInsetsPadding(WindowInsets.statusBars),
-        state = listState,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter),
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-    ) {
-        item(key = "comments-card") { CommentsPreviewCard(ui.comments) { commentsOpen = true } }
-        upNext(ui, state, controller, watch, hiddenChannels)
+    Box(modifier.windowInsetsPadding(WindowInsets.statusBars)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            item(key = "comments-card") { CommentsPreviewCard(ui.comments) { commentsOpen = true } }
+            upNext(ui, state, controller, watch, hiddenChannels)
+        }
+        CommentsPanel(commentsOpen, ui, auth, watch, onLogin) { commentsOpen = false }
     }
-    if (commentsOpen) CommentsSheet(ui, auth, watch, onLogin) { commentsOpen = false }
 }
 
 /** YouTube-style comments entry: title with the total, and a peek at the first comment. Tapping opens the full list. */
@@ -375,7 +407,7 @@ private fun CommentsPreviewCard(comments: CommentsUiState, onOpen: () -> Unit) {
         Column(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 Text(stringResource(R.string.comments_title), style = MaterialTheme.typography.titleSmall)
-                comments.totalText?.let {
+                compactCount(comments.totalText)?.let {
                     Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -395,27 +427,44 @@ private fun CommentsPreviewCard(comments: CommentsUiState, onOpen: () -> Unit) {
     }
 }
 
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+/**
+ * Comments, filling exactly the area under the video (it never covers the player): slides up from the bottom and goes
+ * away with the close button or Back.
+ */
 @Composable
-private fun CommentsSheet(ui: WatchUiState, auth: AuthState, watch: WatchViewModel, onLogin: () -> Unit, onDismiss: () -> Unit) {
-    val listState = rememberLazyListState()
-    LaunchedEffect(listState, ui.comments.comments.size) {
-        snapshotFlow {
-            val info = listState.layoutInfo
-            (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 4
-        }.distinctUntilChanged().filter { it }.collect { watch.loadMoreComments() }
-    }
-    androidx.compose.material3.ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+private fun CommentsPanel(visible: Boolean, ui: WatchUiState, auth: AuthState, watch: WatchViewModel, onLogin: () -> Unit, onClose: () -> Unit) {
+    androidx.activity.compose.BackHandler(enabled = visible, onBack = onClose)
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(tween(260, easing = vibe.tube.ui.components.EmphasizedDecelerate)) { it } + fadeIn(tween(120)),
+        exit = slideOutVertically(tween(200)) { it } + fadeOut(tween(160)),
     ) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.92f),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        val listState = rememberLazyListState()
+        LaunchedEffect(listState, ui.comments.comments.size) {
+            snapshotFlow {
+                val info = listState.layoutInfo
+                (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 4
+            }.distinctUntilChanged().filter { it }.collect { watch.loadMoreComments() }
+        }
+        Surface(
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier.fillMaxSize().pointerInput(Unit) {},
         ) {
-            commentsList(ui, auth, watch, onLogin)
+            Column(Modifier.fillMaxSize()) {
+                Row(Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.comments_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                    vibe.tube.ui.components.TooltipIconButton(VIcon.Close, stringResource(R.string.action_close), onClose)
+                }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    commentsList(ui, auth, watch, onLogin)
+                }
+            }
         }
     }
 }

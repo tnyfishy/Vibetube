@@ -116,22 +116,8 @@ fun HomeScreen(
             contentPadding = PaddingValues(top = headerHeightDp, bottom = contentPadding.calculateBottomPadding()),
             guestBanner = false,
         ) { item, queue -> FeedItemContent(item, queue) }
-        // Status-bar scrim: appears exactly as the heading leaves, so the clock and icons stay readable over the feed.
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(statusTop + 14.dp)
-                .graphicsLayer { alpha = (-headerOffset / headerHeightPx.coerceAtLeast(1)).coerceIn(0f, 1f) }
-                .drawBehind {
-                    drawRect(
-                        androidx.compose.ui.graphics.Brush.verticalGradient(
-                            0f to surface,
-                            (statusTop.toPx() / size.height).coerceIn(0f, 1f) to surface,
-                            1f to Color.Transparent,
-                        ),
-                    )
-                },
-        )
+        // Solid (no fade, no blur) strip behind the status bar so its clock and icons never sit on top of thumbnails.
+        Box(Modifier.fillMaxWidth().height(statusTop).background(surface))
         Box(
             Modifier
                 .fillMaxWidth()
@@ -140,21 +126,7 @@ fun HomeScreen(
                     translationY = headerOffset
                     alpha = (1f + headerOffset / headerHeightPx.coerceAtLeast(1)).coerceIn(0f, 1f)
                 }
-                .drawBehind {
-                    // Solid behind the heading, melting into the feed below it: no bar edge, no divider.
-                    val tail = 14.dp.toPx()
-                    val total = size.height + tail
-                    drawRect(
-                        androidx.compose.ui.graphics.Brush.verticalGradient(
-                            0f to surface,
-                            (size.height / total) to surface,
-                            1f to Color.Transparent,
-                            startY = 0f,
-                            endY = total,
-                        ),
-                        size = androidx.compose.ui.geometry.Size(size.width, total),
-                    )
-                }
+                .background(surface)
                 .padding(top = statusTop),
         ) {
             SearchHeaderRow(

@@ -16,6 +16,9 @@ enum class AppPalette(val seedHue: Float, val seedChroma: Float) {
     Ocean(232f, 40f),
     Rose(355f, 52f),
     Violet(305f, 50f),
+
+    /** Pure monochrome: absolute white / black surfaces with black / white content, no Material tint at all. */
+    Classic(0f, 0f),
 }
 
 /**
@@ -26,6 +29,7 @@ enum class AppPalette(val seedHue: Float, val seedChroma: Float) {
  */
 fun paletteScheme(palette: AppPalette, dark: Boolean): ColorScheme {
     if (palette == AppPalette.Vibe) return if (dark) VibeDarkColorScheme else VibeLightColorScheme
+    if (palette == AppPalette.Classic) return if (dark) ClassicDarkColorScheme else ClassicLightColorScheme
     val h = palette.seedHue
     val primary = Tonal(h, palette.seedChroma)
     val secondary = Tonal(h, palette.seedChroma / 3f)
@@ -115,3 +119,41 @@ private fun gamma(v: Float): Float {
     val c = v.coerceIn(0f, 1f)
     return if (c <= 0.0031308f) 12.92f * c else 1.055f * c.pow(1f / 2.4f) - 0.055f
 }
+
+private val ClassicLightColorScheme = lightColorScheme(
+    primary = Color(0xFF000000), onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFEBEBEB), onPrimaryContainer = Color(0xFF000000),
+    inversePrimary = Color(0xFFFFFFFF),
+    secondary = Color(0xFF2B2B2B), onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFEFEFEF), onSecondaryContainer = Color(0xFF000000),
+    tertiary = Color(0xFF5C5C5C), onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFF2F2F2), onTertiaryContainer = Color(0xFF000000),
+    background = Color(0xFFFFFFFF), onBackground = Color(0xFF000000),
+    surface = Color(0xFFFFFFFF), onSurface = Color(0xFF000000),
+    surfaceVariant = Color(0xFFF1F1F1), onSurfaceVariant = Color(0xFF2B2B2B),
+    surfaceTint = Color(0xFFFFFFFF),
+    inverseSurface = Color(0xFF000000), inverseOnSurface = Color(0xFFFFFFFF),
+    outline = Color(0xFF6E6E6E), outlineVariant = Color(0xFFD6D6D6), scrim = Color.Black,
+    surfaceBright = Color(0xFFFFFFFF), surfaceDim = Color(0xFFE4E4E4),
+    surfaceContainerLowest = Color(0xFFFFFFFF), surfaceContainerLow = Color(0xFFFAFAFA), surfaceContainer = Color(0xFFF5F5F5),
+    surfaceContainerHigh = Color(0xFFEFEFEF), surfaceContainerHighest = Color(0xFFE8E8E8),
+)
+
+private val ClassicDarkColorScheme = darkColorScheme(
+    primary = Color(0xFFFFFFFF), onPrimary = Color(0xFF000000),
+    primaryContainer = Color(0xFF2A2A2A), onPrimaryContainer = Color(0xFFFFFFFF),
+    inversePrimary = Color(0xFF000000),
+    secondary = Color(0xFFD4D4D4), onSecondary = Color(0xFF000000),
+    secondaryContainer = Color(0xFF262626), onSecondaryContainer = Color(0xFFFFFFFF),
+    tertiary = Color(0xFFA6A6A6), onTertiary = Color(0xFF000000),
+    tertiaryContainer = Color(0xFF1F1F1F), onTertiaryContainer = Color(0xFFFFFFFF),
+    background = Color(0xFF000000), onBackground = Color(0xFFFFFFFF),
+    surface = Color(0xFF000000), onSurface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFF1C1C1C), onSurfaceVariant = Color(0xFFE0E0E0),
+    surfaceTint = Color(0xFF000000),
+    inverseSurface = Color(0xFFFFFFFF), inverseOnSurface = Color(0xFF000000),
+    outline = Color(0xFF8C8C8C), outlineVariant = Color(0xFF363636), scrim = Color.Black,
+    surfaceBright = Color(0xFF2C2C2C), surfaceDim = Color(0xFF000000),
+    surfaceContainerLowest = Color(0xFF000000), surfaceContainerLow = Color(0xFF0A0A0A), surfaceContainer = Color(0xFF121212),
+    surfaceContainerHigh = Color(0xFF1A1A1A), surfaceContainerHighest = Color(0xFF222222),
+)

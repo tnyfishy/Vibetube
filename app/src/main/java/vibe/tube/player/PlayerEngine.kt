@@ -28,7 +28,7 @@ class PlayerEngine @Inject constructor(@ApplicationContext private val context: 
     @Volatile
     var queueHandler: QueueHandler? = null
 
-    val player: ExoPlayer by lazy {
+    private val playerHolder = lazy {
         ExoPlayer.Builder(context)
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -50,6 +50,13 @@ class PlayerEngine @Inject constructor(@ApplicationContext private val context: 
             .setSeekBackIncrementMs(10_000)
             .setSeekForwardIncrementMs(10_000)
             .build()
+    }
+
+    val player: ExoPlayer get() = playerHolder.value
+
+    /** Pauses the main player without creating it when it has not been used yet (the Shorts tab does this). */
+    fun pauseIfCreated() {
+        if (playerHolder.isInitialized()) playerHolder.value.pause()
     }
 
     val sessionPlayer: Player by lazy { QueueAwarePlayer(player, this) }

@@ -1,6 +1,10 @@
 package vibe.tube.feature.library
 
 import androidx.compose.foundation.layout.Arrangement
+import vibe.tube.ui.components.bouncyClickable
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.layout
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -63,9 +67,9 @@ fun LibraryScreen(
     onLogin: () -> Unit,
     isGuest: Boolean,
     contentPadding: PaddingValues,
-    viewModel: LibraryViewModel = hiltViewModel(),
+    historyViewModel: MergedHistoryViewModel = hiltViewModel(),
 ) {
-    val recent by viewModel.recent.collectAsStateWithLifecycle()
+    val history by historyViewModel.entries.collectAsStateWithLifecycle()
     Scaffold(
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
         topBar = { TopAppBar(title = { Text(stringResource(R.string.nav_library)) }) },
@@ -92,24 +96,70 @@ fun LibraryScreen(
                     )
                 }
             }
+            // Device + account history in one strip, right at the top of the tab.
+            item(key = "history", span = { GridItemSpan(maxLineSpan) }) {
+                HistoryStrip(history, onSeeAll = onOpenLocalHistory)
+            }
             item { LibraryCard(VIcon.PlaylistPlay, R.string.library_playlists, onOpenPlaylists, enabled = !isGuest) }
             item { LibraryCard(VIcon.ThumbUp, R.string.library_liked, onOpenLiked, enabled = !isGuest) }
             item { LibraryCard(VIcon.Schedule, R.string.library_watch_later, onOpenWatchLater, enabled = !isGuest) }
-            item { LibraryCard(VIcon.History, R.string.library_youtube_history, onOpenHistory, enabled = !isGuest) }
             item { LibraryCard(VIcon.Download, R.string.library_downloads, onOpenDownloads, enabled = true) }
-            item { LibraryCard(VIcon.Storage, R.string.library_local_history, onOpenLocalHistory, enabled = true) }
-            if (recent.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        stringResource(R.string.library_continue_watching),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = Spacing.md),
-                    )
-                }
-                items(recent.take(6), key = { it.videoId }, span = { GridItemSpan(maxLineSpan) }) { entry ->
-                    LocalHistoryRow(entry, viewModel::asVideo, onRemove = null)
-                }
+        }
+    }
+}
+
+@Composable
+private fun HistoryStrip(entries: List<HistoryEntry>, onSeeAll: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        androidx.compose.foundation.layout.Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.library_history), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            if (entries.isNotEmpty()) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = onSeeAll) { Text(stringResource(R.string.library_see_all)) }
             }
+        }
+        if (entries.isEmpty()) {
+            Text(
+                stringResource(R.string.local_history_empty_title),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = Spacing.sm),
+            )
+        } else {
+            // Bleeds into the screen gutters so the strip scrolls edge to edge.
+            androidx.compose.foundation.lazy.LazyRow(
+                modifier = Modifier.layout { measurable, constraints ->
+                    val extra = Spacing.gutter.roundToPx()
+                    val placeable = measurable.measure(constraints.copy(minWidth = constraints.maxWidth + 2 * extra, maxWidth = constraints.maxWidth + 2 * extra))
+                    layout(constraints.maxWidth, placeable.height) { placeable.place(-extra, 0) }
+                },
+                contentPadding = PaddingValues(horizontal = Spacing.gutter),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                items(entries.take(HISTORY_STRIP_LIMIT), key = { it.video.id }) { entry -> HistoryCard(entry.video) }
+            }
+        }
+    }
+}
+
+private const val HISTORY_STRIP_LIMIT = 20
+
+@Composable
+private fun HistoryCard(video: VideoItem) {
+    val actions = LocalVideoActions.current
+    val bounds = remember { vibe.tube.ui.components.ThumbnailBounds() }
+    Column(
+        Modifier
+            .width(176.dp)
+            .bouncyClickable(vibe.tube.ui.theme.VibeShape.card) { vibe.tube.ui.components.PlayerLaunch.set(bounds.rect); actions.play(video, listOf(video)) },
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        vibe.tube.ui.components.VideoThumbnail(video, Modifier.fillMaxWidth().onPlaced { bounds.coordinates = it })
+        Text(video.title, style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 2.dp))
+        video.channelName?.let {
+            Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 2.dp))
         }
     }
 }
@@ -159,16 +209,23 @@ fun LocalHistoryRow(entry: PlaybackHistoryEntity, asVideo: (PlaybackHistoryEntit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LocalHistoryScreen(onBack: () -> Unit, viewModel: LibraryViewModel = hiltViewModel()) {
-    val recent by viewModel.recent.collectAsStateWithLifecycle()
+fun LocalHistoryScreen(onBack: () -> Unit, viewModel: MergedHistoryViewModel = hiltViewModel()) {
+    val entries by viewModel.entries.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    androidx.compose.runtime.LaunchedEffect(listState, entries.size) {
+        androidx.compose.runtime.snapshotFlow {
+            val info = listState.layoutInfo
+            (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 4
+        }.collect { if (it) viewModel.loadMore() }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.library_local_history)) },
+                title = { Text(stringResource(R.string.library_history)) },
                 navigationIcon = { TooltipIconButton(VIcon.ArrowBack, stringResource(R.string.action_back), onBack) },
                 actions = {
-                    if (recent.isNotEmpty()) {
+                    if (entries.any { it.onDevice }) {
                         TooltipIconButton(VIcon.DeleteSweep, stringResource(R.string.action_clear_device_history), { confirmClear = true })
                     }
                 },
@@ -176,25 +233,24 @@ fun LocalHistoryScreen(onBack: () -> Unit, viewModel: LibraryViewModel = hiltVie
         },
     ) { inner ->
         Column(Modifier.fillMaxSize().padding(inner)) {
-            Banner(
-                text = stringResource(R.string.local_history_scope_note),
-                icon = VIcon.Info,
-                modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.sm),
-            )
-            if (recent.isNotEmpty()) {
-                Text(
-                    androidx.compose.ui.res.pluralStringResource(R.plurals.video_count, recent.size, recent.size),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Spacing.gutter),
-                )
-            }
-            if (recent.isEmpty()) {
+            if (entries.isEmpty()) {
                 StateMessage(VIcon.History, stringResource(R.string.local_history_empty_title), stringResource(R.string.local_history_empty_body))
             } else {
-                LazyColumn(contentPadding = PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm)) {
-                    items(recent, key = { it.videoId }) { entry ->
-                        LocalHistoryRow(entry, viewModel::asVideo, onRemove = { viewModel.remove(entry.videoId) })
+                Text(
+                    androidx.compose.ui.res.pluralStringResource(R.plurals.video_count, entries.size, entries.size),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.sm),
+                )
+                LazyColumn(state = listState, contentPadding = PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm)) {
+                    items(entries, key = { it.video.id }) { entry ->
+                        VideoRow(
+                            video = entry.video,
+                            queue = listOf(entry.video),
+                            extraMenu = if (entry.onDevice) {
+                                listOf(MenuEntry(stringResource(R.string.action_remove_from_device_history), VIcon.Delete, { viewModel.remove(entry.video.id) }))
+                            } else emptyList(),
+                        )
                     }
                 }
             }

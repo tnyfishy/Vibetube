@@ -166,6 +166,9 @@ fun SettingsScreen(
                 )
             }
             section(R.string.settings_section_playback)
+            item {
+                SwitchRow(VIcon.Shorts, R.string.settings_shorts_tab, R.string.settings_shorts_tab_desc, settings.shortsTab) { v -> viewModel.update { it.copy(shortsTab = v) } }
+            }
             item { SettingRow(VIcon.HighQuality, R.string.settings_quality_wifi, qualityLabel(settings.wifiQuality)) { dialog = Dialog.WifiQuality } }
             item { SettingRow(VIcon.HighQuality, R.string.settings_quality_mobile, qualityLabel(settings.mobileQuality)) { dialog = Dialog.MobileQuality } }
             item { SettingRow(VIcon.FastForward, R.string.settings_seek_seconds, stringResource(R.string.settings_seek_value, settings.seekSeconds)) { dialog = Dialog.SeekSeconds } }

@@ -2,6 +2,10 @@
 <resources>
     <string name="nav_home">Trang chủ</string>
     <string name="nav_subscriptions">Kênh đăng ký</string>
+    <string name="nav_shorts">Shorts</string>
+    <string name="settings_shorts_tab">Tab Shorts</string>
+    <string name="settings_shorts_tab_desc">Hiện tab Shorts ở thanh dưới (video lấy từ YouTube)</string>
+    <string name="shorts_empty">Hiện chưa có Shorts nào để hiển thị</string>
     <string name="nav_library">Thư viện</string>
     <string name="nav_account">Tài khoản</string>
     <string name="action_back">Quay lại</string>
@@ -79,6 +83,8 @@
     <string name="library_watch_later">Xem sau</string>
     <string name="library_youtube_history">Lịch sử xem</string>
     <string name="library_local_history">Lịch sử trên thiết bị này</string>
+    <string name="library_history">Lịch sử xem</string>
+    <string name="library_see_all">Xem tất cả</string>
     <string name="library_continue_watching">Xem tiếp</string>
     <string name="local_history_scope_note">Danh sách này chỉ lưu trên thiết bị này cho tài khoản đang dùng. Xóa danh sách không làm thay đổi lịch sử Vibetube của bạn.</string>
     <string name="local_history_empty_title">Chưa có video nào được xem trên thiết bị này</string>
@@ -344,6 +350,7 @@
     <string name="palette_ocean">Đại dương</string>
     <string name="palette_rose">Hồng</string>
     <string name="palette_violet">Tím</string>
+    <string name="palette_classic">Cổ điển</string>
     <string name="settings_fullscreen_gestures">Cử chỉ khi toàn màn hình</string>
     <string name="settings_fullscreen_swipe">Vuốt để vào/thoát toàn màn hình</string>
     <string name="settings_fullscreen_swipe_desc">Vuốt lên trên trình phát để toàn màn hình, vuốt xuống để thoát. Khi tắt, độ sáng và âm lượng chiếm mỗi bên một nửa màn hình</string>

@@ -127,7 +127,7 @@ fun CommentsHeader(
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                state.totalText?.let { stringResource(R.string.comments_title_with_total, it) } ?: stringResource(R.string.comments_title),
+                compactCount(state.totalText)?.let { stringResource(R.string.comments_title_with_total, it) } ?: stringResource(R.string.comments_title),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f),
             )
@@ -180,4 +180,35 @@ fun CommentsEmptyStates(state: CommentsUiState, onRetry: () -> Unit) {
         )
         state.comments.isEmpty() -> StateMessage(VIcon.Lyrics, stringResource(R.string.comments_empty_title), null)
     }
+}
+
+/**
+ * Compact count: 999 stays "999", 1000 becomes "1K", 1200 "1.2K", 15300 "15K", 2.4 million "2.4M". Texts that are
+ * already compact are normalised ("1,2 N" / "1,2 Tr" from Vietnamese YouTube become "1.2K" / "1.2M").
+ */
+fun compactCount(text: String?): String? {
+    val raw = text?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    if (raw.all { it.isDigit() || it == '.' || it == ',' || it == ' ' || it == '\u00A0' }) {
+        val n = raw.filter { it.isDigit() }.toLongOrNull() ?: return raw
+        return when {
+            n < 1_000 -> n.toString()
+            n < 1_000_000 -> scaled(n / 1_000.0) + "K"
+            n < 1_000_000_000 -> scaled(n / 1_000_000.0) + "M"
+            else -> scaled(n / 1_000_000_000.0) + "B"
+        }
+    }
+    val match = Regex("^([0-9]+(?:[.,][0-9]+)?)\\s*(K|M|B|N|Tr)$", RegexOption.IGNORE_CASE).find(raw) ?: return raw
+    val number = match.groupValues[1].replace(',', '.')
+    val unit = when (match.groupValues[2].lowercase()) {
+        "n", "k" -> "K"
+        "tr", "m" -> "M"
+        else -> "B"
+    }
+    return number.removeSuffix(".0") + unit
+}
+
+private fun scaled(value: Double): String {
+    // Under ten (K / M) keep one decimal, above that whole numbers; always round down so 1999 never reads as "2K".
+    val v = if (value < 10) kotlin.math.floor(value * 10) / 10 else kotlin.math.floor(value)
+    return if (v == v.toLong().toDouble()) v.toLong().toString() else String.format(java.util.Locale.US, "%.1f", v)
 }

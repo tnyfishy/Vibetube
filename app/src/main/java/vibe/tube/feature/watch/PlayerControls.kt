@@ -40,6 +40,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -185,7 +186,8 @@ fun VideoSurface(
             visible = flashVisible,
             enter = fadeIn(tween(80)),
             exit = fadeOut(tween(260)),
-            modifier = Modifier.align(if (flashSide < 0) Alignment.CenterStart else Alignment.CenterEnd).padding(horizontal = Spacing.xxl),
+            // Centred in its half of the screen, not hugging the edge, so a stray double-tap near the bezel still reads clearly.
+            modifier = Modifier.align(BiasAlignment(if (flashSide < 0) -0.5f else 0.5f, 0f)),
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 VIconImage(if (flashSide < 0) VIcon.FastRewind else VIcon.FastForward, null, Modifier.size(36.dp), tint = MediaOverlayColors.onScrim)

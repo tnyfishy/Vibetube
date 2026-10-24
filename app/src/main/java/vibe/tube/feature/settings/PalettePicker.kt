@@ -105,6 +105,7 @@ private fun paletteName(p: AppPalette): Int = when (p) {
     AppPalette.Ocean -> R.string.palette_ocean
     AppPalette.Rose -> R.string.palette_rose
     AppPalette.Violet -> R.string.palette_violet
+    AppPalette.Classic -> R.string.palette_classic
 }
 
 @Composable
@@ -129,7 +130,13 @@ private fun PaletteTile(
     val ringColor = MaterialTheme.colorScheme.primary
     val gap = MaterialTheme.colorScheme.surface
     Column(
-        Modifier.selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+        Modifier.selectable(
+            selected = selected,
+            role = Role.RadioButton,
+            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+            indication = null,
+            onClick = onClick,
+        ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(Modifier.size(76.dp), contentAlignment = Alignment.Center) {

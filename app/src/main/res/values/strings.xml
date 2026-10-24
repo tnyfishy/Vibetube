@@ -3,6 +3,10 @@
     <string name="app_name" translatable="false">Vibetube</string>
     <string name="nav_home">Home</string>
     <string name="nav_subscriptions">Subscriptions</string>
+    <string name="nav_shorts">Shorts</string>
+    <string name="settings_shorts_tab">Shorts tab</string>
+    <string name="settings_shorts_tab_desc">Show a Shorts tab in the bottom bar (videos come from YouTube)</string>
+    <string name="shorts_empty">No Shorts to show right now</string>
     <string name="nav_library">Library</string>
     <string name="nav_account">Account</string>
     <string name="action_back">Back</string>
@@ -80,6 +84,8 @@
     <string name="library_watch_later">Watch later</string>
     <string name="library_youtube_history">Watch history</string>
     <string name="library_local_history">History on this device</string>
+    <string name="library_history">Watch history</string>
+    <string name="library_see_all">See all</string>
     <string name="library_continue_watching">Continue watching</string>
     <string name="local_history_scope_note">This list is stored only on this device for the active account. Clearing it does not change your Vibetube history.</string>
     <string name="local_history_empty_title">Nothing watched on this device yet</string>
@@ -347,6 +353,7 @@
     <string name="palette_ocean">Ocean</string>
     <string name="palette_rose">Rose</string>
     <string name="palette_violet">Violet</string>
+    <string name="palette_classic">Classic</string>
     <string name="settings_fullscreen_gestures">Fullscreen gestures</string>
     <string name="settings_fullscreen_swipe">Swipe to enter/exit fullscreen</string>
     <string name="settings_fullscreen_swipe_desc">Swipe up on the player to go fullscreen and down to leave it. When off, brightness and volume each take half of the screen</string>

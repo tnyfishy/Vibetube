@@ -46,6 +46,9 @@ interface YouTubeProvider {
     suspend fun userPlaylists(call: ProviderCall, continuation: String?): Page<FeedItem>
     suspend fun history(call: ProviderCall, continuation: String?): Page<FeedItem>
 
+    /** Short vertical videos for the Shorts tab (YouTube search results narrowed to Shorts). */
+    suspend fun shorts(call: ProviderCall, continuation: String?): Page<FeedItem> = Page(emptyList(), null)
+
     suspend fun playlist(call: ProviderCall, playlistId: String, continuation: String?): PlaylistDetail
     suspend fun search(call: ProviderCall, query: String, kind: SearchKind, sort: SearchSort, continuation: String?): Page<FeedItem>
     suspend fun suggestions(locale: ContentLocale, query: String): List<String>

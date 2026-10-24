@@ -363,7 +363,9 @@ internal fun MorphPlayer(
                             },
                     ) {
                         Spacer(Modifier.height(with(density) { (topInsetPx + videoH).toDp() }))
-                        Details(ui, detailState, controller, watch, auth, onLogin, includeTabs = true, modifier = Modifier.weight(1f))
+                        SheetUnderVideo(Modifier.weight(1f), stripAlpha = { ((p() - 0.92f) / 0.08f).coerceIn(0f, 1f) }) {
+                            Details(ui, detailState, controller, watch, auth, onLogin, includeTabs = true, modifier = Modifier.fillMaxSize())
+                        }
                     }
                 }
             }
@@ -383,10 +385,7 @@ internal fun MorphPlayer(
                         scaleY = sc
                         translationX = lerpF(thumbX(), 0f, p()) + slide()
                         translationY = lerpF(thumbY(), topInsetPx, p()) + fsOffset.value
-                        // Mini card: 12dp all round. Expanded: square on top, softly rounded where it meets the page below.
-                        val topCorner = CornerSize(lerpF(12.dp.toPx(), 0f, t()) / sc)
-                        val bottomCorner = CornerSize(lerpF(12.dp.toPx(), 16.dp.toPx(), t()) / sc)
-                        shape = RoundedCornerShape(topCorner, topCorner, bottomCorner, bottomCorner)
+                        shape = RoundedCornerShape(CornerSize(lerpF(12.dp.toPx(), 0f, t()) / sc))
                         clip = true
                         alpha = (1f + fsOffset.value / fsRange).coerceIn(0f, 1f) * awayAlpha()
                     },

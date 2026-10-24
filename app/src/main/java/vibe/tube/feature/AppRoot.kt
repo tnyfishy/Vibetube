@@ -115,6 +115,7 @@ import vibe.tube.feature.nav.GalleryRoute
 import vibe.tube.feature.nav.DownloadsRoute
 import vibe.tube.feature.nav.HomeRoute
 import vibe.tube.feature.nav.LibraryRoute
+import vibe.tube.feature.nav.ShortsRoute
 import vibe.tube.feature.nav.LicensesRoute
 import vibe.tube.feature.nav.LocalHistoryRoute
 import vibe.tube.feature.nav.LoginRoute
@@ -142,8 +143,9 @@ import vibe.tube.youtube.model.VideoItem
 
 private data class Tab(val route: Any, val label: Int, val icon: Int, val iconSelected: Int)
 
-private val tabs = listOf(
+private val allTabs = listOf(
     Tab(HomeRoute, R.string.nav_home, VIcon.Home, VIcon.HomeFilled),
+    Tab(ShortsRoute, R.string.nav_shorts, VIcon.Shorts, VIcon.ShortsFilled),
     Tab(SubscriptionsRoute, R.string.nav_subscriptions, VIcon.Subscriptions, VIcon.SubscriptionsFilled),
     Tab(LibraryRoute, R.string.nav_library, VIcon.VideoLibrary, VIcon.VideoLibraryFilled),
     Tab(AccountRoute, R.string.nav_account, VIcon.AccountCircle, VIcon.AccountCircleFilled),
@@ -159,6 +161,8 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     val playerState by remember { controller.state.map { PlayerFlags(it.visible, it.expanded, it.fullscreen, it.inPip) }.distinctUntilChanged() }
         .collectAsStateWithLifecycle(initialValue = PlayerFlags())
     val settings by appViewModel.settings.collectAsStateWithLifecycle()
+    // The Shorts tab can be switched off in Settings.
+    val tabs = remember(settings.shortsTab) { allTabs.filter { it.route != ShortsRoute || settings.shortsTab } }
     val avatarUrl by appViewModel.avatarUrl.collectAsStateWithLifecycle()
     val saveTarget by appViewModel.events.saveTarget.collectAsStateWithLifecycle()
     val downloadTarget by appViewModel.events.downloadTarget.collectAsStateWithLifecycle()
@@ -384,7 +388,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                 contentBottom = {
                     if (narrow) (rootHeightPx - barLift()).coerceAtLeast(0) else contentBottomPx
                 },
-                miniAway = onSettings,
+                miniAway = onSettings || destination?.hasRoute(ShortsRoute::class) == true,
             )
             val welcomePrefs = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("app_state", android.content.Context.MODE_PRIVATE)
             var welcomeSeen by androidx.compose.runtime.remember {
@@ -443,7 +447,7 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
     val fadeInSpec = tween<Float>(220, delayMillis = 40, easing = LinearOutSlowInEasing)
     val fadeOutSpec = tween<Float>(120, easing = LinearEasing)
 
-    fun tabIndex(d: NavDestination): Int = tabs.indexOfFirst { d.hasRoute(it.route::class) }
+    fun tabIndex(d: NavDestination): Int = allTabs.indexOfFirst { d.hasRoute(it.route::class) }
     fun isSearch(d: NavDestination) = d.hasRoute(SearchRoute::class)
 
     // Direction-aware shared-axis motion: tabs slide sideways in the swipe direction, detail screens
@@ -506,6 +510,9 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
                         contentPadding = noPadding,
                         visibilityScope = this,
                     )
+                }
+                page<ShortsRoute> {
+                    vibe.tube.feature.shorts.ShortsScreen(onLogin = { nav.navigate(LoginRoute) })
                 }
                 page<SubscriptionsRoute> {
                     SubscriptionsScreen(
@@ -583,7 +590,7 @@ private inline fun <reified T : Any> NavGraphBuilder.page(
 ) {
     composable<T> { entry ->
         val d = entry.destination
-        val flat = tabs.any { d.hasRoute(it.route::class) } || d.hasRoute(SearchRoute::class)
+        val flat = allTabs.any { d.hasRoute(it.route::class) } || d.hasRoute(SearchRoute::class)
         PageFrame(this, clip = !flat) { content(entry) }
     }
 }

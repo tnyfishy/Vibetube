@@ -37,6 +37,8 @@ object VIcon {
     @DrawableRes val Lock: Int = R.drawable.ic_lock
     @DrawableRes val VolumeUp: Int = R.drawable.ic_volume_up
     @DrawableRes val TextFields: Int = R.drawable.ic_text_fields
+    @DrawableRes val Shorts: Int = R.drawable.ic_shorts
+    @DrawableRes val ShortsFilled: Int = R.drawable.ic_shorts_filled
     @DrawableRes val Login: Int = R.drawable.ic_login
     @DrawableRes val Logout: Int = R.drawable.ic_logout
     @DrawableRes val Lyrics: Int = R.drawable.ic_lyrics

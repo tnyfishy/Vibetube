@@ -122,6 +122,31 @@ class InnerTubeProvider(
         return page(client.post("search", body, call.locale, call.auth))
     }
 
+    private val shortsCursor = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /**
+     * Shorts source: YouTube's own search for "#shorts" topics (each fresh load picks another topic), keeping only the
+     * vertical short videos. A page without any short is skipped by following its continuation (a few times at most).
+     */
+    override suspend fun shorts(call: ProviderCall, continuation: String?): Page<FeedItem> {
+        fun isShortItem(item: FeedItem) =
+            item is vibe.tube.youtube.model.VideoItem && !item.isLive && (item.isShort || (item.durationSeconds ?: Int.MAX_VALUE) in 1..61)
+        var token = continuation
+        var query: String? = if (continuation == null) {
+            val pool = SHORTS_QUERIES[call.locale.region] ?: if (call.locale.language == "vi") SHORTS_QUERIES.getValue("VN") else SHORTS_QUERIES.getValue("")
+            pool[(shortsCursor.getAndIncrement() + (System.nanoTime() % 5).toInt().coerceAtLeast(0)) % pool.size]
+        } else null
+        repeat(4) {
+            val body = buildJsonObject { if (token != null) put("continuation", token!!) else put("query", query.orEmpty()) }
+            val result = page(client.post("search", body, call.locale, call.auth))
+            val shorts = result.items.filter(::isShortItem)
+            if (shorts.isNotEmpty() || result.continuation == null) return result.copy(items = shorts)
+            token = result.continuation
+            query = null
+        }
+        return Page(emptyList(), token)
+    }
+
     override suspend fun subscriptionsFeed(call: ProviderCall, continuation: String?): Page<FeedItem> {
         requireAuth(call, "subscriptions")
         return page(browse(call, "FEsubscriptions", continuation))
@@ -404,6 +429,11 @@ class InnerTubeProvider(
         const val SUBSCRIBE_PARAMS = "EgIIAhgA"
 
         /** Topic searches per region (first entry = the default "trending" query). The empty key is the fallback. */
+        private val SHORTS_QUERIES: Map<String, List<String>> = mapOf(
+            "VN" to listOf("#shorts", "#shorts hài hước", "#shorts nhạc trend", "#shorts ẩm thực", "#shorts bóng đá", "#shorts du lịch", "#shorts mèo"),
+            "" to listOf("#shorts", "#shorts funny", "#shorts music", "#shorts food", "#shorts sports", "#shorts travel", "#shorts cats"),
+        )
+
         private val TRENDING_QUERIES: Map<String, List<String>> = mapOf(
             "VN" to listOf("thịnh hành", "nhạc thịnh hành", "tin tức hôm nay", "giải trí", "game", "ẩm thực", "du lịch", "bóng đá"),
             "JP" to listOf("急上昇", "音楽 人気", "ニュース", "ゲーム", "料理", "旅行", "アニメ"),

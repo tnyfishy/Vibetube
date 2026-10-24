@@ -42,31 +42,70 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch { history.clearPlayback(scope()) }
     }
 
-    fun asVideo(entry: PlaybackHistoryEntity): VideoItem {
-        val duration = entry.durationSeconds
-        val percent = if (duration != null && duration > 0 && !entry.completed) {
-            ((entry.positionMs / 1000f) / duration * 100).toInt().coerceIn(0, 100)
-        } else null
-        return VideoItem(
-            id = entry.videoId,
-            title = entry.title,
-            channelName = entry.channelName,
-            channelId = null,
-            channelAvatar = null,
-            thumbnails = entry.thumbnailUrl?.let { listOf(Thumb(it, 480, 270)) }.orEmpty(),
-            durationText = duration?.let { formatDuration(it) },
-            durationSeconds = duration,
-            viewCountText = null,
-            publishedText = null,
-            watchedPercent = percent,
-        )
+    fun asVideo(entry: PlaybackHistoryEntity): VideoItem = entry.toVideoItem()
+}
+
+internal fun PlaybackHistoryEntity.toVideoItem(): VideoItem {
+    val duration = durationSeconds
+    val percent = if (duration != null && duration > 0 && !completed) {
+        ((positionMs / 1000f) / duration * 100).toInt().coerceIn(0, 100)
+    } else null
+    return VideoItem(
+        id = videoId,
+        title = title,
+        channelName = channelName,
+        channelId = null,
+        channelAvatar = null,
+        thumbnails = thumbnailUrl?.let { listOf(Thumb(it, 480, 270)) }.orEmpty(),
+        durationText = duration?.let { formatHistoryDuration(it) },
+        durationSeconds = duration,
+        viewCountText = null,
+        publishedText = null,
+        watchedPercent = percent,
+    )
+}
+
+private fun formatHistoryDuration(seconds: Int): String {
+    val h = seconds / 3600
+    val m = (seconds % 3600) / 60
+    val s = seconds % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+}
+
+/** One watched video; [onDevice] entries can be removed from this device's history. */
+data class HistoryEntry(val video: VideoItem, val onDevice: Boolean)
+
+/** Device history and the YouTube account history merged into one list (device plays first, then the account's). */
+@HiltViewModel
+class MergedHistoryViewModel @Inject constructor(
+    feeds: vibe.tube.data.repo.FeedRepository,
+    private val history: LocalHistoryRepository,
+    private val session: SessionManager,
+) : ViewModel() {
+    private val account = feeds.history(viewModelScope)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val local = session.context.flatMapLatest { history.recentPlayback(it?.scopeKey ?: FeedController.GUEST_SCOPE) }
+
+    val entries: StateFlow<List<HistoryEntry>> = kotlinx.coroutines.flow.combine(local, account.state) { device, remote ->
+        val seen = HashSet<String>()
+        buildList {
+            device.forEach { if (seen.add(it.videoId)) add(HistoryEntry(it.toVideoItem(), true)) }
+            remote.items.forEach { item -> if (item is VideoItem && seen.add(item.id)) add(HistoryEntry(item, false)) }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun loadMore() = account.loadMore()
+    fun refresh() = account.refresh()
+
+    private fun scope(): String = session.currentContext()?.scopeKey ?: FeedController.GUEST_SCOPE
+
+    fun remove(videoId: String) {
+        viewModelScope.launch { history.removePlayback(scope(), videoId) }
     }
 
-    private fun formatDuration(seconds: Int): String {
-        val h = seconds / 3600
-        val m = (seconds % 3600) / 60
-        val s = seconds % 60
-        return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+    fun clearAll() {
+        viewModelScope.launch { history.clearPlayback(scope()) }
     }
 }
 
