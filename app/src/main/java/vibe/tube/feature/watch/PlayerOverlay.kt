@@ -14,6 +14,9 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.height
@@ -126,7 +129,6 @@ fun PlayerOverlay(
         return
     }
     val state by controller.state.collectAsStateWithLifecycle()
-    val captionCues by controller.captionCues.collectAsStateWithLifecycle()
     val expanded = state.visible && state.expanded
     BackHandler(enabled = expanded) {
         if (state.fullscreen) controller.setFullscreen(false) else controller.collapse()
@@ -152,6 +154,7 @@ private fun PlayerPage(
 ) {
     val ui by watch.state.collectAsStateWithLifecycle()
     val auth by watch.authState.collectAsStateWithLifecycle()
+    val captionCues by controller.captionCues.collectAsStateWithLifecycle()
     var options by remember { mutableStateOf(false) }
     var chaptersOpen by remember { mutableStateOf(false) }
     val chapters = remember(ui.info?.videoId, ui.info?.description) {
@@ -262,6 +265,49 @@ private fun PlayerPage(
     }
 }
 
+/** Like and dislike as one joined pill: the like count on the left, the dislike on the right, a hairline between. */
+@Composable
+private fun LikeDislikePill(
+    status: LikeStatus?,
+    likeText: String,
+    dislikeText: String?,
+    enabled: Boolean,
+    onLike: () -> Unit,
+    onDislike: () -> Unit,
+) {
+    val container = MaterialTheme.colorScheme.secondaryContainer
+    val content = MaterialTheme.colorScheme.onSecondaryContainer
+    val liked = status == LikeStatus.Like
+    val disliked = status == LikeStatus.Dislike
+    Row(
+        Modifier.height(32.dp).clip(CircleShape).background(container),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            Modifier.fillMaxHeight().clickable(enabled = enabled, onClick = onLike).padding(start = 12.dp, end = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            VIconImage(if (liked) VIcon.ThumbUpFilled else VIcon.ThumbUp, null, Modifier.size(18.dp), tint = if (liked) MaterialTheme.colorScheme.primary else content)
+            Text(likeText, style = MaterialTheme.typography.labelLarge, color = content, maxLines = 1)
+        }
+        Box(Modifier.width(1.dp).height(18.dp).background(content.copy(alpha = 0.25f)))
+        Row(
+            Modifier.fillMaxHeight().clickable(enabled = enabled, onClick = onDislike).padding(start = 10.dp, end = if (dislikeText != null) 12.dp else 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            VIconImage(
+                if (disliked) VIcon.ThumbDownFilled else VIcon.ThumbDown,
+                stringResource(R.string.action_dislike),
+                Modifier.size(18.dp),
+                tint = if (disliked) MaterialTheme.colorScheme.primary else content,
+            )
+            if (dislikeText != null) Text(dislikeText, style = MaterialTheme.typography.labelLarge, color = content, maxLines = 1)
+        }
+    }
+}
+
 @Composable
 private fun ActionRow(
     ui: WatchUiState,
@@ -270,18 +316,18 @@ private fun ActionRow(
     onLogin: () -> Unit,
 ) {
     val actions = LocalVideoActions.current
-    val liked = ui.likeStatus == LikeStatus.Like
     Row(
         Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FilterChip(
-            selected = liked,
+        LikeDislikePill(
+            status = ui.likeStatus,
+            likeText = ui.info?.likeCountText?.takeIf { it.isNotBlank() } ?: compactCount(ui.votes?.likes?.toString()) ?: stringResource(R.string.action_like),
+            dislikeText = compactCount(ui.votes?.dislikes?.toString()),
             enabled = !ui.likeBusy,
-            onClick = { watch.toggleLike(onLogin) },
-            label = { Text(ui.info?.likeCountText ?: stringResource(R.string.action_like)) },
-            leadingIcon = { VIconImage(if (liked) VIcon.ThumbUpFilled else VIcon.ThumbUp, null) },
+            onLike = { watch.toggleLike(onLogin) },
+            onDislike = { watch.toggleDislike(onLogin) },
         )
         AssistChip(
             onClick = watch::requestSave,
@@ -485,11 +531,14 @@ private fun LazyListScope.detailsHeader(ui: WatchUiState, state: PlayerUiState, 
                         }
                     }
                 }
-                if (ui.subscribed == true) {
-                    FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { watch.toggleSubscribe(onLogin) }, enabled = !ui.subscribeBusy) { Text(stringResource(R.string.action_subscribed)) }
-                } else {
-                    Button(shapes = ButtonDefaults.shapes(), onClick = { watch.toggleSubscribe(onLogin) }, enabled = !ui.subscribeBusy && channel.id != null) { Text(stringResource(R.string.action_subscribe)) }
-                }
+                vibe.tube.ui.components.SubscribeButton(
+                    subscribed = ui.subscribed == true,
+                    enabled = !ui.subscribeBusy && channel.id != null,
+                    notifyLevels = channel.notify?.params?.keys.orEmpty(),
+                    notifyLevel = ui.notifyLevel,
+                    onToggle = { watch.toggleSubscribe(onLogin) },
+                    onNotify = watch::setNotify,
+                )
             }
         }
     }

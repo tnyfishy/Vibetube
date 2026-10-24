@@ -59,7 +59,11 @@ data class WatchUiState(
     val error: Throwable? = null,
     val info: WatchInfo? = null,
     val likeStatus: LikeStatus? = null,
+    /** Like / dislike totals from Return YouTube Dislike (null until loaded or when unavailable). */
+    val votes: vibe.tube.data.repo.Votes? = null,
     val subscribed: Boolean? = null,
+    /** The channel's notification bell (only known while subscribed). */
+    val notifyLevel: vibe.tube.youtube.model.NotifyLevel? = null,
     val likeBusy: Boolean = false,
     val subscribeBusy: Boolean = false,
     val related: List<FeedItem> = emptyList(),
@@ -76,6 +80,7 @@ class WatchViewModel @Inject constructor(
     private val actions: AccountActions,
     private val session: SessionManager,
     private val events: UiEvents,
+    private val voteCounts: vibe.tube.data.repo.VoteCounts,
 ) : ViewModel() {
 
     private val mutable = MutableStateFlow(WatchUiState())
@@ -122,9 +127,14 @@ class WatchViewModel @Inject constructor(
                         info = info,
                         likeStatus = info.likeStatus,
                         subscribed = info.channel?.subscribed,
+                        notifyLevel = info.channel?.notify?.current,
                         related = info.related,
                         relatedContinuation = info.relatedContinuation,
                     )
+                }
+                viewModelScope.launch {
+                    val v = voteCounts.get(videoId)
+                    if (v != null && gen == generation) mutable.update { it.copy(votes = v) }
                 }
                 player.offerAutoplay(info.autoplayVideoId?.let { autoplayItem(info) })
                 info.commentsToken?.let { loadComments(it, gen, reset = true) }
@@ -303,34 +313,42 @@ class WatchViewModel @Inject constructor(
         }
     }
 
-    fun toggleLike(onLogin: () -> Unit) {
+    fun toggleLike(onLogin: () -> Unit) = rate(LikeStatus.Like, onLogin)
+
+    fun toggleDislike(onLogin: () -> Unit) = rate(LikeStatus.Dislike, onLogin)
+
+    /** Tapping the rating the video already has takes it back; tapping the other one switches to it. */
+    private fun rate(tapped: LikeStatus, onLogin: () -> Unit) {
         val id = mutable.value.videoId ?: return
         if (session.authState.value !is AuthState.Verified) {
             events.post(R.string.msg_login_required)
             onLogin()
             return
         }
-        val previous = mutable.value.likeStatus == LikeStatus.Like
+        if (mutable.value.likeBusy) return
+        val previous = mutable.value.likeStatus ?: LikeStatus.Indifferent
+        val desired = if (previous == tapped) LikeStatus.Indifferent else tapped
+        mutable.update { it.copy(likeStatus = desired, likeBusy = true) }
         viewModelScope.launch {
-            mutable.update { it.copy(likeBusy = true) }
-            val result = optimisticToggle(
-                previous = previous,
-                desired = !previous,
-                apply = { liked -> mutable.update { it.copy(likeStatus = if (liked) LikeStatus.Like else LikeStatus.Indifferent) } },
-                request = { liked -> actions.like(id, liked) },
+            val failure = runCatching { actions.rate(id, desired) }.exceptionOrNull()
+            if (failure is kotlinx.coroutines.CancellationException) throw failure
+            mutable.update { it.copy(likeBusy = false, likeStatus = if (failure != null) previous else it.likeStatus) }
+            if (failure != null) {
+                events.postError(failure)
+                return@launch
+            }
+            events.post(
+                when (desired) {
+                    LikeStatus.Like -> R.string.msg_liked
+                    LikeStatus.Dislike -> R.string.msg_disliked
+                    LikeStatus.Indifferent -> if (previous == LikeStatus.Dislike) R.string.msg_undisliked else R.string.msg_unliked
+                },
             )
-            mutable.update { it.copy(likeBusy = false) }
-            when (result) {
-                is ToggleResult.RolledBack -> events.postError(result.error)
-                is ToggleResult.Confirmed -> {
-                    events.post(if (result.value) R.string.msg_liked else R.string.msg_unliked)
-                    reconcile(id) { info ->
-                        val server = info.likeStatus
-                        if (server != null && (server == LikeStatus.Like) != result.value) {
-                            mutable.update { it.copy(likeStatus = server) }
-                            events.post(R.string.msg_action_not_reflected)
-                        }
-                    }
+            reconcile(id) { info ->
+                val server = info.likeStatus
+                if (server != null && server != desired) {
+                    mutable.update { it.copy(likeStatus = server) }
+                    events.post(R.string.msg_action_not_reflected)
                 }
             }
         }
@@ -355,7 +373,38 @@ class WatchViewModel @Inject constructor(
             mutable.update { it.copy(subscribeBusy = false) }
             when (result) {
                 is ToggleResult.RolledBack -> events.postError(result.error)
-                is ToggleResult.Confirmed -> events.post(if (result.value) R.string.msg_subscribed else R.string.msg_unsubscribed)
+                is ToggleResult.Confirmed -> {
+                    events.post(if (result.value) R.string.msg_subscribed else R.string.msg_unsubscribed)
+                    if (!result.value) {
+                        mutable.update { it.copy(notifyLevel = null) }
+                    } else {
+                        // The bell's requests only come with the page of a channel that is already subscribed: fetch it again.
+                        val videoId = mutable.value.videoId ?: return@launch
+                        reconcile(videoId) { info ->
+                            val notify = info.channel?.notify
+                            mutable.update { s ->
+                                s.copy(
+                                    info = s.info?.let { i -> i.copy(channel = i.channel?.copy(notify = notify)) },
+                                    notifyLevel = notify?.current,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Switches the channel's bell; the icon changes at once and goes back if YouTube refuses. */
+    fun setNotify(level: vibe.tube.youtube.model.NotifyLevel) {
+        val params = mutable.value.info?.channel?.notify?.params?.get(level) ?: return
+        val previous = mutable.value.notifyLevel
+        mutable.update { it.copy(notifyLevel = level) }
+        viewModelScope.launch {
+            runCatching { actions.setNotifyLevel(params) }.onFailure { e ->
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                mutable.update { it.copy(notifyLevel = previous) }
+                events.postError(e)
             }
         }
     }

@@ -27,6 +27,7 @@ import javax.inject.Inject
 data class ChannelUiState(
     val detail: ChannelDetail? = null,
     val subscribed: Boolean? = null,
+    val notifyLevel: vibe.tube.youtube.model.NotifyLevel? = null,
     val busy: Boolean = false,
     val error: Throwable? = null,
 )
@@ -53,7 +54,7 @@ class ChannelDetailViewModel @Inject constructor(
         job?.cancel()
         job = viewModelScope.launch {
             runCatching { provider.channel(actions.publicCall(), channelId) }
-                .onSuccess { d -> mutable.update { it.copy(detail = d, subscribed = d.subscribed, error = null) } }
+                .onSuccess { d -> mutable.update { it.copy(detail = d, subscribed = d.subscribed, notifyLevel = d.notify?.current, error = null) } }
                 .onFailure { e -> mutable.update { it.copy(error = e) } }
         }
     }
@@ -75,8 +76,31 @@ class ChannelDetailViewModel @Inject constructor(
             )
             mutable.update { it.copy(busy = false) }
             when (result) {
-                is ToggleResult.Confirmed -> events.post(if (result.value) R.string.msg_subscribed else R.string.msg_unsubscribed)
+                is ToggleResult.Confirmed -> {
+                    events.post(if (result.value) R.string.msg_subscribed else R.string.msg_unsubscribed)
+                    if (!result.value) {
+                        mutable.update { it.copy(notifyLevel = null) }
+                    } else {
+                        // The bell's requests come with the page of a channel that is already subscribed.
+                        runCatching { provider.channel(actions.publicCall(), channelId) }.onSuccess { d ->
+                            mutable.update { it.copy(detail = d, notifyLevel = d.notify?.current) }
+                        }
+                    }
+                }
                 is ToggleResult.RolledBack -> events.postError(result.error)
+            }
+        }
+    }
+
+    fun setNotify(level: vibe.tube.youtube.model.NotifyLevel) {
+        val params = mutable.value.detail?.notify?.params?.get(level) ?: return
+        val previous = mutable.value.notifyLevel
+        mutable.update { it.copy(notifyLevel = level) }
+        viewModelScope.launch {
+            runCatching { actions.setNotifyLevel(params) }.onFailure { e ->
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                mutable.update { it.copy(notifyLevel = previous) }
+                events.postError(e)
             }
         }
     }

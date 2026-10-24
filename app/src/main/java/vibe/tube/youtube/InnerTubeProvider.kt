@@ -40,6 +40,8 @@ import vibe.tube.youtube.parser.list
 import vibe.tube.youtube.parser.path
 import vibe.tube.youtube.parser.str
 import vibe.tube.youtube.parser.textOf
+import vibe.tube.youtube.parser.walk
+import vibe.tube.youtube.parser.int
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -280,6 +282,7 @@ class InnerTubeProvider(
             description = metadata.at("description").str,
             subscribed = subscribe.at("subscribed").let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.toBooleanStrictOrNull() },
             badge = ItemParsers.badgeOf(header),
+            notify = vibe.tube.youtube.parser.NotifyParser.parse(root),
         )
     }
 
@@ -328,6 +331,49 @@ class InnerTubeProvider(
         requireAuth(call, "like")
         val body = buildJsonObject { put("target", buildJsonObject { put("videoId", videoId) }) }
         val response = client.post(if (liked) "like/like" else "like/removelike", body, call.locale, call.auth)
+        ensureNoError("like", response)
+        if (response.root.at("actions") == null && response.root.at("responseContext") == null) {
+            throw AppError.Rejected("like", "empty_response")
+        }
+    }
+
+    override suspend fun setNotifyLevel(call: ProviderCall, params: String) {
+        requireAuth(call, "notify")
+        val response = client.post("notification/modify_channel_preference", buildJsonObject { put("params", params) }, call.locale, call.auth)
+        ensureNoError("notify", response)
+    }
+
+    override suspend fun notifications(call: ProviderCall, continuation: String?): vibe.tube.youtube.model.NotificationsPage {
+        requireAuth(call, "notifications")
+        val body = buildJsonObject {
+            if (continuation != null) put("continuation", continuation)
+            else put("notificationsMenuRequestType", "NOTIFICATIONS_MENU_REQUEST_TYPE_INBOX")
+        }
+        return vibe.tube.youtube.parser.NotificationsParser.parse(client.post("notification/get_notification_menu", body, call.locale, call.auth).root)
+    }
+
+    override suspend fun unseenNotificationCount(call: ProviderCall): Int {
+        requireAuth(call, "notifications")
+        val root = client.post("notification/get_unseen_count", buildJsonObject { }, call.locale, call.auth).root
+        var count = 0
+        root.walk { key, value ->
+            if (key == "unseenCount") {
+                count = value.int ?: (value as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() ?: count
+                false
+            } else true
+        }
+        return count
+    }
+
+    override suspend fun rate(call: ProviderCall, videoId: String, status: vibe.tube.youtube.model.LikeStatus) {
+        requireAuth(call, "like")
+        val body = buildJsonObject { put("target", buildJsonObject { put("videoId", videoId) }) }
+        val endpoint = when (status) {
+            vibe.tube.youtube.model.LikeStatus.Like -> "like/like"
+            vibe.tube.youtube.model.LikeStatus.Dislike -> "like/dislike"
+            vibe.tube.youtube.model.LikeStatus.Indifferent -> "like/removelike"
+        }
+        val response = client.post(endpoint, body, call.locale, call.auth)
         ensureNoError("like", response)
         if (response.root.at("actions") == null && response.root.at("responseContext") == null) {
             throw AppError.Rejected("like", "empty_response")

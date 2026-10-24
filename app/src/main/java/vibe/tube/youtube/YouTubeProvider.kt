@@ -61,6 +61,16 @@ interface YouTubeProvider {
     suspend fun comments(call: ProviderCall, continuation: String): CommentsPage
 
     suspend fun like(call: ProviderCall, videoId: String, liked: Boolean)
+
+    /** Switches a subscribed channel's bell; [params] is the token the channel page / watch page gave for that level. */
+    suspend fun setNotifyLevel(call: ProviderCall, params: String)
+
+    suspend fun notifications(call: ProviderCall, continuation: String?): vibe.tube.youtube.model.NotificationsPage
+
+    suspend fun unseenNotificationCount(call: ProviderCall): Int
+
+    /** Sets the signed-in viewer's rating of a video: like, dislike, or neither. */
+    suspend fun rate(call: ProviderCall, videoId: String, status: vibe.tube.youtube.model.LikeStatus)
     suspend fun subscribe(call: ProviderCall, channelId: String, subscribed: Boolean)
     suspend fun playlistsForVideo(call: ProviderCall, videoId: String): List<AddToPlaylistOption>
     suspend fun addToPlaylist(call: ProviderCall, playlistId: String, videoId: String)

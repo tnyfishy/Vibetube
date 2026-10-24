@@ -130,7 +130,27 @@ data class ChannelRef(
     val badge: ChannelBadge = ChannelBadge.None,
     /** "@handle" when the page names it. */
     val handle: String? = null,
+    /** The notification bell of a subscribed channel (null when the page did not carry it). */
+    val notify: ChannelNotify? = null,
 )
+
+/** How much a subscribed channel may notify: every upload, only what YouTube picks, or nothing. */
+enum class NotifyLevel { All, Personalized, None }
+
+data class ChannelNotify(val current: NotifyLevel, val params: Map<NotifyLevel, String>)
+
+data class NotificationItem(
+    val id: String,
+    val title: String,
+    val timeText: String?,
+    val avatar: String?,
+    val thumbnail: String?,
+    val videoId: String?,
+    val channelPath: String?,
+    val read: Boolean,
+)
+
+data class NotificationsPage(val items: List<NotificationItem>, val continuation: String?)
 
 enum class LikeStatus { Like, Indifferent, Dislike }
 
@@ -213,4 +233,5 @@ data class ChannelDetail(
     val description: String?,
     val subscribed: Boolean?,
     val badge: ChannelBadge = ChannelBadge.None,
+    val notify: ChannelNotify? = null,
 )

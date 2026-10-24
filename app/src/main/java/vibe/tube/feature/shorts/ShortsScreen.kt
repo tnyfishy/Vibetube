@@ -373,8 +373,16 @@ private fun ShortPage(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     val liked = meta?.liked == true
-                    ShortAction(if (liked) VIcon.ThumbUpFilled else VIcon.ThumbUp, stringResource(R.string.action_like), null) {
+                    val disliked = meta?.disliked == true
+                    ShortAction(if (liked) VIcon.ThumbUpFilled else VIcon.ThumbUp, stringResource(R.string.action_like), compactCount(meta?.likeCount)) {
                         viewModel.toggleLike(video, onLogin)
+                    }
+                    ShortAction(
+                        if (disliked) VIcon.ThumbDownFilled else VIcon.ThumbDown,
+                        stringResource(R.string.action_dislike),
+                        compactCount(meta?.dislikeCount) ?: stringResource(R.string.action_dislike),
+                    ) {
+                        viewModel.toggleDislike(video, onLogin)
                     }
                     ShortAction(VIcon.Comment, stringResource(R.string.comments_title), compactCount(meta?.commentsCount), onOpenComments)
                     ShortAction(VIcon.VisibilityOff, stringResource(R.string.shorts_hide_ui), null) { onUiHidden(true) }
@@ -412,17 +420,35 @@ private fun ChannelRow(video: VideoItem, meta: ShortMeta?, viewModel: ShortsView
             val subscribed = meta?.subscribed == true
             val container by animateColorAsState(if (subscribed) Color.White.copy(alpha = 0.22f) else Color.White, tween(200), label = "subContainer")
             val content by animateColorAsState(if (subscribed) Color.White else Color.Black, tween(200), label = "subContent")
-            Surface(
-                onClick = { viewModel.toggleSubscribe(video, onLogin) },
-                shape = CircleShape,
-                color = container,
-                contentColor = content,
-            ) {
-                Text(
-                    stringResource(if (subscribed) R.string.action_subscribed else R.string.action_subscribe),
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            var menu by remember { mutableStateOf(false) }
+            Box {
+                Surface(
+                    // Subscribed, the chip is the bell: tapping opens the levels and Unsubscribe.
+                    onClick = { if (subscribed) menu = true else viewModel.toggleSubscribe(video, onLogin) },
+                    shape = CircleShape,
+                    color = container,
+                    contentColor = content,
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        if (subscribed) VIconImage(vibe.tube.ui.components.notifyIcon(meta?.notifyLevel), null, Modifier.size(16.dp))
+                        Text(
+                            stringResource(if (subscribed) R.string.action_subscribed else R.string.action_subscribe),
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                        )
+                    }
+                }
+                vibe.tube.ui.components.SubscribeMenu(
+                    expanded = menu,
+                    onDismiss = { menu = false },
+                    available = meta?.channel?.notify?.params?.keys.orEmpty(),
+                    level = meta?.notifyLevel,
+                    onLevel = { viewModel.setNotify(video, it) },
+                    onUnsubscribe = { viewModel.toggleSubscribe(video, onLogin) },
                 )
             }
         }

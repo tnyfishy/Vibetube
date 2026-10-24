@@ -35,6 +35,15 @@ class AccountActions(
 
     suspend fun like(videoId: String, liked: Boolean) = guarded { provider.like(authorized("like"), videoId, liked) }
 
+    suspend fun setNotifyLevel(params: String) = guarded { provider.setNotifyLevel(authorized("notify"), params) }
+
+    suspend fun notifications(continuation: String?) = guarded { provider.notifications(authorized("notifications"), continuation) }
+
+    suspend fun unseenNotificationCount() = guarded { provider.unseenNotificationCount(authorized("notifications")) }
+
+    suspend fun rate(videoId: String, status: vibe.tube.youtube.model.LikeStatus) =
+        guarded { provider.rate(authorized("like"), videoId, status) }
+
     suspend fun subscribe(channelId: String, subscribed: Boolean) =
         guarded { provider.subscribe(authorized("subscribe"), channelId, subscribed) }
 

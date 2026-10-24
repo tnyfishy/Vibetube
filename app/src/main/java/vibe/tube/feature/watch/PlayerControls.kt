@@ -326,7 +326,7 @@ private fun Controls(
             Spacer(Modifier.weight(1f))
             if (captionsAvailable) {
                 TooltipIconButton(
-                    VIcon.ClosedCaption,
+                    if (captionsOn) VIcon.ClosedCaption else VIcon.ClosedCaptionOff,
                     stringResource(if (captionsOn) R.string.player_caption_off else R.string.player_caption_on),
                     { onInteract(); onToggleCaptions() },
                     tint = if (captionsOn) MaterialTheme.colorScheme.primary else MediaOverlayColors.onScrim,

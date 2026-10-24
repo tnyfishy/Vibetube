@@ -123,6 +123,7 @@ import vibe.tube.feature.nav.LoginRoute
 import vibe.tube.feature.nav.PlaylistRoute
 import vibe.tube.feature.nav.PlaylistsRoute
 import vibe.tube.feature.nav.SearchRoute
+import vibe.tube.feature.nav.NotificationsRoute
 import vibe.tube.feature.nav.SettingsRoute
 import vibe.tube.feature.nav.SubscriptionsRoute
 import vibe.tube.feature.nav.YoutubeHistoryRoute
@@ -580,6 +581,7 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
                         onSearch = { nav.navigate(SearchRoute()) },
                         onLogin = { nav.navigate(LoginRoute) },
                         onAccount = { onTab(AccountRoute) },
+                        onNotifications = { nav.navigate(NotificationsRoute) },
                         avatarUrl = avatarUrl,
                         contentPadding = noPadding,
                         visibilityScope = this,
@@ -635,6 +637,9 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
                         onLicenses = { nav.navigate(LicensesRoute) },
                         onDebug = null,
                     )
+                }
+                page<NotificationsRoute> {
+                    vibe.tube.feature.notifications.NotificationsScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) })
                 }
                 page<LicensesRoute> { LicensesScreen(onBack = { nav.popBackStack() }) }
                 page<LoginRoute> { LoginScreen(onClose = { nav.popBackStack() }) }

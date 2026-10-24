@@ -83,16 +83,14 @@ fun ChannelScreen(
                             if (meta.isNotBlank()) {
                                 Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            val subscribed = detail.subscribed
-                            if (subscribed == true) {
-                                FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = { detailViewModel.toggleSubscribe(onLogin) }, enabled = !detail.busy) {
-                                    Text(stringResource(R.string.action_subscribed))
-                                }
-                            } else {
-                                Button(shapes = ButtonDefaults.shapes(), onClick = { detailViewModel.toggleSubscribe(onLogin) }, enabled = !detail.busy && d != null) {
-                                    Text(stringResource(R.string.action_subscribe))
-                                }
-                            }
+                            vibe.tube.ui.components.SubscribeButton(
+                                subscribed = detail.subscribed == true,
+                                enabled = !detail.busy && d != null,
+                                notifyLevels = d?.notify?.params?.keys.orEmpty(),
+                                notifyLevel = detail.notifyLevel,
+                                onToggle = { detailViewModel.toggleSubscribe(onLogin) },
+                                onNotify = detailViewModel::setNotify,
+                            )
                         }
                     }
                 }

@@ -66,11 +66,19 @@ fun HomeScreen(
     onSearch: () -> Unit,
     onLogin: () -> Unit,
     onAccount: () -> Unit,
+    onNotifications: () -> Unit,
     avatarUrl: String?,
     contentPadding: PaddingValues,
     visibilityScope: AnimatedVisibilityScope? = null,
     viewModel: HomeViewModel = hiltViewModel(),
+    badge: vibe.tube.feature.notifications.NotificationBadgeViewModel = hiltViewModel(),
 ) {
+    val unseen by badge.unseen.collectAsStateWithLifecycle()
+    // Back from the list (or from the background) the number may have changed.
+    androidx.lifecycle.compose.LifecycleResumeEffect(badge) {
+        badge.refresh()
+        onPauseOrDispose { }
+    }
     val state by viewModel.controller.state.collectAsStateWithLifecycle()
     val hideShorts by viewModel.hideShorts.collectAsStateWithLifecycle()
     val auth by viewModel.authState.collectAsStateWithLifecycle()
@@ -142,9 +150,19 @@ fun HomeScreen(
                 visibilityScope = visibilityScope,
                 intro = true,
             ) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
                 if (auth is AuthState.Guest) {
                     TooltipIconButton(VIcon.Person, stringResource(R.string.action_sign_in), onLogin)
                 } else {
+                    androidx.compose.material3.BadgedBox(
+                        badge = {
+                            if (unseen > 0) {
+                                androidx.compose.material3.Badge { Text(if (unseen > 99) "99+" else unseen.toString()) }
+                            }
+                        },
+                    ) {
+                        TooltipIconButton(VIcon.Notifications, stringResource(R.string.notifications_title), { badge.clear(); onNotifications() })
+                    }
                     // Signed in: the account photo takes the place of the person icon.
                     Box(
                         Modifier
@@ -160,6 +178,7 @@ fun HomeScreen(
                         }
                     }
                 }
+              }
             }
         }
     }
