@@ -61,7 +61,7 @@ class DownloadService : Service() {
         val list = active.orEmpty()
         val current = list.firstOrNull()
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_download)
+            .setSmallIcon(R.drawable.ic_stat_download)
             .setContentTitle(getString(R.string.download_notification_title))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -115,7 +115,7 @@ class DownloadService : Service() {
                 )
             }
             val notification = NotificationCompat.Builder(context, DONE_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_download)
+                .setSmallIcon(R.drawable.ic_stat_download)
                 .setContentTitle(context.getString(if (ok) R.string.download_done_title else R.string.download_failed_title))
                 .setContentText(title)
                 .setContentIntent(openDownloadsIntent(context))

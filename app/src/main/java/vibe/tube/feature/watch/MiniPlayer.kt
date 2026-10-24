@@ -25,7 +25,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,13 +55,23 @@ fun MiniPlayer(controller: PlayerController, modifier: Modifier = Modifier, enab
     val state by controller.state.collectAsStateWithLifecycle()
     val show = enabled && state.visible && !state.expanded && state.current != null && !state.inPip
     var drag by remember { mutableFloatStateOf(0f) }
+    // The close button shrinks the card away; going full screen still slides it down.
+    var closing by remember { mutableStateOf(false) }
+    var lastVideo by remember { mutableStateOf<vibe.tube.youtube.model.VideoItem?>(null) }
+    state.current?.let { lastVideo = it }
+    LaunchedEffect(show) { if (show) closing = false }
     AnimatedVisibility(
         visible = show,
         enter = slideInVertically(VibeMotion.spatial()) { it } + fadeIn(VibeMotion.effects()),
-        exit = slideOutVertically(VibeMotion.spatial()) { it } + fadeOut(VibeMotion.effects()),
+        exit = if (closing) {
+            androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(220), targetScale = 0.6f) + fadeOut(androidx.compose.animation.core.tween(200))
+        } else {
+            slideOutVertically(VibeMotion.spatial()) { it } + fadeOut(VibeMotion.effects())
+        },
         modifier = modifier,
     ) {
-        val video = state.current ?: return@AnimatedVisibility
+        // Keeps showing the last video while the card animates out after the player was closed.
+        val video = state.current ?: lastVideo ?: return@AnimatedVisibility
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -68,7 +80,8 @@ fun MiniPlayer(controller: PlayerController, modifier: Modifier = Modifier, enab
                     orientation = Orientation.Vertical,
                     state = rememberDraggableState { drag += it },
                     onDragStopped = {
-                        if (drag < -48f) controller.expand() else if (drag > 96f) controller.dismiss()
+                        // A tap that drifted a little still counts as a tap.
+                        if (drag < -48f || kotlin.math.abs(drag) <= 48f) controller.expand() else if (drag > 96f) controller.dismiss()
                         drag = 0f
                     },
                 ),
@@ -107,7 +120,7 @@ fun MiniPlayer(controller: PlayerController, modifier: Modifier = Modifier, enab
                         controller::togglePlay,
                         animateIcon = true,
                     )
-                    TooltipIconButton(VIcon.Close, stringResource(R.string.action_close_player), controller::dismiss)
+                    TooltipIconButton(VIcon.Close, stringResource(R.string.action_close_player), { closing = true; controller.dismiss() })
                 }
                 val fraction = if (state.durationMs > 0) (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f) else 0f
                 VibeLinearProgress(progress = { fraction }, modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.sm))

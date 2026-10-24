@@ -45,7 +45,7 @@ class VibetubeApp : Application(), SingletonImageLoader.Factory {
     /** Image cache tuned for scrolling feeds: moderate RAM share, no global crossfade (lists opt in per request). */
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
-            .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.18).build() }
+            .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.25).build() }
             .build()
 
     private companion object {

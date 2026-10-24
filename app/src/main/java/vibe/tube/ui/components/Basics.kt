@@ -34,6 +34,7 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -113,6 +114,11 @@ fun SwappingIcon(
     ) { current -> VIconImage(current, contentDescription, modifier, tint = tint) }
 }
 
+/** URLs that failed to load while a fallback existed; skipped from then on (process lifetime). */
+internal object MissingImages {
+    val urls: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+}
+
 @Composable
 fun RemoteImage(
     url: String?,
@@ -122,7 +128,7 @@ fun RemoteImage(
 ) {
     val context = LocalContext.current
     val reduced = LocalReducedMotion.current
-    val request = ImageRequest.Builder(context).data(url).crossfade(!reduced).build()
+    val request = remember(url, reduced) { ImageRequest.Builder(context).data(url).crossfade(!reduced).build() }
     AsyncImage(model = request, contentDescription = contentDescription, modifier = modifier, contentScale = contentScale)
 }
 
@@ -139,16 +145,22 @@ fun RemoteImage(
 ) {
     val context = LocalContext.current
     val reduced = LocalReducedMotion.current
-    var index by androidx.compose.runtime.remember(urls) { androidx.compose.runtime.mutableIntStateOf(0) }
-    val request = androidx.compose.runtime.remember(urls, index, reduced) {
-        ImageRequest.Builder(context).data(urls.getOrNull(index)).crossfade(if (reduced) 0 else 120).build()
+    // Candidates already known not to exist (YouTube answers 404 for a missing maxresdefault) are not asked for again
+    // each time a card scrolls back into view.
+    val candidates = remember(urls) { urls.filterNot { it in MissingImages.urls }.ifEmpty { urls } }
+    var index by androidx.compose.runtime.remember(candidates) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val request = androidx.compose.runtime.remember(candidates, index, reduced) {
+        ImageRequest.Builder(context).data(candidates.getOrNull(index)).crossfade(if (reduced) 0 else 120).build()
     }
     AsyncImage(
         model = request,
         contentDescription = contentDescription,
         modifier = modifier,
         contentScale = contentScale,
-        onError = { if (index < urls.lastIndex) index++ },
+        onError = {
+            candidates.getOrNull(index)?.let { if (candidates.size > 1) MissingImages.urls.add(it) }
+            if (index < candidates.lastIndex) index++
+        },
     )
 }
 

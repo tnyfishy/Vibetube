@@ -96,8 +96,8 @@ class AppViewModel @Inject constructor(
         events.hideDownloadToast(id)
     }
 
-    fun download(video: VideoItem, choice: vibe.tube.download.DownloadPlanner.Choice) {
-        downloads.enqueue(video, choice)
+    fun download(video: VideoItem, choice: vibe.tube.download.DownloadPlanner.Choice, short: Boolean = video.isShort) {
+        downloads.enqueue(video, choice, short)
     }
 
     suspend fun downloadOptions(videoId: String): Result<vibe.tube.download.DownloadPlanner.Options> =

@@ -317,6 +317,7 @@
     <string name="play_err_bot_body">Vibetube trả về yêu cầu \"xác nhận bạn không phải bot\" cho mạng này. Vibetube không vượt qua kiểm tra này. Hãy thử lại sau, dùng mạng khác hoặc đăng nhập.</string>
     <string name="play_err_members_title">Video dành cho hội viên</string>
     <string name="play_err_members_body">Chỉ hội viên của kênh này mới xem được video này. Hãy đăng ký hội viên kênh để phát.</string>
+    <string name="badge_short">Short</string>
     <string name="shorts_hide_ui">Ẩn giao diện</string>
     <string name="badge_members">Dành cho hội viên</string>
     <string name="play_err_age_title">Video giới hạn độ tuổi</string>

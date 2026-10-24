@@ -304,7 +304,7 @@ private fun ShortPage(
                 contentScale = ContentScale.Crop,
             )
         }
-        if (active && (playState.loading || (!playState.ready && !playState.error))) {
+        if (active && !playState.scrubbing && (playState.loading || (!playState.ready && !playState.error))) {
             ContainedLoadingIndicator(Modifier.align(Alignment.Center).size(48.dp))
         }
         if (active && playState.error) {

@@ -8,7 +8,11 @@ import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -63,6 +67,13 @@ import javax.inject.Inject
 
 data class DownloadedFile(val uri: Uri, val name: String, val mime: String, val size: Long, val modifiedMs: Long) {
     val isAudio: Boolean get() = mime.startsWith("audio/")
+
+    /** Saved from the Shorts tab (the name carries [DownloadManager.SHORT_TAG] before the extension). */
+    val isShort: Boolean get() = name.substringBeforeLast('.').endsWith(DownloadManager.SHORT_TAG)
+
+    /** The name to show: without the Short tag (that is shown as a chip). */
+    val title: String
+        get() = if (isShort) name.substringBeforeLast('.').removeSuffix(DownloadManager.SHORT_TAG) + name.substringAfterLast('.', "").let { if (it.isEmpty()) "" else ".$it" } else name
 }
 
 @HiltViewModel
@@ -233,14 +244,28 @@ fun DownloadsScreen(onBack: () -> Unit, viewModel: DownloadsViewModel = hiltView
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
                     ) {
-                        VIconImage(if (file.isAudio) VIcon.MusicNote else VIcon.VideoLibrary, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.primary)
-                        Column(Modifier.weight(1f)) {
-                            Text(file.name, style = MaterialTheme.typography.titleSmall, maxLines = 2)
-                            Text(
-                                listOf(sizeText(file.size), DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(file.modifiedMs))).joinToString(" · "),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        FileThumbnail(file)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(file.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (file.isShort) {
+                                    Text(
+                                        stringResource(R.string.badge_short),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier
+                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                                    )
+                                }
+                                Text(
+                                    listOf(sizeText(file.size), DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(file.modifiedMs))).joinToString(" · "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                )
+                            }
                         }
                         TooltipIconButton(VIcon.Delete, stringResource(R.string.download_delete), { pendingDelete = file })
                     }
@@ -252,7 +277,7 @@ fun DownloadsScreen(onBack: () -> Unit, viewModel: DownloadsViewModel = hiltView
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { pendingDelete = null },
             title = { Text(stringResource(R.string.download_delete_title)) },
-            text = { Text(stringResource(R.string.download_delete_body, file.name)) },
+            text = { Text(stringResource(R.string.download_delete_body, file.title)) },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { viewModel.delete(file); pendingDelete = null }) { Text(stringResource(R.string.download_delete)) }
             },
@@ -260,6 +285,60 @@ fun DownloadsScreen(onBack: () -> Unit, viewModel: DownloadsViewModel = hiltView
                 androidx.compose.material3.TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.action_cancel)) }
             },
         )
+    }
+}
+
+/** A small picture of the saved video (a frame near its start), made on a background thread and kept in memory. */
+@Composable
+private fun FileThumbnail(file: DownloadedFile) {
+    val context = LocalContext.current
+    val bitmap by androidx.compose.runtime.produceState<android.graphics.Bitmap?>(ThumbCache.get(file.uri.toString()), file.uri) {
+        if (file.isAudio || value != null) return@produceState
+        value = withContext(ThumbCache.dispatcher) { ThumbCache.load(context, file.uri) }
+    }
+    Box(
+        Modifier
+            .size(width = 96.dp, height = 54.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center,
+    ) {
+        val frame = bitmap
+        if (frame != null) {
+            androidx.compose.foundation.Image(
+                bitmap = frame.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+            )
+        } else {
+            VIconImage(if (file.isAudio) VIcon.MusicNote else VIcon.VideoLibrary, null, Modifier.size(26.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+private object ThumbCache {
+    private val cache = object : android.util.LruCache<String, android.graphics.Bitmap>(48) {}
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val dispatcher = Dispatchers.IO.limitedParallelism(2)
+
+    fun get(key: String): android.graphics.Bitmap? = cache.get(key)
+
+    fun load(context: Context, uri: Uri): android.graphics.Bitmap? {
+        cache.get(uri.toString())?.let { return it }
+        val retriever = android.media.MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(context, uri)
+            val durationMs = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+            // A moment in, so it is not the (often black) first frame.
+            val atUs = (durationMs.coerceAtMost(2_000L) / 2) * 1000L
+            val frame = retriever.getScaledFrameAtTime(atUs, android.media.MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 320, 180)
+            frame?.also { cache.put(uri.toString(), it) }
+        } catch (_: Exception) {
+            null
+        } finally {
+            runCatching { retriever.release() }
+        }
     }
 }
 

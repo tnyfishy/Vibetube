@@ -61,6 +61,8 @@ data class DownloadJob(
     val quality: String? = null,
     val choice: DownloadPlanner.Choice? = null,
     val paused: Boolean = false,
+    /** The video was saved from the Shorts tab: its file is tagged so the list can show a "Short" chip. */
+    val short: Boolean = false,
 ) {
     val active: Boolean get() = phase != DownloadPhase.Done && phase != DownloadPhase.Failed
 }
@@ -135,9 +137,9 @@ class DownloadManager @Inject constructor(
         }
     }
 
-    fun enqueue(video: VideoItem, choice: DownloadPlanner.Choice) {
+    fun enqueue(video: VideoItem, choice: DownloadPlanner.Choice, short: Boolean = video.isShort) {
         val kind = choice.kind
-        val job = DownloadJob(nextId++, video.id, video.title, kind, choice = choice)
+        val job = DownloadJob(nextId++, video.id, video.title, kind, choice = choice, short = short)
         jobsState.update { list -> list.filter { it.active } + job }
         queue.trySend(job)
         DownloadService.start(context)
@@ -203,7 +205,7 @@ class DownloadManager @Inject constructor(
                 val total = plan.format.contentLength ?: 0L
                 fetch(job.id, plan.format, media.userAgent, file) { done -> if (total > 0) update(job.id) { it.copy(progress = done.toFloat() / total) } }
                 update(job.id) { it.copy(phase = DownloadPhase.Saving, progress = 1f) }
-                val name = base + (quality?.let { " [$it]" } ?: "") + "." + DownloadPlanner.extension(plan.format)
+                val name = base + (quality?.let { " [$it]" } ?: "") + (if (job.short) SHORT_TAG else "") + "." + DownloadPlanner.extension(plan.format)
                 save(name, DownloadPlanner.mimeType(plan)) { fd -> FileOutputStream(fd).use { out -> file.inputStream().use { it.copyTo(out) } } }
             }
             is DownloadPlan.Mux -> {
@@ -216,7 +218,7 @@ class DownloadManager @Inject constructor(
                 fetch(job.id, plan.audio, media.userAgent, audioFile) { done -> update(job.id) { it.copy(progress = 0.9f * (vTotal + done) / all) } }
                 update(job.id) { it.copy(phase = DownloadPhase.Merging, progress = 0.92f) }
                 val ext = if (plan.webm) "webm" else "mp4"
-                val name = base + (quality?.let { " [$it]" } ?: "") + "." + ext
+                val name = base + (quality?.let { " [$it]" } ?: "") + (if (job.short) SHORT_TAG else "") + "." + ext
                 save(name, DownloadPlanner.mimeType(plan)) { fd -> mux(videoFile, audioFile, fd, plan.webm) }
             }
         }
@@ -355,6 +357,8 @@ class DownloadManager @Inject constructor(
             ?: throw IOException("no_track_$prefix")
 
     companion object {
+        /** Appended to the name of files saved from Shorts (before the extension); the Downloaded list turns it into a chip. */
+        const val SHORT_TAG = " [Short]"
         private const val CHUNK = 8L * 1024 * 1024
         private const val MAX_FAILURES = 4
         private const val MAX_SAMPLE_BYTES = 8 * 1024 * 1024

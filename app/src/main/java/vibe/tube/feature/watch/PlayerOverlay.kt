@@ -66,6 +66,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -311,7 +312,8 @@ internal fun Details(
     includeTabs: Boolean,
     modifier: Modifier,
 ) {
-    var commentsOpen by remember { mutableStateOf(false) }
+    val comments = remember { CommentsTransition() }
+    val commentsScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val hiddenChannels = vibe.tube.ui.components.LocalHiddenChannels.current
     LaunchedEffect(listState, ui.related.size) {
@@ -322,7 +324,7 @@ internal fun Details(
             if (includeTabs) watch.loadMoreRelated()
         }
     }
-    Box(modifier.fillMaxWidth()) {
+    Box(modifier.fillMaxWidth().onGloballyPositioned { comments.containerPositioned(it) }) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
@@ -332,11 +334,13 @@ internal fun Details(
             detailsHeader(ui, state, watch, onLogin)
             if (includeTabs) {
                 // Comments live in their own card (opens a panel); the next videos follow right below it.
-                item(key = "comments-card") { CommentsPreviewCard(ui.comments) { commentsOpen = true } }
+                item(key = "comments-card") {
+                    CommentsPreviewCard(ui.comments, Modifier.onGloballyPositioned { comments.cardPositioned(it) }) { commentsScope.launch { comments.show() } }
+                }
                 upNext(ui, state, controller, watch, hiddenChannels)
             }
         }
-        CommentsPanel(commentsOpen, ui, auth, watch, onLogin) { commentsOpen = false }
+        CommentsPanel(comments, ui, auth, watch, onLogin)
     }
 }
 
@@ -347,21 +351,15 @@ internal fun Details(
 @Composable
 internal fun SheetUnderVideo(modifier: Modifier, stripAlpha: () -> Float = { 1f }, content: @Composable () -> Unit) {
     val surface = MaterialTheme.colorScheme.surface
-    val ambient = rememberVideoBottomColors()
     Box(modifier.fillMaxWidth()) {
-        // The strip behind the rounded corners is filled with the colours along the bottom edge of the playing video (ambient light),
-        // so the corners read as part of the picture. It only shows while the player is fully open; during the morph it must not
-        // hang below the shrinking video.
+        // The strip behind the rounded corners is plain black, like the video's letterbox. It only shows while the player is
+        // fully open; the moment the player is pulled down it fades away (see stripAlpha) so it never hangs below the shrinking video.
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(SHEET_RADIUS)
                 .graphicsLayer { alpha = stripAlpha() }
-                .drawBehind {
-                    val c = ambient.value
-                    val stops = Array(c.size) { i -> i / (c.size - 1f) to c[i] }
-                    drawRect(Brush.horizontalGradient(colorStops = stops))
-                },
+                .background(Color.Black),
         )
         Box(
             Modifier
@@ -384,7 +382,8 @@ private fun SidePanel(
     onLogin: () -> Unit,
     modifier: Modifier,
 ) {
-    var commentsOpen by remember { mutableStateOf(false) }
+    val comments = remember { CommentsTransition() }
+    val commentsScope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val hiddenChannels = vibe.tube.ui.components.LocalHiddenChannels.current
     LaunchedEffect(listState, ui.related.size) {
@@ -393,23 +392,25 @@ private fun SidePanel(
             (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 4
         }.distinctUntilChanged().filter { it }.collect { watch.loadMoreRelated() }
     }
-    Box(modifier.windowInsetsPadding(WindowInsets.statusBars)) {
+    Box(modifier.windowInsetsPadding(WindowInsets.statusBars).onGloballyPositioned { comments.containerPositioned(it) }) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
             contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            item(key = "comments-card") { CommentsPreviewCard(ui.comments) { commentsOpen = true } }
+            item(key = "comments-card") {
+                    CommentsPreviewCard(ui.comments, Modifier.onGloballyPositioned { comments.cardPositioned(it) }) { commentsScope.launch { comments.show() } }
+                }
             upNext(ui, state, controller, watch, hiddenChannels)
         }
-        CommentsPanel(commentsOpen, ui, auth, watch, onLogin) { commentsOpen = false }
+        CommentsPanel(comments, ui, auth, watch, onLogin)
     }
 }
 
 /** YouTube-style comments entry: title with the total, and a peek at the first comment. Tapping opens the full list. */
 @Composable
-private fun CommentsPreviewCard(comments: CommentsUiState, onOpen: () -> Unit) {
+private fun CommentsPreviewCard(comments: CommentsUiState, modifier: Modifier = Modifier, onOpen: () -> Unit) {
     val first = comments.comments.firstOrNull()
     val disabled = comments.disabledMessage != null
     Surface(
@@ -417,7 +418,7 @@ private fun CommentsPreviewCard(comments: CommentsUiState, onOpen: () -> Unit) {
         enabled = !disabled,
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -437,48 +438,6 @@ private fun CommentsPreviewCard(comments: CommentsUiState, onOpen: () -> Unit) {
                     androidx.compose.material3.LinearWavyProgressIndicator(Modifier.fillMaxWidth(0.4f))
                 }
                 else -> Text(stringResource(R.string.comments_empty_title), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-/**
- * Comments, filling exactly the area under the video (it never covers the player): slides up from the bottom and goes
- * away with the close button or Back.
- */
-@Composable
-private fun CommentsPanel(visible: Boolean, ui: WatchUiState, auth: AuthState, watch: WatchViewModel, onLogin: () -> Unit, onClose: () -> Unit) {
-    androidx.activity.compose.BackHandler(enabled = visible, onBack = onClose)
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically(tween(260, easing = vibe.tube.ui.components.EmphasizedDecelerate)) { it } + fadeIn(tween(120)),
-        exit = slideOutVertically(tween(200)) { it } + fadeOut(tween(160)),
-    ) {
-        val listState = rememberLazyListState()
-        LaunchedEffect(listState, ui.comments.comments.size) {
-            snapshotFlow {
-                val info = listState.layoutInfo
-                (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 4
-            }.distinctUntilChanged().filter { it }.collect { watch.loadMoreComments() }
-        }
-        Surface(
-            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxSize().pointerInput(Unit) {},
-        ) {
-            Column(Modifier.fillMaxSize()) {
-                Row(Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.comments_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    vibe.tube.ui.components.TooltipIconButton(VIcon.Close, stringResource(R.string.action_close), onClose)
-                }
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    commentsList(ui, auth, watch, onLogin)
-                }
             }
         }
     }
@@ -613,7 +572,7 @@ private object LocalVideoActionsDelegate {
         @Composable get() = LocalVideoActions.current
 }
 
-private fun LazyListScope.commentsList(ui: WatchUiState, auth: AuthState, watch: WatchViewModel, onLogin: () -> Unit) {
+internal fun LazyListScope.commentsList(ui: WatchUiState, auth: AuthState, watch: WatchViewModel, onLogin: () -> Unit) {
     val c = ui.comments
     item(key = "comments-header") {
         CommentsHeader(c, auth, onSort = watch::changeSort, onPost = { text, done -> watch.postComment(text, done) }, onLogin = onLogin)

@@ -162,7 +162,8 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     val playerState by remember { controller.state.map { PlayerFlags(it.visible, it.expanded, it.fullscreen, it.inPip) }.distinctUntilChanged() }
         .collectAsStateWithLifecycle(initialValue = PlayerFlags())
     val settings by appViewModel.settings.collectAsStateWithLifecycle()
-    val watchProgress by appViewModel.watchProgress.collectAsStateWithLifecycle()
+    // Not read here (no `by`): only the thumbnails that show a bar observe it, so AppRoot itself never recomposes for it.
+    val watchProgress = appViewModel.watchProgress.collectAsStateWithLifecycle()
     val tabs = remember(settings.hideShorts) { if (settings.hideShorts) allTabs.filter { it.route != ShortsRoute } else allTabs }
     val avatarUrl by appViewModel.avatarUrl.collectAsStateWithLifecycle()
     val saveTarget by appViewModel.events.saveTarget.collectAsStateWithLifecycle()
@@ -460,7 +461,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                     video = video,
                     onDismiss = appViewModel.events::dismissDownload,
                     loadOptions = { appViewModel.downloadOptions(video.id) },
-                    onChoose = { choice -> appViewModel.events.dismissDownload(); appViewModel.download(video, choice) },
+                    onChoose = { choice -> appViewModel.events.dismissDownload(); appViewModel.download(video, choice, short = downloadVideoOnly || video.isShort) },
                     videoOnly = downloadVideoOnly,
                 )
             }
@@ -512,7 +513,7 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
     // Plain tweens with M3 emphasized easing: no springs, so nothing overshoots or bounces.
     val enterSpec = tween<IntOffset>(300, easing = EmphasizedDecelerate)
     val exitSpec = tween<IntOffset>(220, easing = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f))
-    val fadeInSpec = tween<Float>(220, delayMillis = 40, easing = LinearOutSlowInEasing)
+    val fadeInSpec = tween<Float>(180, easing = LinearOutSlowInEasing)
     val fadeOutSpec = tween<Float>(120, easing = LinearEasing)
 
     fun tabIndex(d: NavDestination): Int = allTabs.indexOfFirst { d.hasRoute(it.route::class) }
@@ -561,7 +562,12 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
                 popExitTransition = { exit(initialState.destination, targetState.destination, popping = true) },
                 // The back-gesture preview: the leaving page just follows the finger to the right (clipped to the
                 // device's corner radius) while the page below is already in place. No default 0.9 scale-down.
-                predictivePopEnterTransition = { EnterTransition.None },
+                // The page below drifts in from slightly to the left while the leaving page follows the finger (parallax), on the
+                // same linear curve, so the gesture and the finished animation are one continuous motion.
+                predictivePopEnterTransition = {
+                    if (isSearch(initialState.destination) || isSearch(targetState.destination)) EnterTransition.None
+                    else slideInHorizontally(tween(300, easing = LinearEasing)) { -it / 8 }
+                },
                 // Search never slides away (its body just fades, the header hands over to the home pill); sliding a half-faded
                 // page across the screen is what left a ghost streak on the back gesture.
                 predictivePopExitTransition = { _ ->

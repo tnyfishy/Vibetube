@@ -49,6 +49,8 @@ data class ShortsPlayState(
     val aspect: Float = 0f,
     /** Held-down 2x playback. */
     val fast: Boolean = false,
+    /** The seek bar's thumb is being dragged: no loading spinner while the picture catches up. */
+    val scrubbing: Boolean = false,
 )
 
 /**
@@ -108,6 +110,7 @@ class ShortsPlayer @Inject constructor(
                     // Start as soon as a fraction of a second is buffered; a standby player fills up to the max and waits.
                     .setBufferDurationsMs(3_000, 15_000, 250, 700)
                     .setTargetBufferBytes(20 * 1024 * 1024)
+                    .setPrioritizeTimeOverSizeThresholds(true)
                     .setBackBuffer(0, false)
                     .build(),
             )
@@ -364,6 +367,7 @@ class ShortsPlayer @Inject constructor(
         val p = currentSlot?.player ?: return
         resumeAfterScrub = p.playWhenReady
         p.playWhenReady = false
+        mutable.update { it.copy(scrubbing = true) }
     }
 
     fun scrubTo(fraction: Float, final: Boolean) {
@@ -378,6 +382,7 @@ class ShortsPlayer @Inject constructor(
         if (final) {
             if (resumeAfterScrub) p.playWhenReady = true
             resumeAfterScrub = false
+            mutable.update { it.copy(scrubbing = false) }
         }
     }
 

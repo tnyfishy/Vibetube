@@ -318,6 +318,7 @@
     <string name="play_err_bot_body">Vibetube returned a \"confirm you\'re not a bot\" check for this network. Vibetube does not bypass it. Try again later, on another network, or sign in.</string>
     <string name="play_err_members_title">Members-only video</string>
     <string name="play_err_members_body">Only members of this channel can watch this video. Join the channel with a membership to play it.</string>
+    <string name="badge_short">Short</string>
     <string name="shorts_hide_ui">Hide controls</string>
     <string name="badge_members">Members only</string>
     <string name="play_err_age_title">Age-restricted video</string>

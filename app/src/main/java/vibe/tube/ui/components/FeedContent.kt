@@ -20,6 +20,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
@@ -118,10 +119,13 @@ fun FeedContent(
     val hidden = LocalHiddenChannels.current
     // Playlists and history are opened on purpose (queue mode), so hidden channels only affect recommendations.
     val applyHidden = hidden.isNotEmpty() && !LocalQueueMode.current
-    val visible = state.items.filterNot { item ->
-        item is VideoItem && ((hideShorts && item.isShort) || (applyHidden && item.channelId in hidden))
+    // Remembered: a fresh list on every recomposition would make every card in the grid recompose with it.
+    val visible = remember(state.items, hideShorts, applyHidden, hidden) {
+        state.items.filterNot { item ->
+            item is VideoItem && ((hideShorts && item.isShort) || (applyHidden && item.channelId in hidden))
+        }
     }
-    val queue = visible.filterIsInstance<VideoItem>()
+    val queue = remember(visible) { visible.filterIsInstance<VideoItem>() }
     val refreshing = state.phase == FeedPhase.Refreshing
     val blockingFailure = state.failure.takeIf { state.items.isEmpty() }
 

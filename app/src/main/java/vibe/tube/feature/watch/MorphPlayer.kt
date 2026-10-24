@@ -135,6 +135,8 @@ internal fun MorphPlayer(
     val progress = remember { Animatable(if (visible && expanded) 1f else 0f).apply { updateBounds(0f, 1f) } }
     val deviceCorner = with(density) { vibe.tube.ui.rememberDeviceCornerRadius().toPx() }
     val dismiss = remember { Animatable(0f) }
+    // The close (X) button: the minimized player shrinks towards its own centre while it fades out.
+    val closeP = remember { Animatable(0f) }
     // Swipe-up-to-fullscreen: the video follows the finger and fades; negative while pulled up.
     val fsOffset = remember { Animatable(0f) }
     val fsRange = with(density) { 120.dp.toPx() }
@@ -196,6 +198,7 @@ internal fun MorphPlayer(
         if (!visible) {
             progress.snapTo(0f)
             dismiss.snapTo(0f)
+            closeP.snapTo(0f)
             originMix.snapTo(0f)
         }
     }
@@ -256,6 +259,11 @@ internal fun MorphPlayer(
         val miniish by remember { derivedStateOf { progress.value < 0.35f } }
         val pageVisible by remember { derivedStateOf { progress.value > 0.1f } }
         val controlsOn by remember { derivedStateOf { progress.value > 0.92f } }
+
+        suspend fun shrinkAndDismiss() {
+            closeP.animateTo(1f, tween(240, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+            controller.dismiss()
+        }
 
         suspend fun fadeOutAndDismiss() {
             dismiss.animateTo(fadeRange * 1.1f, tween(180))
@@ -328,7 +336,17 @@ internal fun MorphPlayer(
             Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    alpha = (1f - dismiss.value / fadeRange).coerceIn(0f, 1f) * enterFade.value * (1f - flyP.value).coerceIn(0f, 1f)
+                    val cp = closeP.value
+                    alpha = (1f - dismiss.value / fadeRange).coerceIn(0f, 1f) * enterFade.value * (1f - flyP.value).coerceIn(0f, 1f) * (1f - cp)
+                    if (cp > 0f) {
+                        val s = 1f - 0.45f * cp
+                        scaleX = s
+                        scaleY = s
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(
+                            ((miniX() + miniW / 2f) / size.width.coerceAtLeast(1f)).coerceIn(0f, 1f),
+                            ((miniY() + miniH / 2f) / size.height.coerceAtLeast(1f)).coerceIn(0f, 1f),
+                        )
+                    }
                     translationX = flyDir.x * flyP.value * wPx
                     translationY = dismiss.value * 0.5f + flyDir.y * flyP.value * wPx
                 },
@@ -363,7 +381,7 @@ internal fun MorphPlayer(
                             },
                     ) {
                         Spacer(Modifier.height(with(density) { (topInsetPx + videoH).toDp() }))
-                        SheetUnderVideo(Modifier.weight(1f), stripAlpha = { ((p() - 0.92f) / 0.08f).coerceIn(0f, 1f) }) {
+                        SheetUnderVideo(Modifier.weight(1f), stripAlpha = { ((p() - 0.975f) / 0.025f).coerceIn(0f, 1f) }) {
                             Details(ui, detailState, controller, watch, auth, onLogin, includeTabs = true, modifier = Modifier.fillMaxSize())
                         }
                     }
@@ -488,6 +506,10 @@ internal fun MorphPlayer(
                     miniRect
                         .pointerInput(Unit) {
                             var total = androidx.compose.ui.geometry.Offset.Zero
+                            var startedAt = 0L
+                            var startAx = 1f
+                            var startAy = 1f
+                            val tapSlop = with(density) { 28.dp.toPx() }
                             val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
                             fun settle(velocity: androidx.compose.ui.unit.Velocity) {
                                 val speed = kotlin.math.hypot(velocity.x, velocity.y)
@@ -543,6 +565,9 @@ internal fun MorphPlayer(
                             }
                             detectDragGestures(
                                 onDragStart = {
+                                    startedAt = System.currentTimeMillis()
+                                    startAx = anchorX.value
+                                    startAy = anchorY.value
                                     total = androidx.compose.ui.geometry.Offset.Zero
                                     tracker.resetTracking()
                                     miniDragging = true
@@ -550,7 +575,13 @@ internal fun MorphPlayer(
                                 },
                                 onDragEnd = {
                                     miniDragging = false
-                                    settle(tracker.calculateVelocity())
+                                    // A quick touch that wandered a little is still a tap: put the card back and open it.
+                                    if (System.currentTimeMillis() - startedAt < 400L && kotlin.math.hypot(total.x, total.y) < tapSlop) {
+                                        scope.launch { anchorX.snapTo(startAx); anchorY.snapTo(startAy) }
+                                        controller.expand()
+                                    } else {
+                                        settle(tracker.calculateVelocity())
+                                    }
                                 },
                                 onDragCancel = {
                                     miniDragging = false
@@ -590,7 +621,7 @@ internal fun MorphPlayer(
                         Modifier.align(Alignment.TopEnd).padding(4.dp),
                         icon = VIcon.Close,
                         label = stringResource(R.string.action_close_player),
-                        onClick = { scope.launch { fadeOutAndDismiss() } },
+                        onClick = { scope.launch { shrinkAndDismiss() } },
                     )
                 }
             }

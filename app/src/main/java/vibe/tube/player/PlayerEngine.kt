@@ -29,7 +29,7 @@ class PlayerEngine @Inject constructor(@ApplicationContext private val context: 
     var queueHandler: QueueHandler? = null
 
     private val playerHolder = lazy {
-        ExoPlayer.Builder(context)
+        ExoPlayer.Builder(context, androidx.media3.exoplayer.DefaultRenderersFactory(context).setEnableDecoderFallback(true))
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
@@ -42,7 +42,7 @@ class PlayerEngine @Inject constructor(@ApplicationContext private val context: 
             .setLoadControl(
                 DefaultLoadControl.Builder()
                     // Smaller buffers keep memory and network wake-ups down; 60 s ahead is plenty for streaming.
-                    .setBufferDurationsMs(25_000, 60_000, 1_000, 2_500)
+                    .setBufferDurationsMs(25_000, 60_000, 500, 2_000)
                     .setTargetBufferBytes(48 * 1024 * 1024)
                     .setBackBuffer(10_000, false)
                     .build(),
