@@ -75,6 +75,12 @@ fun HomeScreen(
     val hideShorts by viewModel.hideShorts.collectAsStateWithLifecycle()
     val auth by viewModel.authState.collectAsStateWithLifecycle()
     val gridState = rememberLazyGridState()
+    androidx.compose.runtime.LaunchedEffect(viewModel) {
+        viewModel.events.homeReselect.collect {
+            gridState.scrollToItem(0)
+            viewModel.refresh()
+        }
+    }
     val density = androidx.compose.ui.platform.LocalDensity.current
     val statusTop = androidx.compose.foundation.layout.WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val surface = MaterialTheme.colorScheme.surface

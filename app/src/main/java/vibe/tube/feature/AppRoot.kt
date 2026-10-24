@@ -162,10 +162,12 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
     val playerState by remember { controller.state.map { PlayerFlags(it.visible, it.expanded, it.fullscreen, it.inPip) }.distinctUntilChanged() }
         .collectAsStateWithLifecycle(initialValue = PlayerFlags())
     val settings by appViewModel.settings.collectAsStateWithLifecycle()
-    val tabs = allTabs
+    val watchProgress by appViewModel.watchProgress.collectAsStateWithLifecycle()
+    val tabs = remember(settings.hideShorts) { if (settings.hideShorts) allTabs.filter { it.route != ShortsRoute } else allTabs }
     val avatarUrl by appViewModel.avatarUrl.collectAsStateWithLifecycle()
     val saveTarget by appViewModel.events.saveTarget.collectAsStateWithLifecycle()
     val downloadTarget by appViewModel.events.downloadTarget.collectAsStateWithLifecycle()
+    val downloadVideoOnly by appViewModel.events.downloadVideoOnly.collectAsStateWithLifecycle()
     val backStack by nav.currentBackStackEntryAsState()
     val destination = backStack?.destination
     val onTopLevel = tabs.any { destination?.hasRoute(it.route::class) == true }
@@ -240,6 +242,9 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                     if (!nav.popBackStack(tab.route, inclusive = false)) {
                         nav.navigate(tab.route) { launchSingleTop = true }
                     }
+                } else {
+                    // Tapping Home while on Home reloads the feed.
+                    appViewModel.events.requestHomeReselect()
                 }
             } else {
                 nav.navigate(tab.route) {
@@ -310,7 +315,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
         val h = if (homeTab || !showNav) max(hide, barOut.value) else barOut.value
         max(barFullPx * (1f - h), navInset.toFloat()).roundToInt()
     }
-    CompositionLocalProvider(LocalVideoActions provides actions, vibe.tube.feature.watch.LocalSeekSeconds provides settings.seekSeconds, vibe.tube.feature.watch.LocalFullscreenGestures provides settings.fullscreenGestures, vibe.tube.feature.watch.LocalFullscreenSwipeToggle provides settings.fullscreenSwipeToggle, LocalMiniPlayerPadding provides (miniPadding + homeFeedPadding), vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds) {
+    CompositionLocalProvider(LocalVideoActions provides actions, vibe.tube.feature.watch.LocalSeekSeconds provides settings.seekSeconds, vibe.tube.feature.watch.LocalFullscreenGestures provides settings.fullscreenGestures, vibe.tube.feature.watch.LocalFullscreenSwipeToggle provides settings.fullscreenSwipeToggle, LocalMiniPlayerPadding provides (miniPadding + homeFeedPadding), vibe.tube.ui.components.LocalHiddenChannels provides hiddenIds, vibe.tube.ui.components.LocalWatchProgress provides watchProgress) {
         Box(Modifier.fillMaxSize().onSizeChanged { rootHeightPx = it.height }) {
             NavigationSuiteScaffold(
                 layoutType = if (isBar) NavigationSuiteType.None else suiteType,
@@ -366,6 +371,9 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                                 .height(barFullDp)
                                 .graphicsLayer { translationY = max(hide, barOut.value) * barFullPx },
                         ) {
+                            // One font size for every label: the longest label decides, so the row never looks uneven.
+                            val labelKey = tabs.map { stringResource(it.label) }.joinToString("|")
+                            var labelSize by remember(labelKey) { androidx.compose.runtime.mutableFloatStateOf(12f) }
                             Row(Modifier.fillMaxWidth().height(barBody)) {
                                 tabs.forEach { tab ->
                                     val selected = destination?.hasRoute(tab.route::class) == true
@@ -393,6 +401,8 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                                             stringResource(tab.label),
                                             selected = selected,
                                             color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            size = labelSize,
+                                            onShrink = { labelSize = it },
                                         )
                                     }
                                 }
@@ -451,6 +461,7 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                     onDismiss = appViewModel.events::dismissDownload,
                     loadOptions = { appViewModel.downloadOptions(video.id) },
                     onChoose = { choice -> appViewModel.events.dismissDownload(); appViewModel.download(video, choice) },
+                    videoOnly = downloadVideoOnly,
                 )
             }
             saveTarget?.let { video ->
@@ -469,9 +480,8 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
  * ("Subscriptions", Vietnamese labels, wide fonts) always show in full and sit on the same baseline in every slot.
  */
 @Composable
-private fun NavLabel(text: String, selected: Boolean, color: androidx.compose.ui.graphics.Color) {
+private fun NavLabel(text: String, selected: Boolean, color: androidx.compose.ui.graphics.Color, size: Float, onShrink: (Float) -> Unit) {
     val base = MaterialTheme.typography.labelMedium
-    var size by remember(text, base.fontFamily) { androidx.compose.runtime.mutableFloatStateOf(12f) }
     Text(
         text,
         style = base.copy(
@@ -489,7 +499,7 @@ private fun NavLabel(text: String, selected: Boolean, color: androidx.compose.ui
         softWrap = false,
         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-        onTextLayout = { layout -> if (layout.hasVisualOverflow && size > 9f) size = (size - 0.5f).coerceAtLeast(9f) },
+        onTextLayout = { layout -> if (layout.hasVisualOverflow && size > 9f) onShrink((size - 0.5f).coerceAtLeast(9f)) },
     )
 }
 

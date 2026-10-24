@@ -108,6 +108,9 @@ data class AppSettings(
     val saveLocalHistory: Boolean = true,
     val privateMode: Boolean = false,
     val hideShorts: Boolean = false,
+    /** Shorts have their own default quality (same options as long videos, up to 1080p60). */
+    val shortsWifiQuality: QualityCap = QualityCap.P720,
+    val shortsMobileQuality: QualityCap = QualityCap.P480,
     /** Folder (SAF tree URI) chosen for downloads; blank means the default `Download/VibeTube`. */
     val downloadDir: String = "",
     /** Channels the user asked not to be recommended, stored as `channelId|name`. */

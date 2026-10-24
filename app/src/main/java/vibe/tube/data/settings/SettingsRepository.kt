@@ -51,6 +51,8 @@ class SettingsRepository(
             contentRegion = this[CONTENT_REGION] ?: d.contentRegion,
             wifiQuality = enumOr(this[WIFI_Q], d.wifiQuality),
             mobileQuality = enumOr(this[MOBILE_Q], d.mobileQuality),
+            shortsWifiQuality = enumOr(this[SHORTS_WIFI_Q], d.shortsWifiQuality),
+            shortsMobileQuality = enumOr(this[SHORTS_MOBILE_Q], d.shortsMobileQuality),
             autoplay = this[AUTOPLAY] ?: d.autoplay,
             autoplayOnHeadphones = this[AUTOPLAY_HEADPHONES] ?: d.autoplayOnHeadphones,
             fullscreenGestures = this[FS_GESTURES] ?: d.fullscreenGestures,
@@ -81,6 +83,8 @@ class SettingsRepository(
         this[CONTENT_REGION] = s.contentRegion
         this[WIFI_Q] = s.wifiQuality.name
         this[MOBILE_Q] = s.mobileQuality.name
+        this[SHORTS_WIFI_Q] = s.shortsWifiQuality.name
+        this[SHORTS_MOBILE_Q] = s.shortsMobileQuality.name
         this[AUTOPLAY] = s.autoplay
         this[AUTOPLAY_HEADPHONES] = s.autoplayOnHeadphones
         this[FS_GESTURES] = s.fullscreenGestures
@@ -113,6 +117,8 @@ class SettingsRepository(
         private val CONTENT_REGION = stringPreferencesKey("content_region")
         private val WIFI_Q = stringPreferencesKey("wifi_quality")
         private val MOBILE_Q = stringPreferencesKey("mobile_quality")
+        private val SHORTS_WIFI_Q = stringPreferencesKey("shorts_wifi_quality")
+        private val SHORTS_MOBILE_Q = stringPreferencesKey("shorts_mobile_quality")
         private val AUTOPLAY = booleanPreferencesKey("autoplay")
         private val AUTOPLAY_HEADPHONES = booleanPreferencesKey("autoplay_headphones")
         private val FS_GESTURES = booleanPreferencesKey("fullscreen_gestures")

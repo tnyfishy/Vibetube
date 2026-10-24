@@ -50,12 +50,25 @@ class UiEvents {
         openDownloadsChannel.trySend(Unit)
     }
 
-    fun requestDownload(video: VideoItem) {
+    /** True when the open download dialog should offer video only (Shorts: no separate audio download). */
+    private val downloadVideoOnlyState = MutableStateFlow(false)
+    val downloadVideoOnly: StateFlow<Boolean> = downloadVideoOnlyState.asStateFlow()
+
+    fun requestDownload(video: VideoItem, videoOnly: Boolean = false) {
+        downloadVideoOnlyState.value = videoOnly
         downloadTargetState.value = video
     }
 
     fun dismissDownload() {
         downloadTargetState.value = null
+    }
+
+    /** Fired when the Home tab is tapped while Home is already showing: the feed reloads. */
+    private val homeReselectFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val homeReselect: SharedFlow<Unit> = homeReselectFlow.asSharedFlow()
+
+    fun requestHomeReselect() {
+        homeReselectFlow.tryEmit(Unit)
     }
 
     fun post(message: UiMessage) {

@@ -5,7 +5,13 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import vibe.tube.R
@@ -29,7 +35,31 @@ class AppViewModel @Inject constructor(
     val playerController: PlayerController,
     val engine: PlayerEngine,
     private val downloads: vibe.tube.download.DownloadManager,
+    private val history: vibe.tube.data.repo.LocalHistoryRepository,
 ) : ViewModel() {
+
+    /**
+     * Watched percent per video id from this device's own history, so guests see "watched" bars on every card.
+     * Rounded and throttled: it changes while a video plays and must not make every card in the feed recompose.
+     */
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, kotlinx.coroutines.FlowPreview::class)
+    val watchProgress: StateFlow<Map<String, Int>> = session.context
+        .map { it?.scopeKey ?: vibe.tube.data.repo.FeedController.GUEST_SCOPE }
+        .distinctUntilChanged()
+        .flatMapLatest { scope ->
+            val source = history.recentPlayback(scope, 400).map { list ->
+                list.mapNotNull { e ->
+                    val d = e.durationSeconds
+                    if (d == null || d <= 0 || e.completed) null
+                    else (((e.positionMs / 1000f) / d * 100).toInt().coerceIn(0, 100) / 2 * 2).takeIf { it > 0 }?.let { e.videoId to it }
+                }.toMap()
+            }.distinctUntilChanged()
+            kotlinx.coroutines.flow.flow {
+                emit(source.first())
+                emitAll(source.drop(1).sample(10_000))
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     val settings: StateFlow<AppSettings> = settingsRepository.settings.stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.latest.value)
     val authState: StateFlow<AuthState> = session.authState

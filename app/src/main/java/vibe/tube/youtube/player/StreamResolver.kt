@@ -213,6 +213,7 @@ class StreamResolver(
 
         private val TERMINAL_FAILURES = setOf(
             PlaybackFailure.Private,
+            PlaybackFailure.MembersOnly,
             PlaybackFailure.Removed,
             PlaybackFailure.RegionBlocked,
             PlaybackFailure.DrmUnsupported,
@@ -221,6 +222,7 @@ class StreamResolver(
         fun classify(status: String, reason: String?, root: JsonElement): PlaybackFailure {
             val text = (reason ?: "").lowercase()
             return when {
+                text.contains("members-only") || text.contains("members only") || text.contains("join this channel") || text.contains("hội viên") -> PlaybackFailure.MembersOnly
                 text.contains("not a bot") || text.contains("bot") -> PlaybackFailure.BotCheck
                 text.contains("age") || status == "AGE_VERIFICATION_REQUIRED" || status == "CONTENT_CHECK_REQUIRED" -> PlaybackFailure.AgeRestricted
                 text.contains("private") -> PlaybackFailure.Private

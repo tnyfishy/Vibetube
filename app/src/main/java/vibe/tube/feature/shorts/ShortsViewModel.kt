@@ -44,6 +44,7 @@ class ShortsViewModel @Inject constructor(
     private val events: UiEvents,
     private val provider: YouTubeProvider,
     val shorts: ShortsPlayer,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val appContext: android.content.Context,
 ) : FeedViewModel(settings, session) {
     override val controller = feeds.shorts(viewModelScope)
 
@@ -70,10 +71,28 @@ class ShortsViewModel @Inject constructor(
                             loaded = true,
                         )
                     }
+                    info.channel?.avatar?.let(::prefetchAvatar)
                 }
             inFlight.remove(video.id)
         }
     }
+
+    /** Prefetches channel info (and the avatar image) for the shorts coming up, so the overlay is complete when they appear. */
+    fun prefetchMetas(videos: List<VideoItem>) {
+        videos.forEach { video ->
+            video.channelAvatar?.let(::prefetchAvatar)
+            ensureMeta(video)
+        }
+    }
+
+    private fun prefetchAvatar(url: String) {
+        // Same URL the overlay's 36dp avatar asks for, so the request is answered from Coil's cache.
+        val sized = vibe.tube.ui.components.upscaleAvatarUrl(url, 144)
+        coil3.SingletonImageLoader.get(appContext).enqueue(coil3.request.ImageRequest.Builder(appContext).data(sized).build())
+    }
+
+    /** Shorts download video only: no audio-only choice. */
+    fun download(video: VideoItem) = events.requestDownload(video, videoOnly = true)
 
     private fun setMeta(id: String, transform: (ShortMeta) -> ShortMeta) {
         metaState.update { it + (id to transform(it[id] ?: ShortMeta())) }

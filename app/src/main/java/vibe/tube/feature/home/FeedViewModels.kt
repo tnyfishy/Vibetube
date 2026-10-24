@@ -20,8 +20,8 @@ import javax.inject.Inject
 
 abstract class FeedViewModel(settings: SettingsRepository, session: SessionManager) : ViewModel() {
     abstract val controller: FeedController
-    val hideShorts: StateFlow<Boolean> = settings.settings.map { it.hideShorts }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    /** "Hide Shorts" now hides the Shorts tab only; feeds are never filtered. */
+    val hideShorts: StateFlow<Boolean> = kotlinx.coroutines.flow.MutableStateFlow(false)
     val authState: StateFlow<AuthState> = session.authState
     fun refresh() = controller.refresh()
     fun loadMore() = controller.loadMore()
@@ -32,6 +32,7 @@ class HomeViewModel @Inject constructor(
     feeds: FeedRepository,
     settings: SettingsRepository,
     session: SessionManager,
+    val events: vibe.tube.feature.common.UiEvents,
 ) : FeedViewModel(settings, session) {
     override val controller = feeds.home(viewModelScope)
 }

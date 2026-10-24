@@ -361,7 +361,6 @@ internal fun SheetUnderVideo(modifier: Modifier, stripAlpha: () -> Float = { 1f 
                     val c = ambient.value
                     val stops = Array(c.size) { i -> i / (c.size - 1f) to c[i] }
                     drawRect(Brush.horizontalGradient(colorStops = stops))
-                    drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.22f))))
                 },
         )
         Box(

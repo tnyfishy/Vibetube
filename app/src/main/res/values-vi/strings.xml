@@ -198,6 +198,8 @@
     <string name="settings_section_playback">Phát video</string>
     <string name="settings_quality_wifi">Chất lượng trên Wi-Fi</string>
     <string name="settings_quality_mobile">Chất lượng trên dữ liệu di động</string>
+    <string name="settings_quality_shorts_wifi">Chất lượng Shorts trên Wi-Fi</string>
+    <string name="settings_quality_shorts_mobile">Chất lượng Shorts trên dữ liệu di động</string>
     <string name="quality_auto">Tự động</string>
     <string name="quality_auto_active">Tự động (%1$dp)</string>
     <string name="settings_autoplay">Tự động phát tiếp</string>
@@ -209,7 +211,7 @@
     <string name="settings_subtitles">Phụ đề</string>
     <string name="settings_subtitles_desc">Tự động hiện phụ đề khi có</string>
     <string name="settings_hide_shorts">Ẩn Shorts</string>
-    <string name="settings_hide_shorts_desc">Ẩn Shorts khỏi feed và kết quả tìm kiếm</string>
+    <string name="settings_hide_shorts_desc">Ẩn tab Shorts khỏi thanh menu</string>
     <string name="settings_section_privacy">Lịch sử và quyền riêng tư</string>
     <string name="settings_local_history">Lưu lịch sử trên thiết bị này</string>
     <string name="settings_local_history_desc">Ghi nhớ video đã phát và vị trí dừng</string>
@@ -313,6 +315,10 @@
     <string name="play_err_login_body">Vibetube yêu cầu đăng nhập để phát video này.</string>
     <string name="play_err_bot_title">Vibetube yêu cầu xác minh</string>
     <string name="play_err_bot_body">Vibetube trả về yêu cầu \"xác nhận bạn không phải bot\" cho mạng này. Vibetube không vượt qua kiểm tra này. Hãy thử lại sau, dùng mạng khác hoặc đăng nhập.</string>
+    <string name="play_err_members_title">Video dành cho hội viên</string>
+    <string name="play_err_members_body">Chỉ hội viên của kênh này mới xem được video này. Hãy đăng ký hội viên kênh để phát.</string>
+    <string name="shorts_hide_ui">Ẩn giao diện</string>
+    <string name="badge_members">Dành cho hội viên</string>
     <string name="play_err_age_title">Video giới hạn độ tuổi</string>
     <string name="play_err_age_body">Video này cần xác minh độ tuổi, hiện chưa được hỗ trợ.</string>
     <string name="play_err_region_title">Không khả dụng ở vùng của bạn</string>

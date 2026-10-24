@@ -64,6 +64,9 @@ private fun OverlayBadge(text: String, modifier: Modifier = Modifier, container:
     )
 }
 
+/** Watched percent per video id from this device's own history, for videos YouTube sent no progress for (guests). */
+val LocalWatchProgress = androidx.compose.runtime.compositionLocalOf<Map<String, Int>> { emptyMap() }
+
 /** Highest-resolution thumbnail first (maxres when it exists), then what the API returned. */
 internal fun thumbnailCandidates(video: VideoItem): List<String> {
     val given = video.thumbnails.best()
@@ -97,16 +100,27 @@ fun VideoThumbnail(video: VideoItem, modifier: Modifier = Modifier, shape: andro
             video.availability == VideoAvailability.Deleted -> stringResource(R.string.badge_deleted)
             else -> video.durationText
         }
+        // Local (guest) watch progress fills in where YouTube did not send any.
+        val watched = video.watchedPercent ?: LocalWatchProgress.current[video.id]
+        val hasBar = watched != null && watched > 0
         if (badge != null) {
             OverlayBadge(
                 badge,
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(Spacing.sm),
+                    .padding(start = Spacing.sm, end = Spacing.sm, top = Spacing.sm, bottom = if (hasBar) Spacing.sm + 10.dp else Spacing.sm),
                 container = if (video.isLive) MaterialTheme.colorScheme.error else MediaOverlayColors.scrim,
             )
         }
-        val watched = video.watchedPercent
+        if (video.membersOnly) {
+            OverlayBadge(
+                stringResource(R.string.badge_members),
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(Spacing.sm),
+                container = androidx.compose.ui.graphics.Color(0xFF1B7F4B).copy(alpha = 0.92f),
+            )
+        }
         if (watched != null && watched > 0) {
             Box(
                 Modifier

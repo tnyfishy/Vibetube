@@ -52,9 +52,10 @@ data class ShortsPlayState(
 )
 
 /**
- * Light, separate player for the Shorts tab, built for fast starts: two small ExoPlayers take turns. While one plays the
- * short on screen (looping), the other already has the *next* short resolved, prepared and buffered, so swiping to it is
- * instant. Resolved stream URLs are also cached for a while (swiping back, retries). It never touches the main player's
+ * Light, separate player for the Shorts tab, built for fast starts: three small ExoPlayers take turns. While one plays
+ * the short on screen (looping), the others already have the next two shorts resolved, prepared and buffered, so swiping
+ * forward is instant; the shorts after those get their stream URLs resolved ahead of time. Resolved stream URLs are also
+ * cached for a while (swiping back, retries). It never touches the main player's
  * queue; starting a short only pauses the main video.
  */
 @Singleton
@@ -79,7 +80,7 @@ class ShortsPlayer @Inject constructor(
     }
 
     private var slotList: List<Slot>? = null
-    private val slots: List<Slot> get() = slotList ?: listOf(Slot(), Slot()).also { slotList = it }
+    private val slots: List<Slot> get() = slotList ?: List(SLOT_COUNT) { Slot() }.also { slotList = it }
     private var currentSlot: Slot? = null
     private var current: VideoItem? = null
     private val failedClients = mutableSetOf<String>()
@@ -106,7 +107,7 @@ class ShortsPlayer @Inject constructor(
                 DefaultLoadControl.Builder()
                     // Start as soon as a fraction of a second is buffered; a standby player fills up to the max and waits.
                     .setBufferDurationsMs(3_000, 15_000, 250, 700)
-                    .setTargetBufferBytes(12 * 1024 * 1024)
+                    .setTargetBufferBytes(20 * 1024 * 1024)
                     .setBackBuffer(0, false)
                     .build(),
             )
@@ -174,21 +175,25 @@ class ShortsPlayer @Inject constructor(
      * Starts [video] (the short now on screen) and prepares [next] in the background. A short that was preloaded just
      * starts; one that is already playing just resumes.
      */
-    fun play(video: VideoItem, next: VideoItem? = null) {
+    fun play(video: VideoItem, upcoming: List<VideoItem> = emptyList()) {
         if (current?.id == video.id && mutable.value.error) {
             retry()
-            next?.let(::preload)
+            preloadAll(video, upcoming)
             return
         }
         if (current?.id == video.id && !mutable.value.error && currentSlot?.videoId == video.id) {
             if (!userPaused) currentSlot?.player?.playWhenReady = true
-            next?.let(::preload)
+            preloadAll(video, upcoming)
             return
         }
         mainEngine.pauseIfCreated()
         val all = slots
         val existing = all.firstOrNull { it.videoId == video.id }
-        val slot = existing ?: all.first { it !== currentSlot }
+        val wanted = (listOf(video.id) + upcoming.take(SLOT_COUNT - 1).map { it.id }).toSet()
+        val slot = existing
+            ?: all.firstOrNull { it !== currentSlot && it.videoId == null }
+            ?: all.firstOrNull { it !== currentSlot && it.videoId !in wanted }
+            ?: all.first { it !== currentSlot }
         currentSlot?.takeIf { it !== slot }?.let { old ->
             old.player.playWhenReady = false
             old.player.setPlaybackSpeed(1f)
@@ -216,15 +221,54 @@ class ShortsPlayer @Inject constructor(
         } else {
             load(slot, video, playWhenReady = true)
         }
-        next?.let(::preload)
+        preloadAll(video, upcoming)
     }
 
-    /** Resolves, prepares and buffers [video] in the idle player so that [play] can switch to it instantly. */
-    fun preload(video: VideoItem) {
+    /**
+     * Fills the idle players with the next shorts (in order) and warms the stream-URL cache for the ones after those.
+     * A player that already holds one of the wanted shorts is left alone.
+     */
+    private fun preloadAll(video: VideoItem, upcoming: List<VideoItem>) {
         val all = slots
-        if (all.any { it.videoId == video.id }) return
-        val slot = all.firstOrNull { it !== currentSlot } ?: return
-        load(slot, video, playWhenReady = false)
+        val wanted = upcoming.take(SLOT_COUNT - 1)
+        val wantedIds = wanted.map { it.id }.toSet() + video.id
+        for (next in wanted) {
+            if (all.any { it.videoId == next.id }) continue
+            val free = all.firstOrNull { it !== currentSlot && it.videoId == null }
+                ?: all.firstOrNull { it !== currentSlot && it.videoId !in wantedIds }
+                ?: break
+            load(free, next, playWhenReady = false)
+        }
+        upcoming.drop(SLOT_COUNT - 1).take(WARM_AHEAD).forEach(::warm)
+    }
+
+    /** Resolves [video]'s stream URLs into the cache (no player involved), so loading it later skips the network round trip. */
+    private fun warm(video: VideoItem) {
+        if (resolved[video.id]?.let { System.currentTimeMillis() - it.at < CACHE_TTL_MS } == true) return
+        if (!warming.add(video.id)) return
+        scope.launch {
+            try {
+                mediaFor(video.id)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+            } finally {
+                warming.remove(video.id)
+            }
+        }
+    }
+    private val warming = mutableSetOf<String>()
+
+    private fun isUnmetered(): Boolean {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager ?: return false
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+        return caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)
+    }
+
+    /** The user's Shorts quality for the current connection. */
+    private fun cap(): vibe.tube.data.settings.QualityCap {
+        val s = settings.latest.value
+        return if (isUnmetered()) s.shortsWifiQuality else s.shortsMobileQuality
     }
 
     private fun load(slot: Slot, video: VideoItem, playWhenReady: Boolean) {
@@ -241,8 +285,9 @@ class ShortsPlayer @Inject constructor(
                     if (slot === currentSlot) mutable.update { it.copy(loading = false, error = true) } else slot.videoId = null
                     return@launch
                 }
-                // 720p-class vertical video: sharp enough for a phone, and starts quickly.
-                val plan = MediaPlanner.plan(media, maxHeight = MAX_HEIGHT, allowWebm = true, maxFps = 30)
+                // Vertical formats report their long side as `height`, so a "1080p" cap on the short side is 1920 here.
+                val cap = cap()
+                val plan = MediaPlanner.plan(media, maxHeight = cap.maxHeight?.let { it * 16 / 9 }, allowWebm = true, maxFps = cap.maxFps)
                 if (plan == null) {
                     resolved.remove(video.id)
                     if (slot === currentSlot) mutable.update { it.copy(loading = false, error = true) } else slot.videoId = null
@@ -347,7 +392,8 @@ class ShortsPlayer @Inject constructor(
 
     private companion object {
         const val MAX_RETRIES = 2
-        const val MAX_HEIGHT = 1280
+        const val SLOT_COUNT = 3
+        const val WARM_AHEAD = 3
         const val CACHE_SIZE = 12
         const val CACHE_TTL_MS = 30 * 60_000L
         const val SCRUB_SEEK_INTERVAL_MS = 120L

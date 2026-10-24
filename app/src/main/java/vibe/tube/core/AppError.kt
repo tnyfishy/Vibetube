@@ -17,6 +17,7 @@ enum class PlaybackFailure {
     AgeRestricted,
     RegionBlocked,
     Private,
+    MembersOnly,
     Removed,
     Unavailable,
     LiveUnsupported,

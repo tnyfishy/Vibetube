@@ -169,18 +169,26 @@ private fun ShortsPager(
     LaunchedEffect(pager, videos.firstOrNull()?.id) {
         snapshotFlow { pager.currentPage }.collect { page ->
             latest.getOrNull(page)?.let { video ->
-                player.play(video, latest.getOrNull(page + 1))
+                val upcoming = latest.drop(page + 1).take(UPCOMING)
+                player.play(video, upcoming)
                 viewModel.ensureMeta(video)
+                viewModel.prefetchMetas(upcoming)
             }
             if (page >= latest.size - 3) viewModel.loadMore()
         }
     }
-    // More shorts arrived: make sure the next one is being prepared.
+    // More shorts arrived: make sure the next ones are being prepared.
     LaunchedEffect(videos.size) {
-        latest.getOrNull(pager.currentPage + 1)?.let { next ->
-            if (player.state.value.videoId == latest.getOrNull(pager.currentPage)?.id) player.preload(next)
+        val page = pager.currentPage
+        val current = latest.getOrNull(page) ?: return@LaunchedEffect
+        if (player.state.value.videoId == current.id) {
+            val upcoming = latest.drop(page + 1).take(UPCOMING)
+            player.play(current, upcoming)
+            viewModel.prefetchMetas(upcoming)
         }
     }
+    // Clean mode: all text and buttons fade out; a tap on the video brings them back.
+    var uiHidden by remember { mutableStateOf(false) }
     VerticalPager(
         state = pager,
         modifier = Modifier.fillMaxSize(),
@@ -196,6 +204,8 @@ private fun ShortsPager(
             viewModel = viewModel,
             onLogin = onLogin,
             onOpenComments = { onOpenComments(video) },
+            uiHidden = uiHidden,
+            onUiHidden = { uiHidden = it },
         )
     }
 }
@@ -209,6 +219,8 @@ private fun ShortPage(
     viewModel: ShortsViewModel,
     onLogin: () -> Unit,
     onOpenComments: () -> Unit,
+    uiHidden: Boolean,
+    onUiHidden: (Boolean) -> Unit,
 ) {
     val actions = LocalVideoActions.current
     val player = viewModel.shorts
@@ -238,7 +250,7 @@ private fun ShortPage(
         Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(video.id, isCurrent) {
+            .pointerInput(video.id, isCurrent, uiHidden) {
                 detectTapGestures(
                     onPress = {
                         tryAwaitRelease()
@@ -252,8 +264,12 @@ private fun ShortPage(
                     },
                     onTap = {
                         if (isCurrent) {
-                            userPaused = !player.toggle()
-                            hintTick++
+                            if (uiHidden) {
+                                onUiHidden(false)
+                            } else {
+                                userPaused = !player.toggle()
+                                hintTick++
+                            }
                         }
                     },
                 )
@@ -334,6 +350,9 @@ private fun ShortPage(
             }
         }
 
+        // Bottom scrim, text, buttons and seek bar: they fade out together in clean mode.
+        val uiAlpha by animateFloatAsState(if (uiHidden) 0f else 1f, tween(if (uiHidden) 380 else 180), label = "shortUi")
+        if (uiAlpha > 0.001f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = uiAlpha }) {
         // Bottom scrim
         Box(
             Modifier
@@ -344,7 +363,7 @@ private fun ShortPage(
         )
         Column(Modifier.align(Alignment.BottomStart).fillMaxWidth()) {
             Row(Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.sm), verticalAlignment = Alignment.Bottom) {
-                Column(Modifier.weight(1f).padding(bottom = Spacing.md, end = Spacing.sm), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(Modifier.weight(1f).offset(y = 10.dp).padding(end = Spacing.sm), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     ChannelRow(video, meta, viewModel, onLogin)
                     Text(video.title, color = Color.White, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
@@ -358,13 +377,16 @@ private fun ShortPage(
                         viewModel.toggleLike(video, onLogin)
                     }
                     ShortAction(VIcon.Comment, stringResource(R.string.comments_title), compactCount(meta?.commentsCount), onOpenComments)
-                    ShortAction(VIcon.Schedule, stringResource(R.string.action_watch_later), null) { actions.watchLater(video) }
-                    ShortAction(VIcon.Download, stringResource(R.string.action_download), null) { actions.download(video) }
+                    ShortAction(VIcon.VisibilityOff, stringResource(R.string.shorts_hide_ui), null) { onUiHidden(true) }
+                    ShortAction(VIcon.Download, stringResource(R.string.action_download), null) { viewModel.download(video) }
                     ShortAction(VIcon.Share, stringResource(R.string.action_share), null) { actions.share(video) }
                 }
             }
-            ShortsSeekBar(player, active)
+            ShortsSeekBar(player, active, playing = active && playState.playing)
         }
+        }
+        // Only a hairline of progress stays while clean mode is on.
+        if (uiHidden && active) HairlineProgress(player, Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -426,7 +448,8 @@ private fun ShortAction(icon: Int, label: String, count: String?, onClick: () ->
  * to a stop when released.
  */
 @Composable
-private fun ShortsSeekBar(player: ShortsPlayer, active: Boolean, modifier: Modifier = Modifier) {
+private fun ShortsSeekBar(player: ShortsPlayer, active: Boolean, playing: Boolean, modifier: Modifier = Modifier) {
+    val playingNow by rememberUpdatedState(playing)
     var fraction by remember { mutableFloatStateOf(0f) }
     var dragging by remember { mutableStateOf(false) }
     var angle by remember { mutableFloatStateOf(0f) }
@@ -446,7 +469,9 @@ private fun ShortsSeekBar(player: ShortsPlayer, active: Boolean, modifier: Modif
             delay(33)
         }
     }
-    // Spin: integrates the handle's angle each frame while dragging, and for a moment after letting go.
+    // The handle turns slowly for as long as the short is playing, and stops when it pauses.
+    LaunchedEffect(playing) { if (playing) spinning = true }
+    // Spin: integrates the handle's angle each frame while dragging, while playing, and for a moment after letting go.
     LaunchedEffect(spinning) {
         if (!spinning) return@LaunchedEffect
         var last = androidx.compose.runtime.withFrameNanos { it }
@@ -456,9 +481,10 @@ private fun ShortsSeekBar(player: ShortsPlayer, active: Boolean, modifier: Modif
             last = now
             // A finger that stops moving (but stays down) stops asking for speed.
             if (dragging) targetVelocity *= (1f - 5f * dt).coerceAtLeast(0f)
-            angularVelocity += (targetVelocity - angularVelocity) * (1f - exp(-9f * dt))
+            val idle = if (playingNow && !dragging) IDLE_SPIN_DEG_PER_SEC else 0f
+            angularVelocity += ((if (dragging) targetVelocity else idle) - angularVelocity) * (1f - exp(-9f * dt))
             angle = (angle + angularVelocity * dt) % 360f
-            if (!dragging && abs(angularVelocity) < 4f && abs(targetVelocity) < 4f) {
+            if (!dragging && !playingNow && abs(angularVelocity) < 4f && abs(targetVelocity) < 4f) {
                 angularVelocity = 0f
                 targetVelocity = 0f
                 spinning = false
@@ -562,6 +588,24 @@ private fun ShortsSeekBar(player: ShortsPlayer, active: Boolean, modifier: Modif
                 modifier = Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 12.dp, vertical = 5.dp),
             )
         }
+    }
+}
+
+private const val IDLE_SPIN_DEG_PER_SEC = 40f
+private const val UPCOMING = 4
+
+/** A 2dp progress line along the bottom edge, shown while the controls are hidden. */
+@Composable
+private fun HairlineProgress(player: ShortsPlayer, modifier: Modifier = Modifier) {
+    var fraction by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            fraction = player.fraction()
+            delay(66)
+        }
+    }
+    Box(modifier.fillMaxWidth().height(2.dp).background(Color.White.copy(alpha = 0.25f))) {
+        Box(Modifier.fillMaxHeight().fillMaxWidth(fraction.coerceIn(0f, 1f)).background(Color.White.copy(alpha = 0.85f)))
     }
 }
 

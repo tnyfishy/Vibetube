@@ -64,8 +64,7 @@ class SearchViewModel @Inject constructor(
         .flatMapLatest { it?.state ?: kotlinx.coroutines.flow.flowOf(null) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    val hideShorts: StateFlow<Boolean> = settings.settings.map { it.hideShorts }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val hideShorts: StateFlow<Boolean> = kotlinx.coroutines.flow.MutableStateFlow(false)
 
     val suggestions: StateFlow<List<String>> = mutable
         .map { if (it.submitted == null) it.input.trim() else "" }

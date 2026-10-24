@@ -129,6 +129,7 @@ class PlayerController @Inject constructor(
         registerHeadphoneAutoplay()
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
+                persistProgress()
                 val s = mutable.value
                 if (!settings.latest.value.backgroundPlayback && !s.inPip && engine.player.isPlaying) {
                     engine.player.pause()
@@ -600,7 +601,7 @@ class PlayerController @Inject constructor(
             android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
             android.media.AudioDeviceInfo.TYPE_HEARING_AID,
         ) + if (android.os.Build.VERSION.SDK_INT >= 31) setOf(android.media.AudioDeviceInfo.TYPE_BLE_HEADSET) else emptySet()
-        private const val PERSIST_INTERVAL_MS = 15_000L
+        private const val PERSIST_INTERVAL_MS = 5_000L
         private const val RESTART_THRESHOLD_MS = 3_000L
         private const val MAX_QUEUE_PAGES = 5
         const val NETWORK_DETAIL = "network"

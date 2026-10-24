@@ -84,7 +84,7 @@ fun <T> ChoiceDialog(
 private val contentLanguages = listOf("en", "vi", "ja", "ko", "zh", "es", "fr", "de", "pt", "ru", "id", "th", "hi", "ar", "it", "tr")
 private val contentRegions = listOf("US", "VN", "GB", "JP", "KR", "DE", "FR", "ES", "BR", "IN", "ID", "TH", "RU", "AU", "CA", "SG", "TW", "PH", "MY")
 
-private enum class Dialog { SeekSeconds, Theme, Font, HiddenChannels, DownloadDir, UiLanguage, ContentLanguage, Region, WifiQuality, MobileQuality, ClearCache, ClearHistory, ClearSearch }
+private enum class Dialog { SeekSeconds, Theme, Font, HiddenChannels, DownloadDir, UiLanguage, ContentLanguage, Region, WifiQuality, MobileQuality, ShortsWifiQuality, ShortsMobileQuality, ClearCache, ClearHistory, ClearSearch }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -170,6 +170,8 @@ fun SettingsScreen(
             }
             item { SettingRow(VIcon.HighQuality, R.string.settings_quality_wifi, qualityLabel(settings.wifiQuality)) { dialog = Dialog.WifiQuality } }
             item { SettingRow(VIcon.HighQuality, R.string.settings_quality_mobile, qualityLabel(settings.mobileQuality)) { dialog = Dialog.MobileQuality } }
+            item { SettingRow(VIcon.HighQuality, R.string.settings_quality_shorts_wifi, qualityLabel(settings.shortsWifiQuality)) { dialog = Dialog.ShortsWifiQuality } }
+            item { SettingRow(VIcon.HighQuality, R.string.settings_quality_shorts_mobile, qualityLabel(settings.shortsMobileQuality)) { dialog = Dialog.ShortsMobileQuality } }
             item { SettingRow(VIcon.FastForward, R.string.settings_seek_seconds, stringResource(R.string.settings_seek_value, settings.seekSeconds)) { dialog = Dialog.SeekSeconds } }
             item {
                 SwitchRow(VIcon.SkipNext, R.string.settings_autoplay, R.string.settings_autoplay_desc, settings.autoplay) { v -> viewModel.update { it.copy(autoplay = v) } }
@@ -332,6 +334,18 @@ fun SettingsScreen(
             settings.mobileQuality,
             { dialog = null },
         ) { v -> viewModel.update { it.copy(mobileQuality = v) }; dialog = null }
+        Dialog.ShortsWifiQuality -> ChoiceDialog(
+            stringResource(R.string.settings_quality_shorts_wifi),
+            QualityCap.entries.filter { it.maxHeight == null || it.maxHeight <= 1080 }.map { Choice(it, qualityLabel(it)) },
+            settings.shortsWifiQuality,
+            { dialog = null },
+        ) { v -> viewModel.update { it.copy(shortsWifiQuality = v) }; dialog = null }
+        Dialog.ShortsMobileQuality -> ChoiceDialog(
+            stringResource(R.string.settings_quality_shorts_mobile),
+            QualityCap.entries.filter { it.maxHeight == null || it.maxHeight <= 1080 }.map { Choice(it, qualityLabel(it)) },
+            settings.shortsMobileQuality,
+            { dialog = null },
+        ) { v -> viewModel.update { it.copy(shortsMobileQuality = v) }; dialog = null }
         Dialog.ClearCache -> ConfirmDialog(R.string.settings_clear_cache, R.string.dialog_clear_cache_body, { dialog = null }) { viewModel.clearCache() }
         Dialog.ClearHistory -> ConfirmDialog(R.string.dialog_clear_device_history_title, R.string.dialog_clear_device_history_body, { dialog = null }) { viewModel.clearPlaybackHistory() }
         Dialog.ClearSearch -> ConfirmDialog(R.string.dialog_clear_search_title, R.string.dialog_clear_search_body, { dialog = null }) { viewModel.clearSearchHistory() }

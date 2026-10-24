@@ -115,8 +115,12 @@ object ItemParsers {
         node.at("thumbnailOverlays").list().forEach {
             if (it.at("thumbnailOverlayTimeStatusRenderer").at("style").str == "LIVE") live = true
         }
+        var members = false
         node.at("badges").list().forEach {
             if (it.at("metadataBadgeRenderer").at("style").str == "BADGE_STYLE_TYPE_LIVE_NOW") live = true
+            val style = it.at("metadataBadgeRenderer").at("style").str.orEmpty()
+            val label = it.at("metadataBadgeRenderer").at("label").str.orEmpty().lowercase()
+            if (style.contains("MEMBERS_ONLY") || label.contains("members only") || label.contains("hội viên")) members = true
         }
         val progress = node.at("thumbnailOverlays").list().firstNotNullOfOrNull {
             it.at("thumbnailOverlayResumePlaybackRenderer").at("percentDurationWatched").int
@@ -149,6 +153,7 @@ object ItemParsers {
             availability = availability,
             playlistIndex = node.at("index").textOf()?.toIntOrNull(),
             channelBadge = badgeOf(node.at("ownerBadges")),
+            membersOnly = members,
         )
     }
 

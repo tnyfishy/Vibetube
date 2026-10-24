@@ -46,6 +46,7 @@ fun DownloadDialog(
     onDismiss: () -> Unit,
     loadOptions: suspend () -> Result<DownloadPlanner.Options>,
     onChoose: (DownloadPlanner.Choice) -> Unit,
+    videoOnly: Boolean = false,
 ) {
     var attempt by remember { mutableIntStateOf(0) }
     var tab by remember { mutableIntStateOf(0) }
@@ -73,12 +74,14 @@ fun DownloadDialog(
                     }
                     else -> {
                         val data = loaded.getOrThrow()
-                        PrimaryTabRow(selectedTabIndex = tab, containerColor = androidx.compose.ui.graphics.Color.Transparent) {
-                            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.download_tab_video)) })
-                            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.download_tab_audio)) })
+                        if (!videoOnly) {
+                            PrimaryTabRow(selectedTabIndex = tab, containerColor = androidx.compose.ui.graphics.Color.Transparent) {
+                                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.download_tab_video)) })
+                                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.download_tab_audio)) })
+                            }
                         }
                         LazyColumn(Modifier.heightIn(max = 320.dp)) {
-                            if (tab == 0) {
+                            if (tab == 0 || videoOnly) {
                                 items(data.videos, key = { "${it.height}-${it.fps}" }) { option ->
                                     OptionRow(
                                         title = option.label,
@@ -119,6 +122,7 @@ private fun OptionRow(title: String, detail: String, onClick: () -> Unit) {
 }
 
 private fun formatSize(bytes: Long): String {
+    if (bytes < 1024L * 1024L) return String.format(Locale.US, "%d KB", maxOf(1L, (bytes + 512) / 1024))
     val mb = bytes / (1024.0 * 1024.0)
     return if (mb >= 1024) String.format(Locale.US, "%.1f GB", mb / 1024) else String.format(Locale.US, "%.0f MB", mb)
 }

@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import kotlin.math.roundToInt
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -90,6 +91,7 @@ fun failureText(failure: PlaybackFailure): Pair<String, String> {
         PlaybackFailure.AgeRestricted -> R.string.play_err_age_title to R.string.play_err_age_body
         PlaybackFailure.RegionBlocked -> R.string.play_err_region_title to R.string.play_err_region_body
         PlaybackFailure.Private -> R.string.play_err_private_title to R.string.play_err_private_body
+        PlaybackFailure.MembersOnly -> R.string.play_err_members_title to R.string.play_err_members_body
         PlaybackFailure.Removed -> R.string.play_err_removed_title to R.string.play_err_removed_body
         PlaybackFailure.Unavailable -> R.string.play_err_unavailable_title to R.string.play_err_unavailable_body
         PlaybackFailure.LiveUnsupported -> R.string.play_err_live_title to R.string.play_err_live_body
@@ -437,7 +439,7 @@ private fun Controls(
                             amplitude = { waveAmp.value },
                             animate = state.isPlaying && !dragging,
                             modifier = Modifier.fillMaxSize(),
-                            color = MaterialTheme.colorScheme.primary,
+                            color = if (MaterialTheme.colorScheme.surface.luminance() > 0.5f) androidx.compose.ui.graphics.Color(0xFFE53935) else MaterialTheme.colorScheme.primary,
                             trackColor = MediaOverlayColors.onScrim.copy(alpha = 0.3f),
                             thumb = androidx.compose.ui.unit.DpSize(4.dp, 20.dp),
                         )

@@ -49,6 +49,7 @@ data class VideoItem(
     val availability: VideoAvailability = VideoAvailability.Available,
     val playlistIndex: Int? = null,
     val channelBadge: ChannelBadge = ChannelBadge.None,
+    val membersOnly: Boolean = false,
 ) : FeedItem
 
 @Serializable

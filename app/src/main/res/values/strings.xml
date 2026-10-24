@@ -199,6 +199,8 @@
     <string name="settings_section_playback">Playback</string>
     <string name="settings_quality_wifi">Quality on Wi-Fi</string>
     <string name="settings_quality_mobile">Quality on mobile data</string>
+    <string name="settings_quality_shorts_wifi">Shorts quality on Wi-Fi</string>
+    <string name="settings_quality_shorts_mobile">Shorts quality on mobile data</string>
     <string name="quality_auto">Auto</string>
     <string name="quality_auto_active">Auto (%1$dp)</string>
     <string name="settings_autoplay">Autoplay</string>
@@ -210,7 +212,7 @@
     <string name="settings_subtitles">Subtitles</string>
     <string name="settings_subtitles_desc">Show subtitles automatically when available</string>
     <string name="settings_hide_shorts">Hide Shorts</string>
-    <string name="settings_hide_shorts_desc">Remove Shorts from feeds and search results</string>
+    <string name="settings_hide_shorts_desc">Remove the Shorts tab from the navigation menu</string>
     <string name="settings_section_privacy">History and privacy</string>
     <string name="settings_local_history">Save history on this device</string>
     <string name="settings_local_history_desc">Remember what you played and where you stopped</string>
@@ -314,6 +316,10 @@
     <string name="play_err_login_body">Vibetube requires you to be signed in to play this video.</string>
     <string name="play_err_bot_title">Vibetube asked for verification</string>
     <string name="play_err_bot_body">Vibetube returned a \"confirm you\'re not a bot\" check for this network. Vibetube does not bypass it. Try again later, on another network, or sign in.</string>
+    <string name="play_err_members_title">Members-only video</string>
+    <string name="play_err_members_body">Only members of this channel can watch this video. Join the channel with a membership to play it.</string>
+    <string name="shorts_hide_ui">Hide controls</string>
+    <string name="badge_members">Members only</string>
     <string name="play_err_age_title">Age-restricted video</string>
     <string name="play_err_age_body">This video requires age verification that isn\'t supported here.</string>
     <string name="play_err_region_title">Not available in your region</string>

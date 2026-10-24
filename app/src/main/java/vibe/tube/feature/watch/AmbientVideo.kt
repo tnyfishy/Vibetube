@@ -25,13 +25,16 @@ internal object AmbientVideo {
     }
 }
 
-private const val COLS = 32
-private const val ROWS = 18
-private const val INTERVAL_MS = 110L
+private const val COLS = 64
+
+// Many rows: the last row then covers only the sliver at the very bottom, which is what the strip continues from.
+private const val ROWS = 64
+private const val INTERVAL_MS = 40L
+private const val FOLLOW = 0.75f
 
 /**
  * Live colours of the video's bottom edge, left to right ([COLS] samples, eased so they glide instead of flickering).
- * They are read from the running frame a few times a second, so the strip under the video always follows what is playing.
+ * They are read from the running frame about 25 times a second, so the strip under the video always follows what is playing.
  * Black until the first frame is available.
  */
 @Composable
@@ -58,9 +61,9 @@ internal fun rememberVideoBottomColors(): State<List<Color>> {
                         if (!seeded) {
                             smooth[i * 3] = r; smooth[i * 3 + 1] = g; smooth[i * 3 + 2] = b
                         } else {
-                            smooth[i * 3] += (r - smooth[i * 3]) * 0.45f
-                            smooth[i * 3 + 1] += (g - smooth[i * 3 + 1]) * 0.45f
-                            smooth[i * 3 + 2] += (b - smooth[i * 3 + 2]) * 0.45f
+                            smooth[i * 3] += (r - smooth[i * 3]) * FOLLOW
+                            smooth[i * 3 + 1] += (g - smooth[i * 3 + 1]) * FOLLOW
+                            smooth[i * 3 + 2] += (b - smooth[i * 3 + 2]) * FOLLOW
                         }
                     }
                     seeded = true
