@@ -16,6 +16,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object PlaylistsRoute
 @Serializable data object SettingsRoute
 @Serializable data object NotificationsRoute
+@Serializable data object SetupRoute
 @Serializable data object LoginRoute
 @Serializable data object LicensesRoute
 @Serializable data object GalleryRoute

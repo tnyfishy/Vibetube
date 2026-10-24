@@ -73,6 +73,7 @@ class PlayerController @Inject constructor(
     val state: StateFlow<PlayerUiState> = mutable.asStateFlow()
 
     private val tuningPrefs = context.getSharedPreferences("player_tuning", Context.MODE_PRIVATE)
+    private val effects = AudioEffects(context.getSharedPreferences("audio_effects", Context.MODE_PRIVATE))
     private var loadJob: Job? = null
     private var tickerJob: Job? = null
     private var queueJob: Job? = null
@@ -114,6 +115,15 @@ class PlayerController @Inject constructor(
             if (mutable.value.tuningRemembered) saveTuning()
         }
 
+        override fun onAudioSessionIdChanged(audioSessionId: Int) {
+            effects.attach(audioSessionId)
+            mutable.update { it.copy(effectsAvailable = effects.available) }
+        }
+
+        override fun onSkipSilenceEnabledChanged(skipSilenceEnabled: Boolean) {
+            mutable.update { it.copy(skipSilence = skipSilenceEnabled) }
+        }
+
         override fun onVideoSizeChanged(videoSize: VideoSize) {
             if (videoSize.width > 0 && videoSize.height > 0) {
                 val aspect = videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height
@@ -131,6 +141,11 @@ class PlayerController @Inject constructor(
         wired = true
         engine.queueHandler = this
         engine.player.addListener(listener)
+        mutable.update { it.copy(eqPreset = effects.preset, bassBoost = effects.bassStrength, loudnessMb = effects.gainMb) }
+        engine.player.skipSilenceEnabled = tuningPrefs.getBoolean("skip_silence", false)
+        mutable.update { it.copy(skipSilence = engine.player.skipSilenceEnabled) }
+        effects.attach(engine.player.audioSessionId)
+        mutable.update { it.copy(effectsAvailable = effects.available) }
         if (tuningPrefs.getBoolean("remember", false)) {
             engine.player.playbackParameters = PlaybackParameters(tuningPrefs.getFloat("speed", 1f), tuningPrefs.getFloat("pitch", 1f))
             mutable.update { it.copy(tuningRemembered = true, linkPitch = tuningPrefs.getBoolean("link", false)) }
@@ -533,6 +548,26 @@ class PlayerController @Inject constructor(
     fun setPitch(pitch: Float) {
         val p = engine.player
         p.playbackParameters = PlaybackParameters(p.playbackParameters.speed, pitch.coerceIn(0.5f, 2f))
+    }
+
+    fun setEqPreset(preset: EqPreset) {
+        effects.setPreset(preset)
+        mutable.update { it.copy(eqPreset = preset) }
+    }
+
+    fun setBassBoost(strength: Int) {
+        effects.setBass(strength)
+        mutable.update { it.copy(bassBoost = effects.bassStrength) }
+    }
+
+    fun setLoudness(mb: Int) {
+        effects.setGain(mb)
+        mutable.update { it.copy(loudnessMb = effects.gainMb) }
+    }
+
+    fun setSkipSilence(on: Boolean) {
+        engine.player.skipSilenceEnabled = on
+        tuningPrefs.edit().putBoolean("skip_silence", on).apply()
     }
 
     fun setRememberTuning(on: Boolean) {

@@ -92,6 +92,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onLicenses: () -> Unit,
     onDebug: (() -> Unit)?,
+    onSetup: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
@@ -123,6 +124,7 @@ fun SettingsScreen(
     ) { inner ->
         LazyColumn(Modifier.fillMaxSize().padding(inner)) {
             section(R.string.settings_section_appearance)
+            item { SettingRow(VIcon.Tune, R.string.settings_setup, R.string.settings_setup_desc) { onSetup() } }
             item {
                 SettingRow(
                     VIcon.Palette, R.string.settings_theme,

@@ -53,7 +53,7 @@ import kotlin.math.roundToInt
 private val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 private val sleepMinutes = listOf(5, 10, 15, 30, 45, 60)
 
-private enum class OptionsPage { Main, Speed, Quality, Captions, CaptionTranslate, CaptionStyle, Audio, Sleep }
+private enum class OptionsPage { Main, Speed, Quality, Captions, CaptionTranslate, CaptionStyle, Audio, Effects, Sleep }
 
 /** YouTube-style settings sheet: one row per setting on the first page, each opening its own page. */
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
@@ -102,6 +102,7 @@ fun PlayerOptionsSheet(state: PlayerUiState, controller: PlayerController, onDis
                             OptionsPage.CaptionTranslate -> stringResource(R.string.player_caption_translate)
                             OptionsPage.CaptionStyle -> stringResource(R.string.player_caption_style)
                             OptionsPage.Audio -> stringResource(R.string.player_audio_tracks)
+                            OptionsPage.Effects -> stringResource(R.string.player_audio_effects)
                             OptionsPage.Sleep -> stringResource(R.string.player_sleep_timer)
                         },
                         style = MaterialTheme.typography.titleLarge,
@@ -115,6 +116,7 @@ fun PlayerOptionsSheet(state: PlayerUiState, controller: PlayerController, onDis
                     OptionsPage.CaptionTranslate -> CaptionTranslatePage(state, controller, onDone = { page = OptionsPage.Main })
                     OptionsPage.CaptionStyle -> CaptionStylePage(controller)
                     OptionsPage.Audio -> AudioPage(state, controller, onDone = { page = OptionsPage.Main })
+                    OptionsPage.Effects -> EffectsPage(state, controller)
                     OptionsPage.Sleep -> SleepPage(state, controller, onDone = { page = OptionsPage.Main })
                 }
             }
@@ -138,6 +140,11 @@ private fun MainPage(state: PlayerUiState, onOpen: (OptionsPage) -> Unit) {
         val a = state.audioTracks.firstOrNull { it.id == state.selectedAudioTrack || (state.selectedAudioTrack == null && it.isDefault) }?.name.orEmpty()
         OptionRow(VIcon.GraphicEq, stringResource(R.string.player_audio_tracks), a) { onOpen(OptionsPage.Audio) }
     }
+    OptionRow(
+        VIcon.Equalizer,
+        stringResource(R.string.player_audio_effects),
+        stringResource(effectName(state.eqPreset)),
+    ) { onOpen(OptionsPage.Effects) }
     val sleep = when {
         state.sleepAtEnd -> stringResource(R.string.player_sleep_end)
         state.sleepUntilMs != null -> stringResource(R.string.player_sleep_minutes, (((state.sleepUntilMs - System.currentTimeMillis()) / 60_000f).coerceAtLeast(0f)).roundToInt().coerceAtLeast(1))
@@ -351,6 +358,55 @@ private fun AudioPage(state: PlayerUiState, controller: PlayerController, onDone
         ChoiceRow(track.name, state.selectedAudioTrack == track.id || (state.selectedAudioTrack == null && track.isDefault)) {
             controller.selectAudioTrack(track.id); onDone()
         }
+    }
+}
+
+private fun effectName(preset: vibe.tube.player.EqPreset): Int = when (preset) {
+    vibe.tube.player.EqPreset.Off -> R.string.eq_off
+    vibe.tube.player.EqPreset.Bass -> R.string.eq_bass
+    vibe.tube.player.EqPreset.Treble -> R.string.eq_treble
+    vibe.tube.player.EqPreset.Vocal -> R.string.eq_vocal
+    vibe.tube.player.EqPreset.Loud -> R.string.eq_loud
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun EffectsPage(state: PlayerUiState, controller: PlayerController) {
+    Column(Modifier.padding(horizontal = Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        Text(stringResource(R.string.player_equalizer), style = MaterialTheme.typography.titleSmall)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            vibe.tube.player.EqPreset.entries.forEach { preset ->
+                FilterChip(
+                    selected = state.eqPreset == preset,
+                    onClick = { controller.setEqPreset(preset) },
+                    label = { Text(stringResource(effectName(preset))) },
+                )
+            }
+        }
+        EffectSlider(stringResource(R.string.player_bass_boost), state.bassBoost / 10f, 0f..100f, "%") { controller.setBassBoost((it * 10f).roundToInt()) }
+        EffectSlider(stringResource(R.string.player_loudness), state.loudnessMb / 100f, 0f..10f, " dB") { controller.setLoudness((it * 100f).roundToInt()) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.player_skip_silence), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Switch(checked = state.skipSilence, onCheckedChange = { controller.setSkipSilence(it) })
+        }
+        if (!state.effectsAvailable) {
+            Text(
+                stringResource(R.string.player_effects_unsupported),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EffectSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, unit: String, onChange: (Float) -> Unit) {
+    Column {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(value.roundToInt().toString() + unit, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
+        Slider(value = value, onValueChange = onChange, valueRange = range)
     }
 }
 

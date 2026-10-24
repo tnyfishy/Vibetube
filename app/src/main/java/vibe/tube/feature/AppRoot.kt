@@ -125,6 +125,7 @@ import vibe.tube.feature.nav.PlaylistsRoute
 import vibe.tube.feature.nav.SearchRoute
 import vibe.tube.feature.nav.NotificationsRoute
 import vibe.tube.feature.nav.SettingsRoute
+import vibe.tube.feature.nav.SetupRoute
 import vibe.tube.feature.nav.SubscriptionsRoute
 import vibe.tube.feature.nav.YoutubeHistoryRoute
 import vibe.tube.feature.search.SearchScreen
@@ -425,6 +426,10 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                 miniAway = onSettings || destination?.hasRoute(ShortsRoute::class) == true,
             )
             val welcomePrefs = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("app_state", android.content.Context.MODE_PRIVATE)
+            // People who already went through the welcome pages are not sent through the setup page afterwards.
+            var setupSeen by androidx.compose.runtime.remember {
+                androidx.compose.runtime.mutableStateOf(welcomePrefs.getBoolean("setup_seen", welcomePrefs.getBoolean("welcome_seen", false)))
+            }
             var welcomeSeen by androidx.compose.runtime.remember {
                 val seen = welcomePrefs.getBoolean("welcome_seen", false)
                 // First launch: keep the home heading off screen under the welcome page until it is time to charge in.
@@ -435,15 +440,22 @@ fun AppRoot(onEnterPip: (() -> Unit)?, appViewModel: AppViewModel = hiltViewMode
                 androidx.compose.runtime.mutableStateOf(seen)
             }
             androidx.compose.animation.AnimatedVisibility(
-                visible = !welcomeSeen,
+                visible = !welcomeSeen || !setupSeen,
                 enter = androidx.compose.animation.EnterTransition.None,
                 exit = androidx.compose.animation.fadeOut(tween(260)),
             ) {
-                vibe.tube.feature.welcome.WelcomeScreen(onDone = {
-                    welcomePrefs.edit().putBoolean("welcome_seen", true).apply()
-                    welcomeSeen = true
-                    vibe.tube.ui.components.HomeIntro.phase = vibe.tube.ui.components.HomeIntro.RUN
-                })
+                if (!welcomeSeen) {
+                    vibe.tube.feature.welcome.WelcomeScreen(onDone = {
+                        welcomePrefs.edit().putBoolean("welcome_seen", true).apply()
+                        welcomeSeen = true
+                    })
+                } else {
+                    vibe.tube.feature.welcome.SetupScreen(onDone = {
+                        welcomePrefs.edit().putBoolean("setup_seen", true).apply()
+                        setupSeen = true
+                        vibe.tube.ui.components.HomeIntro.phase = vibe.tube.ui.components.HomeIntro.RUN
+                    })
+                }
             }
             if (playerState.expanded && playerState.visible) {
                 Box(Modifier.align(Alignment.BottomCenter)) {
@@ -636,8 +648,10 @@ private fun AppNavHost(nav: androidx.navigation.NavHostController, appViewModel:
                         onBack = { nav.popBackStack() },
                         onLicenses = { nav.navigate(LicensesRoute) },
                         onDebug = null,
+                        onSetup = { nav.navigate(SetupRoute) },
                     )
                 }
+                page<SetupRoute> { vibe.tube.feature.welcome.SetupScreen(onDone = { nav.popBackStack() }) }
                 page<NotificationsRoute> {
                     vibe.tube.feature.notifications.NotificationsScreen(onBack = { nav.popBackStack() }, onLogin = { nav.navigate(LoginRoute) })
                 }

@@ -28,6 +28,13 @@ data class PlayerUiState(
     val pitch: Float = 1f,
     val tuningRemembered: Boolean = false,
     val linkPitch: Boolean = false,
+    val eqPreset: EqPreset = EqPreset.Off,
+    /** 0..1000 */
+    val bassBoost: Int = 0,
+    /** Extra loudness in millibels, 0..1000 */
+    val loudnessMb: Int = 0,
+    val skipSilence: Boolean = false,
+    val effectsAvailable: Boolean = true,
     val sleepUntilMs: Long? = null,
     val sleepAtEnd: Boolean = false,
     val isLive: Boolean = false,
