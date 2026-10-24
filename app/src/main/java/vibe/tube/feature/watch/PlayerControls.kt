@@ -267,6 +267,9 @@ fun VideoSurface(
     }
 }
 
+/** The time / chapter line sits a little lower, closer to the seek bar. */
+private val TimeDrop = 8.dp
+
 val LocalSeekSeconds = androidx.compose.runtime.compositionLocalOf { 10 }
 
 @Composable
@@ -334,19 +337,21 @@ private fun Controls(
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = Spacing.md)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (state.isLive) {
-                    Text(stringResource(R.string.badge_live), color = MediaOverlayColors.onScrim, style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.badge_live), color = MediaOverlayColors.onScrim, style = MaterialTheme.typography.labelLarge, modifier = Modifier.offset(y = TimeDrop))
                 } else {
                     val shownMs = if (dragging) (dragValue * duration).toLong() else state.positionMs
                     Text(
                         "${formatTime(shownMs)} / ${formatTime(state.durationMs)}",
                         color = MediaOverlayColors.onScrim,
                         style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.offset(y = TimeDrop),
                     )
                     val chapterIndex = vibe.tube.player.Chapters.currentIndex(chapters, shownMs)
                     if (chapterIndex >= 0) {
                         // A small round separator, centred between the time and the chapter name with equal space on both sides.
                         Box(
                             Modifier
+                                .offset(y = TimeDrop)
                                 .padding(horizontal = Spacing.sm)
                                 .size(3.dp)
                                 .background(MediaOverlayColors.onScrim.copy(alpha = 0.8f), androidx.compose.foundation.shape.CircleShape),
@@ -354,6 +359,7 @@ private fun Controls(
                         Row(
                             Modifier
                                 .weight(1f, fill = false)
+                                .offset(y = TimeDrop)
                                 .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
                                 .clickable(role = androidx.compose.ui.semantics.Role.Button) { onInteract(); onChapters() }
                                 .padding(horizontal = Spacing.xs, vertical = Spacing.xs),

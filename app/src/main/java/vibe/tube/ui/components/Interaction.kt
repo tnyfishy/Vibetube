@@ -262,18 +262,23 @@ fun SearchHeaderRow(
     val offscreen = titleWidth + with(density) { 80.dp.toPx() }
     LaunchedEffect(introPhase) {
         if (introPhase == HomeIntro.RUN) {
-            val impact = gap
-            titleShift.snapTo(-offscreen)
-            introStarted = true
-            kotlinx.coroutines.delay(140)
-            titleShift.animateTo(impact, tween(380, easing = androidx.compose.animation.core.CubicBezierEasing(0.55f, 0f, 0.95f, 0.55f)))
-            val bump = with(density) { 560.dp.toPx() }
-            kotlinx.coroutines.coroutineScope {
-                launch { pillShift.animateTo(0f, spring(dampingRatio = 0.34f, stiffness = 240f), initialVelocity = bump) }
-                launch { titleShift.animateTo(0f, spring(dampingRatio = 0.42f, stiffness = 300f), initialVelocity = -bump * 0.9f) }
+            // Whatever happens (the header scrolls out of the list and is disposed mid-intro, say), the intro counts as
+            // played: it must never restart when the header comes back.
+            try {
+                val impact = gap
+                titleShift.snapTo(-offscreen)
+                introStarted = true
+                kotlinx.coroutines.delay(140)
+                titleShift.animateTo(impact, tween(380, easing = androidx.compose.animation.core.CubicBezierEasing(0.55f, 0f, 0.95f, 0.55f)))
+                val bump = with(density) { 560.dp.toPx() }
+                kotlinx.coroutines.coroutineScope {
+                    launch { pillShift.animateTo(0f, spring(dampingRatio = 0.34f, stiffness = 240f), initialVelocity = bump) }
+                    launch { titleShift.animateTo(0f, spring(dampingRatio = 0.42f, stiffness = 300f), initialVelocity = -bump * 0.9f) }
+                }
+            } finally {
+                HomeIntro.phase = HomeIntro.NONE
+                HomeIntro.played = true
             }
-            HomeIntro.phase = HomeIntro.NONE
-            HomeIntro.played = true
         }
     }
     val squish = with(density) { 28.dp.toPx() }

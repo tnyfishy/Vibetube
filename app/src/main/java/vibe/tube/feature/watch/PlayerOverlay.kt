@@ -16,6 +16,7 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -228,13 +229,13 @@ private fun PlayerPage(
                 state.inPip || fullscreen -> surface(Modifier.fillMaxSize())
                 wide -> Row(Modifier.fillMaxSize().then(insets)) {
                     Column(Modifier.weight(0.62f).fillMaxHeight()) {
-                        surface(Modifier.fillMaxWidth().aspectRatio(state.videoAspect.coerceIn(1.2f, 2.4f)))
+                        surface(Modifier.fillMaxWidth().aspectRatio(state.videoAspect.coerceIn(1.2f, 2.4f)).clip(RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)))
                         Details(ui, state, controller, watch, auth, onLogin, includeTabs = false, modifier = Modifier.weight(1f))
                     }
                     SidePanel(ui, state, controller, watch, auth, onLogin, Modifier.weight(0.38f).fillMaxHeight())
                 }
                 else -> Column(Modifier.fillMaxSize().then(insets)) {
-                    surface(Modifier.fillMaxWidth().aspectRatio(Sizing.THUMBNAIL_ASPECT))
+                    surface(Modifier.fillMaxWidth().aspectRatio(Sizing.THUMBNAIL_ASPECT).clip(RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)))
                     Details(ui, state, controller, watch, auth, onLogin, includeTabs = true, modifier = Modifier.weight(1f))
                 }
             }
@@ -301,16 +302,15 @@ internal fun Details(
     includeTabs: Boolean,
     modifier: Modifier,
 ) {
-    var tab by remember { mutableIntStateOf(0) }
+    var commentsOpen by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val hiddenChannels = vibe.tube.ui.components.LocalHiddenChannels.current
-    val comments = ui.comments
-    LaunchedEffect(listState, tab, comments.comments.size, ui.related.size) {
+    LaunchedEffect(listState, ui.related.size) {
         snapshotFlow {
             val info = listState.layoutInfo
             (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 4
         }.distinctUntilChanged().filter { it }.collect {
-            if (includeTabs && tab == 1) watch.loadMoreComments() else if (includeTabs) watch.loadMoreRelated()
+            if (includeTabs) watch.loadMoreRelated()
         }
     }
     LazyColumn(
@@ -321,19 +321,12 @@ internal fun Details(
     ) {
         detailsHeader(ui, state, watch, onLogin)
         if (includeTabs) {
-            item(key = "tabs") {
-                PrimaryTabRow(selectedTabIndex = tab) {
-                    Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.player_tab_up_next)) })
-                    Tab(
-                        selected = tab == 1,
-                        onClick = { tab = 1 },
-                        text = { Text(comments.totalText?.let { stringResource(R.string.comments_title_with_total, it) } ?: stringResource(R.string.comments_title)) },
-                    )
-                }
-            }
-            if (tab == 0) upNext(ui, state, controller, watch, hiddenChannels) else commentsList(ui, auth, watch, onLogin)
+            // Comments live in their own card (opens a sheet); the next videos follow right below it.
+            item(key = "comments-card") { CommentsPreviewCard(ui.comments) { commentsOpen = true } }
+            upNext(ui, state, controller, watch, hiddenChannels)
         }
     }
+    if (commentsOpen) CommentsSheet(ui, auth, watch, onLogin) { commentsOpen = false }
 }
 
 @Composable
@@ -346,26 +339,83 @@ private fun SidePanel(
     onLogin: () -> Unit,
     modifier: Modifier,
 ) {
-    var tab by remember { mutableIntStateOf(0) }
+    var commentsOpen by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val hiddenChannels = vibe.tube.ui.components.LocalHiddenChannels.current
-    LaunchedEffect(listState, tab, ui.comments.comments.size, ui.related.size) {
+    LaunchedEffect(listState, ui.related.size) {
         snapshotFlow {
             val info = listState.layoutInfo
             (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 4
-        }.distinctUntilChanged().filter { it }.collect { if (tab == 1) watch.loadMoreComments() else watch.loadMoreRelated() }
+        }.distinctUntilChanged().filter { it }.collect { watch.loadMoreRelated() }
     }
-    Column(modifier.windowInsetsPadding(WindowInsets.statusBars)) {
-        PrimaryTabRow(selectedTabIndex = tab) {
-            Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(stringResource(R.string.player_tab_up_next)) })
-            Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(stringResource(R.string.comments_title)) })
+    LazyColumn(
+        modifier = modifier.windowInsetsPadding(WindowInsets.statusBars),
+        state = listState,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter),
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        item(key = "comments-card") { CommentsPreviewCard(ui.comments) { commentsOpen = true } }
+        upNext(ui, state, controller, watch, hiddenChannels)
+    }
+    if (commentsOpen) CommentsSheet(ui, auth, watch, onLogin) { commentsOpen = false }
+}
+
+/** YouTube-style comments entry: title with the total, and a peek at the first comment. Tapping opens the full list. */
+@Composable
+private fun CommentsPreviewCard(comments: CommentsUiState, onOpen: () -> Unit) {
+    val first = comments.comments.firstOrNull()
+    val disabled = comments.disabledMessage != null
+    Surface(
+        onClick = onOpen,
+        enabled = !disabled,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Text(stringResource(R.string.comments_title), style = MaterialTheme.typography.titleSmall)
+                comments.totalText?.let {
+                    Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            when {
+                disabled -> Text(stringResource(R.string.comments_disabled_title), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                first != null -> Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+                    Avatar(first.authorAvatar, Sizing.avatarSmall + 8.dp)
+                    Text(first.text, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                }
+                comments.error -> Text(stringResource(R.string.comments_error_title), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                comments.loading -> Box(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), contentAlignment = Alignment.CenterStart) {
+                    androidx.compose.material3.LinearWavyProgressIndicator(Modifier.fillMaxWidth(0.4f))
+                }
+                else -> Text(stringResource(R.string.comments_empty_title), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun CommentsSheet(ui: WatchUiState, auth: AuthState, watch: WatchViewModel, onLogin: () -> Unit, onDismiss: () -> Unit) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(listState, ui.comments.comments.size) {
+        snapshotFlow {
+            val info = listState.layoutInfo
+            (info.visibleItemsInfo.lastOrNull()?.index ?: 0) >= info.totalItemsCount - 4
+        }.distinctUntilChanged().filter { it }.collect { watch.loadMoreComments() }
+    }
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
         LazyColumn(
             state = listState,
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(Spacing.gutter),
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.92f),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = Spacing.gutter, vertical = Spacing.sm),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
-            if (tab == 0) upNext(ui, state, controller, watch, hiddenChannels) else commentsList(ui, auth, watch, onLogin)
+            commentsList(ui, auth, watch, onLogin)
         }
     }
 }

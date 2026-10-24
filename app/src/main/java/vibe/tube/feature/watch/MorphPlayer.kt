@@ -383,7 +383,10 @@ internal fun MorphPlayer(
                         scaleY = sc
                         translationX = lerpF(thumbX(), 0f, p()) + slide()
                         translationY = lerpF(thumbY(), topInsetPx, p()) + fsOffset.value
-                        shape = RoundedCornerShape(CornerSize(lerpF(12.dp.toPx(), 0f, t()) / sc))
+                        // Mini card: 12dp all round. Expanded: square on top, softly rounded where it meets the page below.
+                        val topCorner = CornerSize(lerpF(12.dp.toPx(), 0f, t()) / sc)
+                        val bottomCorner = CornerSize(lerpF(12.dp.toPx(), 16.dp.toPx(), t()) / sc)
+                        shape = RoundedCornerShape(topCorner, topCorner, bottomCorner, bottomCorner)
                         clip = true
                         alpha = (1f + fsOffset.value / fsRange).coerceIn(0f, 1f) * awayAlpha()
                     },

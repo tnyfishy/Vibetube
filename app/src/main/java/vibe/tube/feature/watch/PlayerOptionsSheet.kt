@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -57,19 +58,32 @@ private enum class OptionsPage { Main, Speed, Quality, Captions, Audio, Sleep }
 @Composable
 fun PlayerOptionsSheet(state: PlayerUiState, controller: PlayerController, onDismiss: () -> Unit) {
     var page by remember { mutableStateOf(OptionsPage.Main) }
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    val config = androidx.compose.ui.platform.LocalConfiguration.current
+    val landscape = config.screenWidthDp > config.screenHeightDp
+    // Landscape screens are short: the sheet opens straight at its content height (no half-open stop), is narrower and
+    // never grows past ~65% of the height, so it no longer shoots up the screen.
+    val maxContentHeight = (config.screenHeightDp * 0.65f).dp
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetMaxWidth = if (landscape) 560.dp else 640.dp,
+    ) {
         AnimatedContent(
             targetState = page,
             transitionSpec = {
                 val forward = targetState != OptionsPage.Main
-                (slideInHorizontally(tween(240)) { if (forward) it / 5 else -it / 5 } + fadeIn(tween(200)))
-                    .togetherWith(slideOutHorizontally(tween(200)) { if (forward) -it / 5 else it / 5 } + fadeOut(tween(120)))
-                    .using(SizeTransform(clip = false))
+                (slideInHorizontally(tween(170)) { if (forward) it / 8 else -it / 8 } + fadeIn(tween(150)))
+                    .togetherWith(slideOutHorizontally(tween(130)) { if (forward) -it / 8 else it / 8 } + fadeOut(tween(90)))
+                    .using(SizeTransform(clip = false) { _, _ -> tween(170) })
             },
             label = "optionsPage",
         ) { current ->
             Column(
-                Modifier.navigationBarsPadding().verticalScroll(rememberScrollState()).padding(bottom = Spacing.md),
+                Modifier
+                    .navigationBarsPadding()
+                    .then(if (landscape) Modifier.heightIn(max = maxContentHeight) else Modifier)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = Spacing.md),
             ) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
                     if (current != OptionsPage.Main) {
@@ -137,19 +151,47 @@ private fun MainPage(state: PlayerUiState, onOpen: (OptionsPage) -> Unit) {
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun SpeedPage(state: PlayerUiState, controller: PlayerController) {
-    Column(Modifier.padding(horizontal = Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        androidx.compose.foundation.layout.FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-        ) {
-            speeds.forEach { value ->
-                FilterChip(
-                    selected = state.speed == value,
-                    onClick = { controller.setSpeed(value) },
-                    label = { Text(if (value == 1f) stringResource(R.string.player_speed_normal) else "${fmt(value)}x") },
-                )
+    val config = androidx.compose.ui.platform.LocalConfiguration.current
+    if (config.screenWidthDp > config.screenHeightDp) {
+        // Landscape: presets on the left, sliders on the right, so the page is half as tall.
+        Row(Modifier.padding(horizontal = Spacing.lg), horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SpeedChips(state, controller)
+                SpeedExtras(state, controller)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SpeedSliders(state, controller)
             }
         }
+        return
+    }
+    Column(Modifier.padding(horizontal = Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        SpeedChips(state, controller)
+        SpeedSliders(state, controller)
+        SpeedExtras(state, controller)
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun SpeedChips(state: PlayerUiState, controller: PlayerController) {
+    androidx.compose.foundation.layout.FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        speeds.forEach { value ->
+            FilterChip(
+                selected = state.speed == value,
+                onClick = { controller.setSpeed(value) },
+                label = { Text(if (value == 1f) stringResource(R.string.player_speed_normal) else "${fmt(value)}x") },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SpeedSliders(state: PlayerUiState, controller: PlayerController) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         TuningSlider(stringResource(R.string.player_speed), state.speed, 0.25f..3f, controller::setSpeed)
         Row(
             Modifier.fillMaxWidth().clickable { controller.setLinkPitch(!state.linkPitch) },
@@ -161,15 +203,19 @@ private fun SpeedPage(state: PlayerUiState, controller: PlayerController) {
         if (!state.linkPitch) {
             TuningSlider(stringResource(R.string.player_pitch), state.pitch, 0.5f..2f, controller::setPitch)
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            FilterChip(
-                selected = state.tuningRemembered,
-                onClick = { controller.setRememberTuning(!state.tuningRemembered) },
-                label = { Text(stringResource(R.string.player_tuning_remember)) },
-            )
-            OutlinedButton(onClick = { controller.setLinkPitch(false); controller.setSpeed(1f); controller.setPitch(1f) }) {
-                Text(stringResource(R.string.player_tuning_reset))
-            }
+    }
+}
+
+@Composable
+private fun SpeedExtras(state: PlayerUiState, controller: PlayerController) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        FilterChip(
+            selected = state.tuningRemembered,
+            onClick = { controller.setRememberTuning(!state.tuningRemembered) },
+            label = { Text(stringResource(R.string.player_tuning_remember)) },
+        )
+        OutlinedButton(onClick = { controller.setLinkPitch(false); controller.setSpeed(1f); controller.setPitch(1f) }) {
+            Text(stringResource(R.string.player_tuning_reset))
         }
     }
 }
@@ -249,7 +295,7 @@ private fun TuningSlider(label: String, value: Float, range: ClosedFloatingPoint
         }
         Slider(
             value = value,
-            onValueChange = { onChange((it * 20f).roundToInt() / 20f) },
+            onValueChange = { onChange((it * 100f).roundToInt() / 100f) },
             valueRange = range,
         )
     }

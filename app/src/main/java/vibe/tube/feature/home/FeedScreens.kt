@@ -2,12 +2,14 @@ package vibe.tube.feature.home
 
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.ui.layout.layout
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -76,6 +78,32 @@ fun HomeScreen(
     val density = androidx.compose.ui.platform.LocalDensity.current
     val statusTop = androidx.compose.foundation.layout.WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val surface = MaterialTheme.colorScheme.surface
+    // The heading is an overlay that follows the scroll like YouTube's: it leaves with the feed (fading as it goes), and
+    // reappears as soon as the user scrolls back down, wherever they are in the list.
+    var headerHeightPx by remember { androidx.compose.runtime.mutableIntStateOf(with(density) { (statusTop + 64.dp).roundToPx() }) }
+    var headerOffset by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    val headerNested = remember(gridState) {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(available: androidx.compose.ui.geometry.Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): androidx.compose.ui.geometry.Offset {
+                val h = headerHeightPx.toFloat()
+                if (h <= 0f) return androidx.compose.ui.geometry.Offset.Zero
+                val atTop = gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
+                headerOffset = if (atTop && available.y > 0f) 0f else (headerOffset + available.y).coerceIn(-h, 0f)
+                return androidx.compose.ui.geometry.Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: androidx.compose.ui.unit.Velocity, available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                // Never rest half-way: settle fully shown or fully hidden.
+                val h = headerHeightPx.toFloat()
+                val target = if (headerOffset < -h / 2f) -h else 0f
+                if (headerOffset != target && headerOffset != 0f && headerOffset != -h) {
+                    androidx.compose.animation.core.animate(headerOffset, target, animationSpec = androidx.compose.animation.core.tween(180)) { v, _ -> headerOffset = v }
+                }
+                return androidx.compose.ui.unit.Velocity.Zero
+            }
+        }
+    }
+    val headerHeightDp = with(density) { headerHeightPx.toDp() }
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
         FeedContent(
             state = state,
@@ -83,71 +111,79 @@ fun HomeScreen(
             onRefresh = viewModel::refresh,
             onLoadMore = viewModel::loadMore,
             onLogin = onLogin,
+            modifier = Modifier.nestedScroll(headerNested),
             gridState = gridState,
-            contentPadding = PaddingValues(top = 0.dp, bottom = contentPadding.calculateBottomPadding()),
-            indicatorTopPadding = statusTop,
+            contentPadding = PaddingValues(top = headerHeightDp, bottom = contentPadding.calculateBottomPadding()),
             guestBanner = false,
-            header = {
-                item(key = "home-header", span = { GridItemSpan(maxLineSpan) }, contentType = "home-header") {
-                    // The heading is part of the feed: it scrolls away with it and fades as the first video arrives, with
-                    // no bar or divider in between.
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                val h = size.height.coerceAtLeast(1f)
-                                alpha = if (gridState.firstVisibleItemIndex > 0) 0f
-                                else (1f - gridState.firstVisibleItemScrollOffset / (h * 0.8f)).coerceIn(0f, 1f)
-                            }
-                            .layout { measurable, constraints ->
-                                // The row keeps its own 8dp end margin (the feed gutter is 16dp).
-                                val extra = (Spacing.gutter - Spacing.sm).roundToPx()
-                                val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + extra, minWidth = constraints.maxWidth + extra))
-                                layout(constraints.maxWidth, placeable.height) { placeable.place(0, 0) }
-                            }
-                            .padding(top = (statusTop - Spacing.sm).coerceAtLeast(0.dp)),
-                    ) {
-                        SearchHeaderRow(
-                            title = stringResource(R.string.app_name),
-                            onSearch = onSearch,
-                            modifier = Modifier.fillMaxWidth().padding(end = Spacing.sm, top = Spacing.xs, bottom = Spacing.sm),
-                            visibilityScope = visibilityScope,
-                            intro = true,
-                        ) {
-                            if (auth is AuthState.Guest) {
-                                TooltipIconButton(VIcon.Person, stringResource(R.string.action_sign_in), onLogin)
-                            } else {
-                                // Signed in: the account photo takes the place of the person icon.
-                                Box(
-                                    Modifier
-                                        .size(48.dp)
-                                        .clip(androidx.compose.foundation.shape.CircleShape)
-                                        .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = stringResource(R.string.nav_account), onClick = onAccount),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    if (avatarUrl != null) {
-                                        Avatar(avatarUrl, 36.dp, description = stringResource(R.string.nav_account))
-                                    } else {
-                                        VIconImage(VIcon.Person, stringResource(R.string.nav_account))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
         ) { item, queue -> FeedItemContent(item, queue) }
-        // Content slides under the status bar: a soft fade keeps the clock and icons readable instead of a hard bar.
+        // Status-bar scrim: appears exactly as the heading leaves, so the clock and icons stay readable over the feed.
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(statusTop + 28.dp)
-                .graphicsLayer {
-                    alpha = if (gridState.firstVisibleItemIndex > 0) 1f
-                    else (gridState.firstVisibleItemScrollOffset / with(density) { 40.dp.toPx() }).coerceIn(0f, 1f)
-                }
-                .background(androidx.compose.ui.graphics.Brush.verticalGradient(0f to surface, (statusTop.value / (statusTop.value + 28f)).coerceIn(0f, 1f) to surface, 1f to Color.Transparent)),
+                .height(statusTop + 14.dp)
+                .graphicsLayer { alpha = (-headerOffset / headerHeightPx.coerceAtLeast(1)).coerceIn(0f, 1f) }
+                .drawBehind {
+                    drawRect(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            0f to surface,
+                            (statusTop.toPx() / size.height).coerceIn(0f, 1f) to surface,
+                            1f to Color.Transparent,
+                        ),
+                    )
+                },
         )
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .onSizeChanged { if (it.height > 0) headerHeightPx = it.height }
+                .graphicsLayer {
+                    translationY = headerOffset
+                    alpha = (1f + headerOffset / headerHeightPx.coerceAtLeast(1)).coerceIn(0f, 1f)
+                }
+                .drawBehind {
+                    // Solid behind the heading, melting into the feed below it: no bar edge, no divider.
+                    val tail = 14.dp.toPx()
+                    val total = size.height + tail
+                    drawRect(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(
+                            0f to surface,
+                            (size.height / total) to surface,
+                            1f to Color.Transparent,
+                            startY = 0f,
+                            endY = total,
+                        ),
+                        size = androidx.compose.ui.geometry.Size(size.width, total),
+                    )
+                }
+                .padding(top = statusTop),
+        ) {
+            SearchHeaderRow(
+                title = stringResource(R.string.app_name),
+                onSearch = onSearch,
+                modifier = Modifier.fillMaxWidth().padding(start = Spacing.lg, end = Spacing.sm, top = Spacing.xs, bottom = Spacing.sm),
+                visibilityScope = visibilityScope,
+                intro = true,
+            ) {
+                if (auth is AuthState.Guest) {
+                    TooltipIconButton(VIcon.Person, stringResource(R.string.action_sign_in), onLogin)
+                } else {
+                    // Signed in: the account photo takes the place of the person icon.
+                    Box(
+                        Modifier
+                            .size(48.dp)
+                            .clip(androidx.compose.foundation.shape.CircleShape)
+                            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClickLabel = stringResource(R.string.nav_account), onClick = onAccount),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (avatarUrl != null) {
+                            Avatar(avatarUrl, 36.dp, description = stringResource(R.string.nav_account))
+                        } else {
+                            VIconImage(VIcon.Person, stringResource(R.string.nav_account))
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
