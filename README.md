@@ -8,7 +8,7 @@ YouTube client cho Android với giao diện Material 3, không quảng cáo, ph
 - Tuỳ biến giao diện
 - Bình luận, trả lời bình luận, dịch bình luận
 - Đồng bộ lịch sử xem, playlist, kênh đăng kí với tài khoản Youtube
-- Nhận thông báo từ kênh đằng kí
+- Nhận thông báo từ kênh đăng kí
 - Shorts
 - Tải xuống video/âm thanh
 - Phụ đề / Luồng âm thanh / Truyền phát màn hình
