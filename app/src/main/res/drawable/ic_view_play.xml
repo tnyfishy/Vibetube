@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Exact Material Symbols geometry from the Google Fonts URL supplied by the user. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="22dp" android:height="28dp" android:viewportWidth="22" android:viewportHeight="28">
+<group android:translateX="-16" android:translateY="-9.85">
+<path android:fillColor="@android:color/white" android:pathData="M16,37.85v-28l22,14l-22,14Zm3,-14Zm0,8.55L32.45,23.85L19,15.3V32.4Z"/>
+</group>
+</vector>

@@ -1,0 +1,31 @@
+# Hand-written baseline profile (no device available to record one): pre-compile the hot Compose, Media3 and app
+# paths. Only release builds use it. Replace with a recorded profile (Macrobenchmark) for the best result.
+HSPLandroidx/compose/runtime/**;->**(**)**
+HSPLandroidx/compose/ui/**;->**(**)**
+HSPLandroidx/compose/foundation/**;->**(**)**
+HSPLandroidx/compose/animation/**;->**(**)**
+HSPLandroidx/compose/material3/**;->**(**)**
+HSPLandroidx/lifecycle/**;->**(**)**
+HSPLandroidx/navigation/**;->**(**)**
+HSPLcoil3/**;->**(**)**
+HSPLvibe/tube/**;->**(**)**
+Landroidx/compose/runtime/**;
+Landroidx/compose/ui/**;
+Landroidx/compose/foundation/**;
+Landroidx/compose/animation/**;
+Landroidx/compose/material3/**;
+Lvibe/tube/**;
+HSPLandroidx/media3/**;->**(**)**
+HSPLandroidx/room/**;->**(**)**
+HSPLandroidx/datastore/**;->**(**)**
+HSPLkotlinx/coroutines/**;->**(**)**
+HSPLkotlinx/serialization/**;->**(**)**
+HSPLokhttp3/**;->**(**)**
+HSPLokio/**;->**(**)**
+Landroidx/media3/**;
+Landroidx/room/**;
+Landroidx/datastore/**;
+Lkotlinx/coroutines/**;
+Lkotlinx/serialization/**;
+Lokhttp3/**;
+Lokio/**;

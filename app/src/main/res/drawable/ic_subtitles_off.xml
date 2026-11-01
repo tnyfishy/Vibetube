@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Google Material Symbols Rounded, exact user-specified opsz24 wght400 GRAD0 ROND50. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+<path android:fillColor="@android:color/white" android:pathData="M4  20Q3.18  20  2.59  19.41T2  18V6Q2  5.18  2.59  4.59T4  4L6  6H4V18H15.15l-2  -2H7Q6.58  16  6.29  15.71T6  15T6.29  14.29T7  14h4.15L1.35  4.15Q1.08  3.88  1.06  3.46T1.35  2.75Q1.63  2.47  2.05  2.47t0.7  0.28l18.5  18.5q0.28  0.27  0.29  0.69t-0.29  0.71q-0.27  0.28  -0.7  0.28t-0.7  -0.28L17.15  20H4ZM22  6V16.75q0  0.5  -0.31  0.75T21  17.75q-0.42  0  -0.71  -0.3T20  16.73V6H9.28Q8.78  6  8.53  5.69T8.28  5q0  -0.43  0.29  -0.71T9.28  4H20q0.83  0  1.41  0.59Q22  5.18  22  6Zm-5  6H15.28q-0.5  0  -0.75  -0.31T14.28  11q0  -0.38  0.25  -0.69T15.28  10H17q0.43  0  0.71  0.29T18  11t-0.29  0.71T17  12ZM14.43  11.58ZM9.58  12.43ZM6.29  11.71Q6  11.43  6  11T6.29  10.29T7  10t0.71  0.29T8  11T7.71  11.71T7  12Q6.58  12  6.29  11.71Z"/>
+</vector>

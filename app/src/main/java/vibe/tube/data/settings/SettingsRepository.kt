@@ -1,0 +1,204 @@
+package vibe.tube.data.settings
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+
+class SettingsRepository(
+    private val store: DataStore<Preferences>,
+    scope: CoroutineScope,
+    private val context: Context? = null,
+) {
+    val settings: Flow<AppSettings> = store.data.map { it.toSettings() }.distinctUntilChanged()
+
+    val latest: StateFlow<AppSettings> = settings.stateIn(scope, SharingStarted.Eagerly, AppSettings())
+
+    suspend fun prime(): AppSettings = settings.first().also { }
+
+    suspend fun update(transform: (AppSettings) -> AppSettings) {
+        store.edit { prefs ->
+            val old = prefs.toSettings()
+            val changed = transform(old)
+            val next = when {
+                changed.privateMode && !old.privateMode -> changed.copy(saveLocalHistory = false)
+                changed.saveLocalHistory && !old.saveLocalHistory -> changed.copy(privateMode = false)
+                changed.privateMode -> changed.copy(saveLocalHistory = false)
+                else -> changed
+            }
+            prefs.write(next)
+            context?.let { writeBootMirror(it, next) }
+        }
+    }
+
+    private fun Preferences.toSettings(): AppSettings {
+        val d = AppSettings()
+        return AppSettings(
+            themeMode = enumOr(this[THEME], d.themeMode),
+            dynamicColor = this[DYNAMIC] ?: d.dynamicColor,
+            palette = enumOr(this[PALETTE], d.palette),
+            font = enumOr(this[FONT], d.font),
+            fontWeightOffset = this[FONT_WEIGHT] ?: d.fontWeightOffset,
+            fontWidth = this[FONT_WIDTH] ?: d.fontWidth,
+            fontRoundness = this[FONT_ROUND] ?: d.fontRoundness,
+            fontSlant = this[FONT_SLANT] ?: d.fontSlant,
+            displayScale = this[DISPLAY_SCALE] ?: d.displayScale,
+            textScale = this[TEXT_SCALE] ?: d.textScale,
+            uiLanguage = this[UI_LANG] ?: d.uiLanguage,
+            contentLanguage = this[CONTENT_LANG] ?: d.contentLanguage,
+            contentRegion = this[CONTENT_REGION] ?: d.contentRegion,
+            wifiQuality = enumOr(this[WIFI_Q], d.wifiQuality),
+            mobileQuality = enumOr(this[MOBILE_Q], d.mobileQuality),
+            shortsWifiQuality = enumOr(this[SHORTS_WIFI_Q], d.shortsWifiQuality),
+            shortsMobileQuality = enumOr(this[SHORTS_MOBILE_Q], d.shortsMobileQuality),
+            voiceStabilization = this[VOICE_STABILIZATION] ?: d.voiceStabilization,
+            ambientFullscreen = this[AMBIENT_FULLSCREEN] ?: true,
+            audioQuality = enumOr(this[AUDIO_Q], d.audioQuality),
+            thumbnailQuality = enumOr(this[THUMB_Q], d.thumbnailQuality),
+            autoplay = this[AUTOPLAY] ?: d.autoplay,
+            autoplayOnHeadphones = this[AUTOPLAY_HEADPHONES] ?: d.autoplayOnHeadphones,
+            fullscreenGestures = this[FS_GESTURES] ?: d.fullscreenGestures,
+            fullscreenSwipeToggle = this[FS_SWIPE_TOGGLE] ?: d.fullscreenSwipeToggle,
+            navHideLabels = this[NAV_HIDE_LABELS] ?: d.navHideLabels,
+            navBarHeight = (this[NAV_HEIGHT] ?: d.navBarHeight).coerceIn(AppSettings.NAV_HEIGHT_RANGE),
+            navIconSize = (this[NAV_ICON] ?: d.navIconSize).coerceIn(AppSettings.NAV_ICON_RANGE),
+            navFloating = this[NAV_FLOATING] ?: d.navFloating,
+            navBlur = this[NAV_BLUR] ?: d.navBlur,
+            backgroundPlayback = this[BACKGROUND] ?: d.backgroundPlayback,
+            seekSeconds = this[SEEK_SECONDS] ?: d.seekSeconds,
+            pictureInPicture = this[PIP] ?: d.pictureInPicture,
+            subtitlesEnabled = this[SUBS] ?: d.subtitlesEnabled,
+            subtitleLanguage = this[SUB_LANG] ?: d.subtitleLanguage,
+            subtitleSize = this[SUB_SIZE] ?: d.subtitleSize,
+            subtitleColor = enumOr(this[SUB_COLOR], d.subtitleColor),
+            subtitleBackground = enumOr(this[SUB_BG], d.subtitleBackground),
+            saveLocalHistory = (this[LOCAL_HISTORY] ?: d.saveLocalHistory) && !(this[PRIVATE] ?: d.privateMode),
+            privateMode = this[PRIVATE] ?: d.privateMode,
+            hideShorts = this[HIDE_SHORTS] ?: d.hideShorts,
+            notifyNewVideos = this[NOTIFY_NEW_VIDEOS] ?: d.notifyNewVideos,
+            downloadDir = this[DOWNLOAD_DIR] ?: d.downloadDir,
+            hiddenChannels = this[HIDDEN_CHANNELS] ?: d.hiddenChannels,
+        )
+    }
+
+    private fun androidx.datastore.preferences.core.MutablePreferences.write(s: AppSettings) {
+        this[THEME] = s.themeMode.name
+        this[DYNAMIC] = s.dynamicColor
+        this[PALETTE] = s.palette.name
+        this[FONT] = s.font.name
+        this[FONT_WEIGHT] = s.fontWeightOffset
+        this[FONT_WIDTH] = s.fontWidth
+        this[FONT_ROUND] = s.fontRoundness
+        this[FONT_SLANT] = s.fontSlant
+        this[DISPLAY_SCALE] = s.displayScale
+        this[TEXT_SCALE] = s.textScale
+        this[UI_LANG] = s.uiLanguage
+        this[CONTENT_LANG] = s.contentLanguage
+        this[CONTENT_REGION] = s.contentRegion
+        this[WIFI_Q] = s.wifiQuality.name
+        this[MOBILE_Q] = s.mobileQuality.name
+        this[SHORTS_WIFI_Q] = s.shortsWifiQuality.name
+        this[SHORTS_MOBILE_Q] = s.shortsMobileQuality.name
+        this[VOICE_STABILIZATION] = s.voiceStabilization
+        this[AMBIENT_FULLSCREEN] = s.ambientFullscreen
+        this[AUDIO_Q] = s.audioQuality.name
+        this[THUMB_Q] = s.thumbnailQuality.name
+        this[AUTOPLAY] = s.autoplay
+        this[AUTOPLAY_HEADPHONES] = s.autoplayOnHeadphones
+        
+        this[FS_GESTURES] = s.fullscreenGestures
+        this[FS_SWIPE_TOGGLE] = s.fullscreenSwipeToggle
+        this[NAV_HIDE_LABELS] = s.navHideLabels
+        this[NAV_HEIGHT] = s.navBarHeight
+        this[NAV_ICON] = s.navIconSize
+        this[NAV_FLOATING] = s.navFloating
+        this[NAV_BLUR] = s.navBlur
+        this[BACKGROUND] = s.backgroundPlayback
+        this[SEEK_SECONDS] = s.seekSeconds
+        this[PIP] = s.pictureInPicture
+        this[SUBS] = s.subtitlesEnabled
+        this[SUB_LANG] = s.subtitleLanguage
+        this[SUB_SIZE] = s.subtitleSize
+        this[SUB_COLOR] = s.subtitleColor.name
+        this[SUB_BG] = s.subtitleBackground.name
+        this[LOCAL_HISTORY] = s.saveLocalHistory
+        this[PRIVATE] = s.privateMode
+        this[HIDE_SHORTS] = s.hideShorts
+        this[NOTIFY_NEW_VIDEOS] = s.notifyNewVideos
+        this[DOWNLOAD_DIR] = s.downloadDir
+        this[HIDDEN_CHANNELS] = s.hiddenChannels
+    }
+
+    private inline fun <reified E : Enum<E>> enumOr(name: String?, default: E): E =
+        name?.let { n -> enumValues<E>().firstOrNull { it.name == n } } ?: default
+
+    companion object {
+        private val THEME = stringPreferencesKey("theme_mode")
+        private val DYNAMIC = booleanPreferencesKey("dynamic_color")
+        private val PALETTE = stringPreferencesKey("palette")
+        private val FONT = stringPreferencesKey("font_family_v2")
+        private val FONT_WEIGHT = intPreferencesKey("font_weight_offset")
+        private val FONT_WIDTH = intPreferencesKey("font_width")
+        private val FONT_ROUND = intPreferencesKey("font_roundness")
+        private val FONT_SLANT = intPreferencesKey("font_slant")
+        private val DISPLAY_SCALE = intPreferencesKey("display_scale")
+        private val TEXT_SCALE = intPreferencesKey("text_scale")
+        private val UI_LANG = stringPreferencesKey("ui_language")
+        private val CONTENT_LANG = stringPreferencesKey("content_language")
+        private val CONTENT_REGION = stringPreferencesKey("content_region")
+        private val WIFI_Q = stringPreferencesKey("wifi_quality")
+        private val MOBILE_Q = stringPreferencesKey("mobile_quality")
+        private val SHORTS_WIFI_Q = stringPreferencesKey("shorts_wifi_quality")
+        private val SHORTS_MOBILE_Q = stringPreferencesKey("shorts_mobile_quality")
+        private val VOICE_STABILIZATION = booleanPreferencesKey("voice_stabilization")
+        private val AUDIO_Q = stringPreferencesKey("audio_quality")
+        private val THUMB_Q = stringPreferencesKey("thumbnail_quality")
+        private val AUTOPLAY = booleanPreferencesKey("autoplay")
+        private val AUTOPLAY_HEADPHONES = booleanPreferencesKey("autoplay_headphones")
+        private val AMBIENT_FULLSCREEN = booleanPreferencesKey("ambient_fullscreen_v1")
+        private val FS_GESTURES = booleanPreferencesKey("fullscreen_gestures")
+        private val FS_SWIPE_TOGGLE = booleanPreferencesKey("fullscreen_swipe_toggle")
+        private val NAV_HIDE_LABELS = booleanPreferencesKey("nav_hide_labels")
+        private val NAV_HEIGHT = intPreferencesKey("nav_bar_height")
+        private val NAV_ICON = intPreferencesKey("nav_icon_size")
+        private val NAV_FLOATING = booleanPreferencesKey("nav_floating")
+        private val NAV_BLUR = booleanPreferencesKey("nav_blur")
+        private val BACKGROUND = booleanPreferencesKey("background_playback")
+        private val SEEK_SECONDS = intPreferencesKey("seek_seconds")
+        private val PIP = booleanPreferencesKey("pip")
+        private val SUBS = booleanPreferencesKey("subtitles_v2")
+        private val SUB_LANG = stringPreferencesKey("subtitle_language")
+        private val SUB_SIZE = intPreferencesKey("subtitle_size")
+        private val SUB_COLOR = stringPreferencesKey("subtitle_color")
+        private val SUB_BG = stringPreferencesKey("subtitle_background")
+        private val LOCAL_HISTORY = booleanPreferencesKey("local_history")
+        private val PRIVATE = booleanPreferencesKey("private_mode")
+        private val HIDE_SHORTS = booleanPreferencesKey("hide_shorts_v2")
+        private val NOTIFY_NEW_VIDEOS = booleanPreferencesKey("notify_new_videos")
+        private val DOWNLOAD_DIR = stringPreferencesKey("download_dir")
+        private val HIDDEN_CHANNELS = stringSetPreferencesKey("hidden_channels")
+
+        private const val BOOT_PREFS = "boot_theme"
+
+        fun readBootTheme(context: Context): ThemeMode {
+            val name = context.getSharedPreferences(BOOT_PREFS, Context.MODE_PRIVATE).getString("mode", null)
+            return ThemeMode.entries.firstOrNull { it.name == name } ?: ThemeMode.System
+        }
+
+        private fun writeBootMirror(context: Context, s: AppSettings) {
+            context.getSharedPreferences(BOOT_PREFS, Context.MODE_PRIVATE).edit().putString("mode", s.themeMode.name).apply()
+        }
+    }
+}

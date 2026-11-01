@@ -1,0 +1,129 @@
+package vibe.tube.ui
+
+import androidx.annotation.DrawableRes
+import vibe.tube.R
+
+object VIcon {
+    @DrawableRes val Cast = R.drawable.ic_cast
+    @DrawableRes val Facebook = R.drawable.ic_facebook
+    @DrawableRes val Telegram = R.drawable.ic_telegram
+    @DrawableRes val Github = R.drawable.ic_github
+    @DrawableRes val KeyboardControlKey: Int = R.drawable.ic_keyboard_control_key
+    @DrawableRes val ChevronRight: Int = R.drawable.ic_chevron_right
+    @DrawableRes val ViewPlay: Int = R.drawable.ic_view_play
+    @DrawableRes val PersonRemove: Int = R.drawable.ic_person_remove
+    @DrawableRes val HeartSmile: Int = R.drawable.ic_heart_smile
+    @DrawableRes val SubtitlesOff: Int = R.drawable.ic_subtitles_off
+    @DrawableRes val Subtitles: Int = R.drawable.ic_subtitles
+    @DrawableRes val FullscreenExit: Int = R.drawable.ic_fullscreen_exit
+    @DrawableRes val Reply: Int = R.drawable.ic_reply
+    @DrawableRes val FastForward: Int = R.drawable.ic_fast_forward
+    @DrawableRes val FastRewind: Int = R.drawable.ic_fast_rewind
+    @DrawableRes val Bedtime: Int = R.drawable.ic_bedtime
+    @DrawableRes val Speed: Int = R.drawable.ic_speed
+    @DrawableRes val Check: Int = R.drawable.ic_check
+    @DrawableRes val GraphicEq: Int = R.drawable.ic_graphic_eq
+    @DrawableRes val AccountCircle: Int = R.drawable.ic_account_circle
+    @DrawableRes val AccountCircleFilled: Int = R.drawable.ic_account_circle_filled
+    @DrawableRes val Add: Int = R.drawable.ic_add
+    @DrawableRes val ArrowBack: Int = R.drawable.ic_arrow_back
+    @DrawableRes val ArrowForward: Int = R.drawable.ic_arrow_forward
+    @DrawableRes val Cached: Int = R.drawable.ic_cached
+    @DrawableRes val Close: Int = R.drawable.ic_close
+    @DrawableRes val ClosedCaptionFilled: Int = R.drawable.ic_closed_caption_filled
+    @DrawableRes val VolumeOff: Int = R.drawable.ic_volume_off
+    @DrawableRes val ClosedCaption: Int = R.drawable.ic_closed_caption
+    @DrawableRes val CloudOff: Int = R.drawable.ic_cloud_off
+    @DrawableRes val Delete: Int = R.drawable.ic_delete
+    @DrawableRes val DeleteSweep: Int = R.drawable.ic_delete_sweep
+    @DrawableRes val Download: Int = R.drawable.ic_download
+    @DrawableRes val Edit: Int = R.drawable.ic_edit
+    @DrawableRes val Error: Int = R.drawable.ic_error
+    @DrawableRes val ExpandMore: Int = R.drawable.ic_expand_more
+    @DrawableRes val Fullscreen: Int = R.drawable.ic_fullscreen
+    @DrawableRes val HighQuality: Int = R.drawable.ic_high_quality
+    @DrawableRes val History: Int = R.drawable.ic_history
+    @DrawableRes val Home: Int = R.drawable.ic_home
+    @DrawableRes val HomeFilled: Int = R.drawable.ic_home_filled
+    @DrawableRes val Info: Int = R.drawable.ic_info
+    @DrawableRes val KeyboardArrowDown: Int = R.drawable.ic_keyboard_arrow_down
+    @DrawableRes val Language: Int = R.drawable.ic_language
+    @DrawableRes val LightMode: Int = R.drawable.ic_light_mode
+    @DrawableRes val Lock: Int = R.drawable.ic_lock
+    @DrawableRes val VolumeUp: Int = R.drawable.ic_volume_up
+    @DrawableRes val TextFields: Int = R.drawable.ic_text_fields
+    @DrawableRes val Shorts: Int = R.drawable.ic_shorts
+    @DrawableRes val ShortsFilled: Int = R.drawable.ic_shorts_filled
+    @DrawableRes val Login: Int = R.drawable.ic_login
+    @DrawableRes val Logout: Int = R.drawable.ic_logout
+    @DrawableRes val Lyrics: Int = R.drawable.ic_lyrics
+    @DrawableRes val MoreVert: Int = R.drawable.ic_more_vert
+    @DrawableRes val MusicNote: Int = R.drawable.ic_music_note
+    @DrawableRes val OpenInNew: Int = R.drawable.ic_open_in_new
+    @DrawableRes val Share: Int = R.drawable.ic_share
+    @DrawableRes val Comment: Int = R.drawable.ic_comment
+    @DrawableRes val Stop: Int = R.drawable.ic_stop
+    @DrawableRes val Palette: Int = R.drawable.ic_palette
+    @DrawableRes val Pause: Int = R.drawable.ic_pause
+    @DrawableRes val Person: Int = R.drawable.ic_person
+    @DrawableRes val PersonAdd: Int = R.drawable.ic_person_add
+    @DrawableRes val PictureInPicture: Int = R.drawable.ic_picture_in_picture
+    @DrawableRes val PlayArrowFilled: Int = R.drawable.ic_play_arrow_filled
+    @DrawableRes val PlaylistAdd: Int = R.drawable.ic_playlist_add
+    @DrawableRes val PlaylistPlay: Int = R.drawable.ic_playlist_play
+    @DrawableRes val PrivacyTip: Int = R.drawable.ic_privacy_tip
+    @DrawableRes val Public: Int = R.drawable.ic_public
+    @DrawableRes val Refresh: Int = R.drawable.ic_refresh
+    @DrawableRes val Schedule: Int = R.drawable.ic_schedule
+    @DrawableRes val Search: Int = R.drawable.ic_search
+    @DrawableRes val Settings: Int = R.drawable.ic_settings
+    @DrawableRes val Shield: Int = R.drawable.ic_shield
+    @DrawableRes val Shuffle: Int = R.drawable.ic_shuffle
+    @DrawableRes val SkipNext: Int = R.drawable.ic_skip_next
+    @DrawableRes val SkipPrevious: Int = R.drawable.ic_skip_previous
+    @DrawableRes val Sort: Int = R.drawable.ic_sort
+    @DrawableRes val Storage: Int = R.drawable.ic_storage
+    @DrawableRes val Subscriptions: Int = R.drawable.ic_subscriptions
+    @DrawableRes val SubscriptionsFilled: Int = R.drawable.ic_subscriptions_filled
+    @DrawableRes val ThumbUp: Int = R.drawable.ic_thumb_up
+    @DrawableRes val ThumbUpFilled: Int = R.drawable.ic_thumb_up_filled
+    @DrawableRes val Tune: Int = R.drawable.ic_tune
+    @DrawableRes val VerifiedFilled: Int = R.drawable.ic_verified_filled
+    @DrawableRes val ArtistBadge: Int = R.drawable.ic_artist_badge
+    @DrawableRes val VideoLibrary: Int = R.drawable.ic_video_library
+    @DrawableRes val VideoLibraryFilled: Int = R.drawable.ic_video_library_filled
+    @DrawableRes val VisibilityOff: Int = R.drawable.ic_visibility_off
+    @DrawableRes val WifiOff: Int = R.drawable.ic_wifi_off
+    @DrawableRes val ThumbDown: Int = R.drawable.ic_thumb_down
+    @DrawableRes val ThumbDownFilled: Int = R.drawable.ic_thumb_down_filled
+    @DrawableRes val Notifications: Int = R.drawable.ic_notifications
+    @DrawableRes val NotificationsFilled: Int = R.drawable.ic_notifications_filled
+    @DrawableRes val NotificationsActive: Int = R.drawable.ic_notifications_active
+    @DrawableRes val NotificationsOff: Int = R.drawable.ic_notifications_off
+    @DrawableRes val Translate: Int = R.drawable.ic_translate
+    @DrawableRes val ClosedCaptionOff: Int = R.drawable.ic_closed_caption_off
+    @DrawableRes val DarkMode: Int = R.drawable.ic_dark_mode
+    @DrawableRes val ArrowDropDown: Int = R.drawable.ic_arrow_drop_down
+    @DrawableRes val Equalizer: Int = R.drawable.ic_equalizer
+    @DrawableRes val CheckCircle: Int = R.drawable.ic_check_circle
+    @DrawableRes val WavingHand: Int = R.drawable.ic_waving_hand
+    @DrawableRes val Coffee: Int = R.drawable.ic_coffee
+    @DrawableRes val Visibility: Int = R.drawable.ic_visibility
+    @DrawableRes val ContentCopy: Int = R.drawable.ic_content_copy
+    @DrawableRes val Repeat: Int = R.drawable.ic_repeat
+    @DrawableRes val RepeatOne: Int = R.drawable.ic_repeat_one
+    @DrawableRes val Favorite: Int = R.drawable.ic_favorite
+
+    private val fillMorphTargets: Map<Int, Int> = mapOf(
+        AccountCircleFilled to R.drawable.ic_account_circle_filled_morph,
+        HomeFilled to R.drawable.ic_home_filled_morph,
+        NotificationsFilled to R.drawable.ic_notifications_filled_morph,
+        ClosedCaptionFilled to R.drawable.ic_closed_caption_filled_morph,
+        SubscriptionsFilled to R.drawable.ic_subscriptions_filled_morph,
+        ThumbDownFilled to R.drawable.ic_thumb_down_filled_morph,
+        ThumbUpFilled to R.drawable.ic_thumb_up_filled_morph,
+        VideoLibraryFilled to R.drawable.ic_video_library_filled_morph,
+    )
+
+    @DrawableRes fun fillMorphTarget(@DrawableRes filled: Int): Int? = fillMorphTargets[filled]
+}

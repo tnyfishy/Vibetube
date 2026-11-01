@@ -1,0 +1,372 @@
+package vibe.tube.ui.components
+
+import androidx.annotation.DrawableRes
+import vibe.tube.R
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import vibe.tube.ui.theme.LocalReducedMotion
+import vibe.tube.ui.theme.Sizing
+import vibe.tube.ui.theme.Spacing
+
+@Composable
+fun VIconImage(
+    @DrawableRes icon: Int,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    tint: Color = Color.Unspecified,
+) {
+    Icon(
+        painter = painterResource(icon),
+        contentDescription = contentDescription,
+        modifier = modifier,
+        tint = if (tint == Color.Unspecified) androidx.compose.material3.LocalContentColor.current else tint,
+    )
+}
+
+@Composable
+fun TooltipIconButton(
+    @DrawableRes icon: Int,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    tint: Color = Color.Unspecified,
+    animateIcon: Boolean = false,
+    iconSize: Dp = Sizing.iconMedium,
+    badge: (@Composable androidx.compose.foundation.layout.BoxScope.() -> Unit)? = null,
+) {
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = rememberTooltipState(),
+    ) {
+        IconButton(
+            onClick = onClick,
+            shapes = IconButtonDefaults.shapes(),
+            modifier = modifier.size(Sizing.minTouchTarget).pressScale(source, 0.88f),
+            interactionSource = source,
+            enabled = enabled,
+        ) {
+
+            val glyph = @Composable {
+                if (icon == vibe.tube.ui.VIcon.ClosedCaption || icon == vibe.tube.ui.VIcon.ClosedCaptionFilled) CaptionGlyph(icon == vibe.tube.ui.VIcon.ClosedCaptionFilled, label, Modifier.size(iconSize), tint)
+                else if (animateIcon) SwappingIcon(icon, label, Modifier.size(iconSize), tint = tint) else VIconImage(icon, label, Modifier.size(iconSize), tint = tint)
+            }
+            if (badge != null) androidx.compose.material3.BadgedBox(badge = badge) { glyph() } else glyph()
+        }
+    }
+}
+
+@Composable
+fun SwappingIcon(
+    @DrawableRes icon: Int,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    tint: Color = Color.Unspecified,
+) {
+    androidx.compose.animation.AnimatedContent(
+        targetState = icon,
+        transitionSpec = {
+            (androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(180, delayMillis = 60)) +
+                androidx.compose.animation.scaleIn(androidx.compose.animation.core.tween(220, delayMillis = 40), initialScale = 0.55f)) togetherWith
+                (androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(90)) +
+                    androidx.compose.animation.scaleOut(androidx.compose.animation.core.tween(120), targetScale = 0.55f))
+        },
+        label = "swappingIcon",
+    ) { current -> VIconImage(current, contentDescription, modifier, tint = tint) }
+}
+
+internal object MissingImages {
+    val urls: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+}
+
+@Composable
+fun RemoteImage(
+    url: String?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+) {
+    val context = LocalContext.current
+    val reduced = LocalReducedMotion.current
+    val request = remember(url, reduced) { ImageRequest.Builder(context).data(url).crossfade(!reduced).build() }
+    AsyncImage(model = request, contentDescription = contentDescription, modifier = modifier, contentScale = contentScale)
+}
+
+@Composable
+fun RemoteImage(
+    urls: List<String>,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+) {
+    val context = LocalContext.current
+    val reduced = LocalReducedMotion.current
+    val candidates = remember(urls) { urls.filterNot { it in MissingImages.urls }.ifEmpty { urls } }
+    var index by androidx.compose.runtime.remember(candidates) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val request = androidx.compose.runtime.remember(candidates, index, reduced) {
+        ImageRequest.Builder(context).data(candidates.getOrNull(index)).crossfade(if (reduced) 0 else 120).build()
+    }
+    AsyncImage(
+        model = request,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = contentScale,
+        onError = {
+            candidates.getOrNull(index)?.let { if (candidates.size > 1) MissingImages.urls.add(it) }
+            if (index < candidates.lastIndex) index++
+        },
+    )
+}
+
+fun upscaleAvatarUrl(url: String?, px: Int = 512): String? {
+    if (url == null) return null
+    val host = runCatching { android.net.Uri.parse(url).host }.getOrNull().orEmpty()
+    if (!(host.endsWith("googleusercontent.com") || host.endsWith("ggpht.com"))) return url
+    val sized = Regex("=s\\d+").replace(url, "=s$px")
+    if (sized != url) return sized
+    return Regex("=w\\d+-h\\d+").replace(url, "=w$px-h$px")
+}
+
+@Composable
+fun Avatar(url: String?, size: Dp, modifier: Modifier = Modifier, description: String? = null,
+    shape: androidx.compose.ui.graphics.Shape = CircleShape, channelId: String? = null) {
+    val context = LocalContext.current
+    val reduced = LocalReducedMotion.current
+    var fallback by androidx.compose.runtime.remember(channelId, url) { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    var failed by androidx.compose.runtime.remember(channelId, url) { androidx.compose.runtime.mutableStateOf(false) }
+    var attempt by androidx.compose.runtime.remember(channelId, url) { androidx.compose.runtime.mutableIntStateOf(0) }
+    val original = (fallback ?: url)?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+    val actual = if (attempt == 0) upscaleAvatarUrl(original, (size.value * 4).toInt().coerceIn(128, 800)) else original
+    androidx.compose.runtime.LaunchedEffect(channelId, url, failed) {
+        if (channelId != null && (original == null || failed)) {
+            val resolver = runCatching { dagger.hilt.android.EntryPointAccessors.fromApplication(context.applicationContext, AvatarDependencies::class.java).avatarResolver() }.getOrNull()
+            val resolved = resolver?.resolve(channelId)
+            if (resolved != null && resolved != original) { fallback = resolved; attempt = 0; failed = false }
+        }
+    }
+    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerHighest, modifier = modifier.size(size)) {
+        androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+            VIconImage(vibe.tube.ui.VIcon.AccountCircleFilled, description, Modifier.padding(size / 8), MaterialTheme.colorScheme.onSurfaceVariant)
+            if (actual != null && !failed) {
+                val request = androidx.compose.runtime.remember(actual, reduced, attempt) {
+                    ImageRequest.Builder(context).data(actual).crossfade(if (reduced) 0 else 120).build()
+                }
+                AsyncImage(model = request, contentDescription = description, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
+                    onSuccess = { failed = false }, onError = { if (attempt < 1) attempt++ else failed = true })
+            }
+        }
+    }
+}
+
+@Composable
+fun CenterLoading(modifier: Modifier = Modifier) {
+    androidx.compose.foundation.layout.Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        ContainedLoadingIndicator()
+    }
+}
+
+@Composable
+fun StateMessage(
+    @DrawableRes icon: Int,
+    title: String,
+    body: String?,
+    modifier: Modifier = Modifier,
+    primaryLabel: String? = null,
+    onPrimary: (() -> Unit)? = null,
+    secondaryLabel: String? = null,
+    onSecondary: (() -> Unit)? = null,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.xl, vertical = Spacing.xxl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(Spacing.md, Alignment.CenterVertically),
+    ) {
+        VIconImage(icon, null, Modifier.size(48.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        if (body != null) {
+            Text(
+                body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
+        if (primaryLabel != null && onPrimary != null) {
+            Spacer(Modifier.height(Spacing.xs))
+            Button(shapes = ButtonDefaults.shapes(), onClick = onPrimary) { Text(primaryLabel) }
+        }
+        if (secondaryLabel != null && onSecondary != null) {
+            FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = onSecondary) { Text(secondaryLabel) }
+        }
+    }
+}
+
+@Composable
+fun Banner(
+    text: String,
+    @DrawableRes icon: Int,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+    onDismiss: (() -> Unit)? = null,
+    container: Color = MaterialTheme.colorScheme.secondaryContainer,
+    content: Color = MaterialTheme.colorScheme.onSecondaryContainer,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .semantics(mergeDescendants = true) { },
+        color = container,
+        contentColor = content,
+        shape = MaterialTheme.shapes.large,
+    ) {
+        Row(
+            Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+        ) {
+            VIconImage(icon, null, Modifier.size(Sizing.iconMedium))
+            Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            if (actionLabel != null && onAction != null) {
+                androidx.compose.material3.TextButton(shapes = ButtonDefaults.shapes(), onClick = onAction) { Text(actionLabel) }
+            }
+            if (onDismiss != null) {
+                TooltipIconButton(vibe.tube.ui.VIcon.Close, androidx.compose.ui.res.stringResource(R.string.action_close), onDismiss)
+            }
+        }
+    }
+}
+
+
+@Composable
+fun ChannelMetaText(
+    channel: String?,
+    badge: vibe.tube.youtube.model.ChannelBadge,
+    rest: List<String?>,
+    modifier: Modifier = Modifier,
+    style: androidx.compose.ui.text.TextStyle = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+    color: Color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+    maxLines: Int = 2,
+    minLines: Int = 1,
+    viewCount: String? = null,
+) {
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val views = androidx.compose.runtime.remember(viewCount, locale) { vibe.tube.ui.metadata.compactViews(viewCount, locale) }
+    val hasBadge = badge != vibe.tube.youtube.model.ChannelBadge.None && !channel.isNullOrBlank()
+    val tail = rest.filterNotNull().filter { it.isNotBlank() }
+    val text = androidx.compose.ui.text.buildAnnotatedString {
+        var first = true
+        if (!channel.isNullOrBlank()) {
+            append(channel)
+            if (hasBadge) {
+                append(" ")
+                appendInlineContent("channelBadge", "✓")
+            }
+            first = false
+        }
+        if (views != null) {
+            if (!first) append(" · ")
+            appendInlineContent("viewIcon", "▶")
+            append(views)
+            first = false
+        }
+        tail.forEach {
+            if (!first) append(" · ")
+            append(it)
+            first = false
+        }
+    }
+    val size = style.fontSize.takeIf { it.isSpecified } ?: 12.sp
+    val inline = if (hasBadge) {
+        mapOf(
+            "channelBadge" to androidx.compose.foundation.text.InlineTextContent(
+                androidx.compose.ui.text.Placeholder(size * 1.15f, size * 1.15f, androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter),
+            ) {
+                VIconImage(
+                    if (badge == vibe.tube.youtube.model.ChannelBadge.Artist) vibe.tube.ui.VIcon.ArtistBadge else vibe.tube.ui.VIcon.VerifiedFilled,
+                    null,
+                    Modifier.fillMaxSize(),
+                    tint = color,
+                )
+            },
+        )
+    } else {
+        emptyMap()
+    }
+    val allInline = inline.toMutableMap()
+    if (views != null) allInline["viewIcon"] = androidx.compose.foundation.text.InlineTextContent(
+        androidx.compose.ui.text.Placeholder(size * 0.8f, size * 1.2f, androidx.compose.ui.text.PlaceholderVerticalAlign.TextCenter),
+    ) {
+        // Glyph's visible edge sits at the placeholder's start so it lines up with the channel name above.
+        androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+            VIconImage(vibe.tube.ui.VIcon.ViewPlay, null, Modifier.fillMaxHeight(0.7f / 1.2f).aspectRatio(22f / 28f), tint = color)
+        }
+    }
+    Text(text, modifier = modifier, style = style, color = color, minLines = minLines, maxLines = maxLines, overflow = TextOverflow.Ellipsis, inlineContent = allInline)
+}
+
+@Composable
+private fun CaptionGlyph(selected: Boolean, label: String, modifier: Modifier, tint: Color) {
+    val reduced = LocalReducedMotion.current
+    val fill = androidx.compose.animation.core.animateFloatAsState(if (selected) 1f else 0f,
+        androidx.compose.animation.core.tween(if (reduced) 0 else 230), label = "captionFill")
+    androidx.compose.foundation.layout.Box(modifier) {
+        VIconImage(vibe.tube.ui.VIcon.ClosedCaption, label, Modifier.fillMaxSize(), tint)
+        VIconImage(vibe.tube.ui.VIcon.ClosedCaptionFilled, null, Modifier.fillMaxSize().then(Modifier.drawWithContent {
+            clipRect(top = size.height * (1f - fill.value)) { this@drawWithContent.drawContent() }
+        }), tint)
+    }
+}

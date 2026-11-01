@@ -1,0 +1,602 @@
+package vibe.tube.feature.watch
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import vibe.tube.R
+import vibe.tube.player.PlayerController
+import vibe.tube.player.PlayerUiState
+import vibe.tube.ui.VIcon
+import vibe.tube.ui.components.ExpandingSection
+import vibe.tube.ui.components.TooltipIconButton
+import vibe.tube.ui.components.VIconImage
+import vibe.tube.ui.theme.Spacing
+import kotlin.math.roundToInt
+
+private val speeds = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f, 3f)
+private const val MAX_CUSTOM_SPEEDS = 5
+
+private fun sameSpeed(a: Float, b: Float) = kotlin.math.abs(a - b) < 0.005f
+private val sleepMinutes = listOf(5, 10, 15, 30, 45, 60)
+
+private enum class OptionsPage { Main, Speed, Quality, Captions, CaptionTranslate, CaptionStyle, Audio, Effects, Sleep, Loop }
+
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+fun PlayerOptionsSheet(state: PlayerUiState, controller: PlayerController, embedded: Boolean = false, onDismiss: () -> Unit) {
+    var page by remember { mutableStateOf(OptionsPage.Main) }
+    val config = androidx.compose.ui.platform.LocalConfiguration.current
+    val landscape = config.screenWidthDp > config.screenHeightDp
+    val maxContentHeight = (config.screenHeightDp * 0.65f).dp
+    val content: @Composable () -> Unit = {
+        androidx.activity.compose.BackHandler(embedded && page != OptionsPage.Main) { page = OptionsPage.Main }
+        AnimatedContent(
+            targetState = page,
+            transitionSpec = {
+                val forward = targetState != OptionsPage.Main
+                (slideInHorizontally(tween(170)) { if (forward) it / 8 else -it / 8 } + fadeIn(tween(150)))
+                    .togetherWith(slideOutHorizontally(tween(130)) { if (forward) -it / 8 else it / 8 } + fadeOut(tween(90)))
+                    .using(SizeTransform(clip = false) { _, _ -> tween(170) })
+            },
+            label = "optionsPage",
+        ) { current ->
+            Column(
+                Modifier
+                    .navigationBarsPadding()
+                    .then(if (landscape && !embedded) Modifier.heightIn(max = maxContentHeight) else Modifier)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = Spacing.md),
+            ) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                    if (current != OptionsPage.Main) {
+                        TooltipIconButton(VIcon.ArrowBack, stringResource(R.string.action_back), { page = OptionsPage.Main })
+                    } else {
+                        Spacer(Modifier.size(Spacing.md))
+                    }
+                    Text(
+                        when (current) {
+                            OptionsPage.Main -> stringResource(R.string.player_options)
+                            OptionsPage.Speed -> stringResource(R.string.player_speed)
+                            OptionsPage.Quality -> stringResource(R.string.player_quality)
+                            OptionsPage.Captions -> stringResource(R.string.player_captions)
+                            OptionsPage.CaptionTranslate -> stringResource(R.string.player_caption_translate)
+                            OptionsPage.CaptionStyle -> stringResource(R.string.player_caption_style)
+                            OptionsPage.Audio -> stringResource(R.string.player_audio_tracks)
+                            OptionsPage.Effects -> stringResource(R.string.player_audio_effects)
+                            OptionsPage.Sleep -> stringResource(R.string.player_sleep_timer)
+                            OptionsPage.Loop -> stringResource(R.string.player_repeat)
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (embedded) TooltipIconButton(VIcon.Close, stringResource(R.string.action_close), onDismiss)
+                }
+                when (current) {
+                    OptionsPage.Main -> MainPage(state, controller, onOpen = { page = it }, onLock = { controller.setScreenLocked(true); onDismiss() })
+                    OptionsPage.Speed -> SpeedPage(state, controller)
+                    OptionsPage.Quality -> QualityPage(state, controller, onDone = { page = OptionsPage.Main })
+                    OptionsPage.Captions -> CaptionsPage(state, controller, onDone = { page = OptionsPage.Main }, onOpen = { page = it })
+                    OptionsPage.CaptionTranslate -> CaptionTranslatePage(state, controller, onDone = { page = OptionsPage.Main })
+                    OptionsPage.CaptionStyle -> CaptionStylePage(controller)
+                    OptionsPage.Audio -> AudioPage(state, controller, onDone = { page = OptionsPage.Main })
+                    OptionsPage.Effects -> EffectsPage(state, controller)
+                    OptionsPage.Sleep -> SleepPage(state, controller, onDone = { page = OptionsPage.Main })
+                    OptionsPage.Loop -> LoopPage(state, controller)
+                }
+            }
+        }
+    }
+    if (embedded) content() else ModalBottomSheet(onDismissRequest = onDismiss,
+        sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetMaxWidth = if (landscape) 560.dp else 640.dp) {
+        ImmersiveDialogEffect(state.fullscreen)
+        content()
+    }
+
+}
+
+@Composable
+private fun MainPage(state: PlayerUiState, controller: PlayerController, onOpen: (OptionsPage) -> Unit, onLock: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
+        VIconImage(VIcon.GraphicEq, null, Modifier.padding(end = Spacing.md))
+        Text(stringResource(R.string.player_ambient), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Switch(checked = state.ambientFullscreen, onCheckedChange = controller::setAmbientFullscreen)
+    }
+    val speedText = if (state.speed == 1f && state.pitch == 1f) stringResource(R.string.player_speed_normal) else "${fmt(state.speed)}x"
+    OptionRow(VIcon.Speed, stringResource(R.string.player_speed), speedText) { onOpen(OptionsPage.Speed) }
+    
+    ExpandingSection(visible = state.qualities.isNotEmpty()) {
+        val q = state.selectedHeight?.let { "${it}p" } ?: if (state.activeHeight != null) stringResource(R.string.quality_auto_active, state.activeHeight) else stringResource(R.string.quality_auto)
+        OptionRow(VIcon.HighQuality, stringResource(R.string.player_quality), q) { onOpen(OptionsPage.Quality) }
+    }
+    ExpandingSection(visible = state.captions.isNotEmpty()) {
+        val c = state.captions.firstOrNull { it.id == state.selectedCaption }?.name ?: stringResource(R.string.player_captions_off)
+        OptionRow(VIcon.ClosedCaption, stringResource(R.string.player_captions), c) { onOpen(OptionsPage.Captions) }
+    }
+    ExpandingSection(visible = state.audioTracks.size > 1) {
+        val a = state.audioTracks.firstOrNull { it.id == state.selectedAudioTrack || (state.selectedAudioTrack == null && it.isDefault) }?.name.orEmpty()
+        OptionRow(VIcon.GraphicEq, stringResource(R.string.player_audio_tracks), a) { onOpen(OptionsPage.Audio) }
+    }
+    OptionRow(
+        VIcon.Equalizer,
+        stringResource(R.string.player_audio_effects),
+        stringResource(effectName(state.eqPreset)),
+    ) { onOpen(OptionsPage.Effects) }
+    val sleep = when {
+        state.sleepAtEnd -> sleepEndLabel(state, short = true)
+        state.sleepUntilMs != null -> stringResource(R.string.player_sleep_minutes, (((state.sleepUntilMs - System.currentTimeMillis()) / 60_000f).coerceAtLeast(0f)).roundToInt().coerceAtLeast(1))
+        else -> stringResource(R.string.player_sleep_off)
+    }
+    OptionRow(VIcon.Bedtime, stringResource(R.string.player_sleep_timer), sleep) { onOpen(OptionsPage.Sleep) }
+    val loopText = when {
+        state.loopEndMs != null -> stringResource(R.string.player_loop_section)
+        state.repeatMode == vibe.tube.player.RepeatMode.One -> stringResource(R.string.player_repeat_one)
+        state.repeatMode == vibe.tube.player.RepeatMode.All -> stringResource(R.string.player_repeat_all)
+        else -> stringResource(R.string.player_repeat_off)
+    }
+    OptionRow(if (state.repeatMode == vibe.tube.player.RepeatMode.One) VIcon.RepeatOne else VIcon.Repeat, stringResource(R.string.player_repeat), loopText) { onOpen(OptionsPage.Loop) }
+    Spacer(Modifier.height(Spacing.sm))
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun SpeedPage(state: PlayerUiState, controller: PlayerController) {
+    val config = androidx.compose.ui.platform.LocalConfiguration.current
+    if (config.screenWidthDp > config.screenHeightDp) {
+        Row(Modifier.padding(horizontal = Spacing.lg), horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SpeedChips(state, controller)
+                SpeedExtras(state, controller)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                SpeedSliders(state, controller)
+            }
+        }
+        return
+    }
+    Column(Modifier.padding(horizontal = Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        SpeedChips(state, controller)
+        SpeedSliders(state, controller)
+        SpeedExtras(state, controller)
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun SpeedChips(state: PlayerUiState, controller: PlayerController) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val prefs = remember { context.getSharedPreferences("speed_chips", 0) }
+    var extra by remember { mutableStateOf(prefs.getString("values", "").orEmpty().split(',').mapNotNull { it.toFloatOrNull() }.filter { it in 0.25f..3f }.distinct().take(MAX_CUSTOM_SPEEDS)) }
+    var adding by remember { mutableStateOf(false) }
+    var input by remember { mutableStateOf("") }
+    var invalid by remember { mutableStateOf(false) }
+    fun saveExtra(values: List<Float>) { extra = values; prefs.edit().putString("values", values.joinToString(",")).apply() }
+    fun closeDialog() { adding = false; input = ""; invalid = false }
+    if (adding) androidx.compose.material3.AlertDialog(onDismissRequest = ::closeDialog, title = { Text(stringResource(R.string.player_speed_add_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                androidx.compose.material3.OutlinedTextField(
+                    input, { input = it; invalid = false }, singleLine = true, isError = invalid,
+                    label = { Text(stringResource(R.string.player_speed_add_hint)) },
+                    enabled = extra.size < MAX_CUSTOM_SPEEDS,
+                )
+                if (extra.isNotEmpty()) {
+                    Text(stringResource(R.string.player_speed_add_remove), style = MaterialTheme.typography.labelMedium)
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        extra.forEach { value -> FilterChip(selected = false, onClick = { saveExtra(extra - value) }, label = { Text("${fmt(value)}x  ✕") }) }
+                    }
+                }
+            }
+        },
+        dismissButton = { TextButton(onClick = ::closeDialog) { Text(stringResource(R.string.player_speed_add_cancel)) } },
+        confirmButton = { TextButton(enabled = extra.size < MAX_CUSTOM_SPEEDS, onClick = {
+            val value = input.trim().replace(',', '.').toFloatOrNull()?.let { (it * 100f).roundToInt() / 100f }
+            if (value == null || value !in 0.25f..3f) { invalid = true; return@TextButton }
+            if ((speeds + extra).none { sameSpeed(it, value) }) saveExtra(extra + value)
+            controller.setSpeed(value)
+            closeDialog()
+        }) { Text(stringResource(R.string.player_speed_add_confirm)) } })
+    androidx.compose.foundation.layout.FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
+    ) {
+        (speeds + extra).sorted().forEach { value ->
+            FilterChip(
+                selected = sameSpeed(state.speed, value),
+                onClick = { controller.setSpeed(value) },
+                label = { Text(if (value == 1f) stringResource(R.string.player_speed_normal) else "${fmt(value)}x") },
+            )
+        }
+        FilterChip(selected = false, onClick = { adding = true }, label = { Text("+") })
+    }
+}
+
+@Composable
+private fun SpeedSliders(state: PlayerUiState, controller: PlayerController) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        TuningSlider(stringResource(R.string.player_speed), state.speed, 0.25f..3f, controller::setSpeed)
+        Row(
+            Modifier.fillMaxWidth().clickable { controller.setLinkPitch(!state.linkPitch) },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.player_link_pitch), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Switch(checked = state.linkPitch, onCheckedChange = { controller.setLinkPitch(it) })
+        }
+        ExpandingSection(visible = !state.linkPitch) {
+            TuningSlider(stringResource(R.string.player_pitch), state.pitch, 0.5f..2f, controller::setPitch)
+        }
+    }
+}
+
+@Composable
+private fun SpeedExtras(state: PlayerUiState, controller: PlayerController) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        FilterChip(
+            selected = state.tuningRemembered,
+            onClick = { controller.setRememberTuning(!state.tuningRemembered) },
+            label = { Text(stringResource(R.string.player_tuning_remember)) },
+        )
+        OutlinedButton(onClick = { controller.setLinkPitch(false); controller.setSpeed(1f); controller.setPitch(1f) }) {
+            Text(stringResource(R.string.player_tuning_reset))
+        }
+    }
+}
+
+@Composable
+private fun QualityPage(state: PlayerUiState, controller: PlayerController, onDone: () -> Unit) {
+    ChoiceRow(
+        if (state.selectedHeight == null && state.activeHeight != null) stringResource(R.string.quality_auto_active, state.activeHeight) else stringResource(R.string.quality_auto),
+        state.selectedHeight == null,
+    ) { controller.selectQuality(null); onDone() }
+    state.qualities.forEach { h -> ChoiceRow("${h}p", state.selectedHeight == h) { controller.selectQuality(h); onDone() } }
+}
+
+@Composable
+private fun CaptionsPage(state: PlayerUiState, controller: PlayerController, onDone: () -> Unit, onOpen: (OptionsPage) -> Unit) {
+    ChoiceRow(stringResource(R.string.player_captions_off), state.selectedCaption == null) { controller.selectCaption(null); onDone() }
+    state.captions.forEach { track ->
+        ChoiceRow(
+            if (track.isAutoGenerated && !track.isTranslation) stringResource(R.string.player_caption_auto, track.name) else track.name,
+            state.selectedCaption == track.id,
+        ) { controller.selectCaption(track.id); onDone() }
+    }
+    if (state.captionTranslations.isNotEmpty() && state.captions.any { it.isTranslatable }) {
+        OptionRow(VIcon.TextFields, stringResource(R.string.player_caption_translate), "") { onOpen(OptionsPage.CaptionTranslate) }
+    }
+    OptionRow(VIcon.ClosedCaption, stringResource(R.string.player_caption_style), "") { onOpen(OptionsPage.CaptionStyle) }
+}
+
+@Composable
+private fun CaptionTranslatePage(state: PlayerUiState, controller: PlayerController, onDone: () -> Unit) {
+    val locale = java.util.Locale.getDefault()
+    val languages = remember(state.captionTranslations) {
+        state.captionTranslations
+            .map { it to java.util.Locale.forLanguageTag(it).getDisplayName(locale).replaceFirstChar { c -> c.titlecase() } }
+            .sortedBy { it.second }
+    }
+    languages.forEach { (code, name) ->
+        ChoiceRow(name, state.selectedCaption == "$code:tl") { controller.selectTranslatedCaption(code); onDone() }
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun CaptionStylePage(controller: PlayerController) {
+    val style = LocalSubtitleStyle.current
+    var liveSize by remember(style.size) { mutableFloatStateOf(style.size.toFloat()) }
+    Column(Modifier.padding(horizontal = Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        androidx.compose.foundation.layout.Box(
+            Modifier
+                .fillMaxWidth()
+                .height(88.dp)
+                .background(androidx.compose.ui.graphics.Color(0xFF3A4A5A), androidx.compose.foundation.shape.RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            Text(
+                stringResource(R.string.caption_preview),
+                color = androidx.compose.ui.graphics.Color(style.color.argb),
+                fontSize = (15f * liveSize / 100f).coerceIn(8f, 45f).sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                style = androidx.compose.ui.text.TextStyle(
+                    shadow = if (style.background == vibe.tube.data.settings.SubtitleBackground.None) {
+                        androidx.compose.ui.graphics.Shadow(androidx.compose.ui.graphics.Color.Black, androidx.compose.ui.geometry.Offset.Zero, 9f)
+                    } else null,
+                ),
+                modifier = Modifier
+                    .padding(bottom = 10.dp, start = 16.dp, end = 16.dp)
+                    .background(
+                        androidx.compose.ui.graphics.Color.Black.copy(alpha = style.background.alpha),
+                        androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                    )
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            )
+        }
+        Text(stringResource(R.string.player_caption_size), style = MaterialTheme.typography.titleSmall)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            listOf(75, 100, 125, 150, 200).forEach { pct ->
+                FilterChip(selected = style.size == pct, onClick = { controller.setSubtitleStyle(size = pct) }, label = { Text("$pct%") })
+            }
+        }
+        androidx.compose.foundation.layout.Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.Slider(
+                value = liveSize,
+                onValueChange = { liveSize = it.roundToInt().toFloat() },
+                onValueChangeFinished = { controller.setSubtitleStyle(size = liveSize.roundToInt()) },
+                valueRange = 40f..300f,
+                modifier = Modifier.weight(1f),
+            )
+            Text("${liveSize.roundToInt()}%", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(start = Spacing.sm))
+        }
+        Text(stringResource(R.string.player_caption_color), style = MaterialTheme.typography.titleSmall)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            vibe.tube.data.settings.SubtitleColor.entries.forEach { c ->
+                FilterChip(
+                    selected = style.color == c,
+                    onClick = { controller.setSubtitleStyle(color = c) },
+                    label = {
+                        Text(
+                            stringResource(
+                                when (c) {
+                                    vibe.tube.data.settings.SubtitleColor.White -> R.string.caption_color_white
+                                    vibe.tube.data.settings.SubtitleColor.Yellow -> R.string.caption_color_yellow
+                                    vibe.tube.data.settings.SubtitleColor.Cyan -> R.string.caption_color_cyan
+                                    vibe.tube.data.settings.SubtitleColor.Green -> R.string.caption_color_green
+                                },
+                            ),
+                        )
+                    },
+                )
+            }
+        }
+        Text(stringResource(R.string.player_caption_background), style = MaterialTheme.typography.titleSmall)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            vibe.tube.data.settings.SubtitleBackground.entries.forEach { b ->
+                FilterChip(
+                    selected = style.background == b,
+                    onClick = { controller.setSubtitleStyle(background = b) },
+                    label = {
+                        Text(
+                            stringResource(
+                                when (b) {
+                                    vibe.tube.data.settings.SubtitleBackground.None -> R.string.caption_bg_none
+                                    vibe.tube.data.settings.SubtitleBackground.Semi -> R.string.caption_bg_semi
+                                    vibe.tube.data.settings.SubtitleBackground.Solid -> R.string.caption_bg_solid
+                                },
+                            ),
+                        )
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AudioPage(state: PlayerUiState, controller: PlayerController, onDone: () -> Unit) {
+    state.audioTracks.forEach { track ->
+        ChoiceRow(track.name, state.selectedAudioTrack == track.id || (state.selectedAudioTrack == null && track.isDefault)) {
+            controller.selectAudioTrack(track.id); onDone()
+        }
+    }
+}
+
+private fun effectName(preset: vibe.tube.player.EqPreset): Int = when (preset) {
+    vibe.tube.player.EqPreset.Off -> R.string.eq_off
+    vibe.tube.player.EqPreset.Bass -> R.string.eq_bass
+    vibe.tube.player.EqPreset.Treble -> R.string.eq_treble
+    vibe.tube.player.EqPreset.Vocal -> R.string.eq_vocal
+    vibe.tube.player.EqPreset.Loud -> R.string.eq_loud
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun EffectsPage(state: PlayerUiState, controller: PlayerController) {
+    Column(Modifier.padding(horizontal = Spacing.lg), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+        Text(stringResource(R.string.player_equalizer), style = MaterialTheme.typography.titleSmall)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            vibe.tube.player.EqPreset.entries.forEach { preset ->
+                FilterChip(selected = state.eqPreset == preset, onClick = { controller.setEqPreset(preset) },
+                    label = { Text(stringResource(effectName(preset))) })
+            }
+        }
+        EffectSlider(stringResource(R.string.player_bass_boost), state.bassBoost / 10f, 0f..100f, "%") { controller.setBassBoost((it * 10f).roundToInt()) }
+        EffectSlider(stringResource(R.string.player_loudness), state.loudnessMb / 100f, 0f..10f, " dB") { controller.setLoudness((it * 100f).roundToInt()) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.player_skip_silence), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Switch(checked = state.skipSilence, onCheckedChange = { controller.setSkipSilence(it) })
+        }
+        ExpandingSection(visible = !state.effectsAvailable) {
+            Text(
+                stringResource(R.string.player_effects_unsupported),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EffectSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, unit: String, onChange: (Float) -> Unit) {
+    Column {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            Text(value.roundToInt().toString() + unit, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
+        Slider(value = value, onValueChange = onChange, valueRange = range)
+    }
+}
+
+@Composable
+private fun SleepPage(state: PlayerUiState, controller: PlayerController, onDone: () -> Unit) {
+    ChoiceRow(stringResource(R.string.player_sleep_off), state.sleepUntilMs == null && !state.sleepAtEnd) { controller.setSleepTimer(null); onDone() }
+    sleepMinutes.forEach { m ->
+        ChoiceRow(stringResource(R.string.player_sleep_minutes, m), false) { controller.setSleepTimer(m); onDone() }
+    }
+    ChoiceRow(sleepEndLabel(state), state.sleepAtEnd) { controller.setSleepAtEnd(true); onDone() }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LoopPage(state: PlayerUiState, controller: PlayerController) {
+    val mode = state.repeatMode
+    val duration = state.durationMs
+    ChoiceRow(stringResource(R.string.player_repeat_off), mode == vibe.tube.player.RepeatMode.Off) { controller.setRepeat(vibe.tube.player.RepeatMode.Off) }
+    ChoiceRow(stringResource(R.string.player_repeat_one), mode == vibe.tube.player.RepeatMode.One) { controller.setRepeat(vibe.tube.player.RepeatMode.One) }
+    if (state.queue.size > 1) {
+        ChoiceRow(stringResource(R.string.player_repeat_all), mode == vibe.tube.player.RepeatMode.All) { controller.setRepeat(vibe.tube.player.RepeatMode.All) }
+    }
+    if (state.isLive || duration <= 0L) return
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(stringResource(R.string.player_loop_section), style = MaterialTheme.typography.titleMedium)
+        Switch(
+            checked = state.loopEndMs != null,
+            onCheckedChange = { on ->
+                if (on) {
+                    val start = state.positionMs.coerceIn(0L, (duration - 2_000L).coerceAtLeast(0L))
+                    controller.setLoopRange(start, (start + 15_000L).coerceAtMost(duration))
+                } else {
+                    controller.setLoopRange(null, null)
+                }
+            },
+        )
+    }
+    
+    var lastRange by remember { mutableStateOf<Pair<Long, Long>?>(null) }
+    val liveStart = state.loopStartMs
+    val liveEnd = state.loopEndMs
+    if (liveStart != null && liveEnd != null) lastRange = liveStart to liveEnd
+    val shownRange = lastRange
+    ExpandingSection(visible = liveStart != null && liveEnd != null && shownRange != null) {
+        if (shownRange == null) return@ExpandingSection
+        val (start, end) = shownRange
+        var range by remember(start, end) { mutableStateOf(start.toFloat()..end.toFloat()) }
+        Column(Modifier.padding(horizontal = Spacing.lg)) {
+            androidx.compose.material3.RangeSlider(
+                value = range,
+                onValueChange = { v ->
+                    val a = v.start
+                    val b = if (v.endInclusive - a < 1_000f) (a + 1_000f).coerceAtMost(duration.toFloat()) else v.endInclusive
+                    range = a..b
+                },
+                onValueChangeFinished = { controller.setLoopRange(range.start.toLong(), range.endInclusive.toLong()) },
+                valueRange = 0f..duration.toFloat(),
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formatTime(range.start.toLong()), style = MaterialTheme.typography.labelLarge)
+                Text(formatTime(range.endInclusive.toLong()), style = MaterialTheme.typography.labelLarge)
+            }
+            Row(Modifier.fillMaxWidth().padding(top = Spacing.sm), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                OutlinedButton(
+                    onClick = { controller.setLoopRange(state.positionMs.coerceAtMost(end - 1_000L).coerceAtLeast(0L), end) },
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(R.string.player_loop_set_start)) }
+                OutlinedButton(
+                    onClick = { controller.setLoopRange(start, state.positionMs.coerceAtLeast(start + 1_000L).coerceAtMost(duration)) },
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(R.string.player_loop_set_end)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OptionRow(icon: Int, title: String, value: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
+    ) {
+        VIconImage(icon, null, Modifier.size(24.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        // The title keeps its natural width and the value takes what is left, so a long value is cut short instead of squeezing the title into a column.
+        Text(title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, softWrap = false)
+        Text(
+            value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.End, modifier = Modifier.weight(1f),
+        )
+        VIconImage(VIcon.ArrowForward, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+private fun fmt(v: Float): String = String.format(java.util.Locale.US, "%.2f", v).trimEnd('0').trimEnd('.')
+
+@Composable
+private fun TuningSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
+    Column {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.titleSmall)
+            Text(String.format(java.util.Locale.US, "%.2fx", value), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+        }
+        Slider(
+            value = value,
+            onValueChange = { onChange((it * 100f).roundToInt() / 100f) },
+            valueRange = range,
+        )
+    }
+}
+
+@Composable
+private fun sleepEndLabel(state: PlayerUiState, short: Boolean = false): String {
+    val minutes = vibe.tube.player.remainingSleepMinutes(state)
+    return if (minutes == null) stringResource(if (short) R.string.player_sleep_end_short else R.string.player_sleep_end)
+    else stringResource(if (short) R.string.player_sleep_end_short_remaining else R.string.player_sleep_end_remaining, minutes)
+}
+

@@ -1,0 +1,5 @@
+# Audit bộ tài nguyên YouTube tham chiếu
+
+ZIP cung cấp gồm 9.757 tệp: 5.188 XML nhị phân Android, 4.069 PNG và 500 WebP. Đã đọc toàn bộ archive và phân loại theo định dạng; 5.188 XML đều là binary XML, không phải XML văn bản. Kích thước ảnh thường gặp gồm 72×72 (1.951), 96×96 (1.506), 54×54 (145) và 144×144 (141). Phần lớn tên đã bị rút gọn; 13 đường dẫn có tên gợi ý là color resources, không đủ để xác định drawable hay bản quyền. Không có bảng tên/tài liệu cấp quyền kèm theo. Chưa giải mã vector, animated/state-list, viewport hoặc đối chiếu optical alignment từng tệp; không coi thống kê ảnh là bằng chứng những ảnh đó là icon.
+
+Không đưa tệp trong archive vào ứng dụng. Các Material Symbols được tạo từ font chính thức theo Apache-2.0 như chú thích trong `tools/icons/generate_symbols.py`. Giữ logo Vibetube và những icon hiện tại khi không xác định được tài nguyên tương đương có quyền sử dụng. Cần xem lại chứng cứ giấy phép của mọi icon tùy chỉnh trước khi phân phối; danh sách này không khẳng định mọi tài nguyên hiện hữu đã được kiểm toán.
