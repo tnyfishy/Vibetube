@@ -2,19 +2,16 @@
 
 YouTube client cho Android với giao diện Material 3, không quảng cáo, phát nền, Shorts và tùy chỉnh trải nghiệm xem.
 
-- Package: `vibe.tube`
-- Phiên bản: `1.0`
-- Android 8.0 trở lên
-- Ambient trong fullscreen, bật mặc định và có thể tắt trong tùy chọn phát.
-
-## Build
-
-Cần JDK 21 và Android SDK 37. Cấu hình khóa ký bằng `keystore.properties.sample`; không đưa keystore hoặc mật khẩu lên Git.
-
-```sh
-./gradlew :app:testDebugUnitTest :app:assembleRelease
-```
-
-APK nằm trong `app/build/outputs/apk/release/`. GitHub Actions hỗ trợ build thủ công và phát hành từ tag `v*` khi đã cấu hình signing secrets.
+## Tính năng có trong VibeTube:
+- Phát nền
+- Đăng nhập Google
+- Tuỳ biến giao diện
+- Bình luận, trả lời bình luận, dịch bình luận
+- Đồng bộ lịch sử xem, playlist, kênh đăng kí với tài khoản Youtube
+- Nhận thông báo từ kênh đằng kí
+- Shorts
+- Tải xuống video/âm thanh
+- Phụ đề / Luồng âm thanh / Truyền phát màn hình
+Và nhiều tính năng khác, bạn tự khám phá.
 
 Giấy phép của các thành phần bên thứ ba: [licenses](licenses/) và [thông báo bản quyền](docs/third-party/).
