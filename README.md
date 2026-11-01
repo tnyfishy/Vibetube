@@ -12,6 +12,6 @@ YouTube client cho Android với giao diện Material 3, không quảng cáo, ph
 - Shorts
 - Tải xuống video/âm thanh
 - Phụ đề / Luồng âm thanh / Truyền phát màn hình
-Và nhiều tính năng khác, bạn tự khám phá.
+- Và nhiều tính năng khác, bạn tự khám phá.
 
 Giấy phép của các thành phần bên thứ ba: [licenses](licenses/) và [thông báo bản quyền](docs/third-party/).
